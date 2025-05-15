@@ -4,6 +4,7 @@ import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "./ui/button";
 import { Trash2, Loader2, Download, RefreshCw } from "lucide-react";
+import { API_BASE_URL } from "../config";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,8 +16,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "./ui/alert-dialog";
-
-const API_BASE_URL = "http://localhost:8000";
 
 interface Video {
   id: string;
