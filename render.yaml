@@ -3,7 +3,15 @@ services:
     name: animathic-backend
     env: python
     buildCommand: |
-      apt-get update && apt-get install -y texlive-latex-extra texlive-fonts-extra texlive-latex-recommended texlive-science texlive-xetex
+      apt-get update && apt-get install -y --no-install-recommends \
+        texlive-latex-extra \
+        texlive-fonts-extra \
+        texlive-latex-recommended \
+        texlive-science \
+        texlive-xetex \
+        texlive-latex-base \
+        texlive-binaries \
+        latexmk
       pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
