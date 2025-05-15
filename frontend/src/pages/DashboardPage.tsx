@@ -1,91 +1,85 @@
 import React, { useState, useEffect } from "react";
-import { useUser } from "@clerk/clerk-react";
+import { useUser, useAuth } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import { Loader2 } from "lucide-react";
 import VideoGallery from "../components/VideoGallery";
-import { Button } from "../components/ui/button";
-import { RefreshCw } from "lucide-react";
-import { PromptInput } from "../components/PromptInput";
+import { API_BASE_URL } from "../config";
 
 const DashboardPage = () => {
-  const { user, isLoaded, isSignedIn } = useUser();
+  const { isLoaded: isUserLoaded, isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const navigate = useNavigate();
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Auto-refresh every 30 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLastRefresh(new Date());
-    }, 30000);
+    const verifySession = async () => {
+      if (!isUserLoaded) return;
 
-    return () => clearInterval(interval);
-  }, []);
+      if (!isSignedIn) {
+        navigate("/");
+        return;
+      }
 
-  // Handle authentication state changes
-  useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      navigate("/sign-in", { replace: true });
-    }
-  }, [isLoaded, isSignedIn, navigate]);
+      try {
+        setIsVerifying(true);
+        const token = await getToken();
 
-  const handleGenerate = (promptText: string) => {
-    if (!isSignedIn) {
-      navigate("/sign-in", { replace: true });
-      return;
-    }
-    navigate("/generate", { state: { prompt: promptText } });
-  };
+        if (!token) {
+          throw new Error("No authentication token available");
+        }
 
-  // Show loading state while Clerk is initializing
-  if (!isLoaded) {
+        const response = await fetch(`${API_BASE_URL}/api/verify-session`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Session verification failed");
+        }
+
+        setRetryCount(0); // Reset retry count on successful verification
+      } catch (error) {
+        console.error("Error verifying session:", error);
+        if (retryCount < 3) {
+          // Retry up to 3 times with exponential backoff
+          const delay = Math.pow(2, retryCount) * 1000;
+          setTimeout(() => {
+            setRetryCount((prev) => prev + 1);
+            verifySession();
+          }, delay);
+        } else {
+          toast.error("Failed to verify session. Please try signing in again.");
+          navigate("/");
+        }
+      } finally {
+        setIsVerifying(false);
+      }
+    };
+
+    verifySession();
+  }, [isUserLoaded, isSignedIn, navigate, retryCount, getToken]);
+
+  if (!isUserLoaded || isVerifying) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-2 border-t-primary border-r-transparent border-b-primary border-l-transparent"></div>
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  // Don't render anything if not signed in (navigation will handle redirect)
   if (!isSignedIn) {
-    return null;
+    return null; // Will be redirected by the useEffect
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">
-            Welcome, {user?.firstName || "User"}!
-          </h1>
-          <p className="text-muted-foreground">
-            Manage your animations and create new ones
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => setLastRefresh(new Date())}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Refresh
-        </Button>
-      </div>
-
-      <div className="space-y-8">
-        <section className="bg-card border rounded-lg p-6">
-          <h2 className="text-2xl font-semibold mb-4">Create New Animation</h2>
-          <PromptInput onSubmit={handleGenerate} />
-        </section>
-
-        <section>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-semibold">Your Animations</h2>
-            <p className="text-sm text-muted-foreground">
-              Last updated: {lastRefresh.toLocaleTimeString()}
-            </p>
-          </div>
-          <VideoGallery key={lastRefresh.toISOString()} />
-        </section>
-      </div>
+      <h1 className="text-3xl font-bold mb-8">Your Videos</h1>
+      <VideoGallery />
     </div>
   );
 };

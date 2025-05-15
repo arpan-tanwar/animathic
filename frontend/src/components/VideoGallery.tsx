@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useUser } from "@clerk/clerk-react";
+import { useUser, useAuth } from "@clerk/clerk-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "./ui/button";
@@ -27,6 +27,7 @@ interface Video {
 
 const VideoGallery = () => {
   const { user, isLoaded: isUserLoaded, isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,10 +43,17 @@ const VideoGallery = () => {
 
     try {
       setLoading(true);
+      const token = await getToken();
+
+      if (!token) {
+        throw new Error("No authentication token available");
+      }
+
       console.log("Fetching videos for user:", user.id);
       const response = await axios.get<Video[]>(`${API_BASE_URL}/api/videos`, {
         headers: {
           "user-id": user.id,
+          Authorization: `Bearer ${token}`,
         },
       });
       console.log("Received videos:", response.data);
@@ -75,13 +83,23 @@ const VideoGallery = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user, isUserLoaded, isSignedIn, retryCount]);
+  }, [user, isUserLoaded, isSignedIn, retryCount, getToken]);
 
   // Fetch videos when component mounts or when user/auth state changes
   useEffect(() => {
-    if (isUserLoaded) {
-      fetchVideos();
-    }
+    let mounted = true;
+
+    const loadVideos = async () => {
+      if (isUserLoaded && mounted) {
+        await fetchVideos();
+      }
+    };
+
+    loadVideos();
+
+    return () => {
+      mounted = false;
+    };
   }, [fetchVideos, isUserLoaded]);
 
   const handleRefresh = () => {
@@ -95,9 +113,16 @@ const VideoGallery = () => {
 
     try {
       setDeletingId(videoId);
+      const token = await getToken();
+
+      if (!token) {
+        throw new Error("No authentication token available");
+      }
+
       await axios.delete(`${API_BASE_URL}/api/videos/${videoId}`, {
         headers: {
           "user-id": user.id,
+          Authorization: `Bearer ${token}`,
         },
       });
       setVideos((prev) => prev.filter((v) => v.id !== videoId));
@@ -122,8 +147,17 @@ const VideoGallery = () => {
 
     try {
       const loadingToast = toast.loading("Preparing download...");
+      const token = await getToken();
+
+      if (!token) {
+        throw new Error("No authentication token available");
+      }
+
       const response = await axios.get(videoUrl, {
         responseType: "blob",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       const blob = new Blob([response.data as BlobPart], { type: "video/mp4" });
