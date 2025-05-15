@@ -7,7 +7,7 @@ import { RefreshCw } from "lucide-react";
 import { PromptInput } from "../components/PromptInput";
 
 const DashboardPage = () => {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
   const navigate = useNavigate();
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -20,10 +20,22 @@ const DashboardPage = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Handle authentication state changes
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      navigate("/sign-in", { replace: true });
+    }
+  }, [isLoaded, isSignedIn, navigate]);
+
   const handleGenerate = (promptText: string) => {
+    if (!isSignedIn) {
+      navigate("/sign-in", { replace: true });
+      return;
+    }
     navigate("/generate", { state: { prompt: promptText } });
   };
 
+  // Show loading state while Clerk is initializing
   if (!isLoaded) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -32,8 +44,8 @@ const DashboardPage = () => {
     );
   }
 
-  if (!user) {
-    navigate("/sign-in");
+  // Don't render anything if not signed in (navigation will handle redirect)
+  if (!isSignedIn) {
     return null;
   }
 
@@ -42,7 +54,7 @@ const DashboardPage = () => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold mb-2">
-            Welcome, {user.firstName}!
+            Welcome, {user?.firstName || "User"}!
           </h1>
           <p className="text-muted-foreground">
             Manage your animations and create new ones

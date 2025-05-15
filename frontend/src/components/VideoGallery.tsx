@@ -26,15 +26,19 @@ interface Video {
 }
 
 const VideoGallery = () => {
-  const { user } = useUser();
+  const { user, isLoaded: isUserLoaded, isSignedIn } = useUser();
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [videoErrors, setVideoErrors] = useState<Record<string, boolean>>({});
+  const [retryCount, setRetryCount] = useState(0);
 
   const fetchVideos = useCallback(async () => {
-    if (!user) return;
+    if (!user || !isUserLoaded || !isSignedIn) {
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
@@ -52,27 +56,42 @@ const VideoGallery = () => {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       setVideos(sortedVideos);
-    } catch (error) {
+      setRetryCount(0); // Reset retry count on successful fetch
+    } catch (error: any) {
       console.error("Error fetching videos:", error);
-      toast.error("Failed to load videos. Please try refreshing the page.");
+      if (error.response?.status === 401) {
+        toast.error("Please sign in to view your videos");
+      } else if (retryCount < 3) {
+        // Retry up to 3 times with exponential backoff
+        const delay = Math.pow(2, retryCount) * 1000;
+        setTimeout(() => {
+          setRetryCount((prev) => prev + 1);
+          fetchVideos();
+        }, delay);
+      } else {
+        toast.error("Failed to load videos. Please try refreshing the page.");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user]);
+  }, [user, isUserLoaded, isSignedIn, retryCount]);
 
-  // Only fetch videos when component mounts
+  // Fetch videos when component mounts or when user/auth state changes
   useEffect(() => {
-    fetchVideos();
-  }, [fetchVideos]);
+    if (isUserLoaded) {
+      fetchVideos();
+    }
+  }, [fetchVideos, isUserLoaded]);
 
   const handleRefresh = () => {
     setRefreshing(true);
+    setRetryCount(0); // Reset retry count on manual refresh
     fetchVideos();
   };
 
   const handleDelete = async (videoId: string) => {
-    if (!user) return;
+    if (!user || !isSignedIn) return;
 
     try {
       setDeletingId(videoId);
@@ -83,49 +102,46 @@ const VideoGallery = () => {
       });
       setVideos((prev) => prev.filter((v) => v.id !== videoId));
       toast.success("Video deleted successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting video:", error);
-      toast.error("Failed to delete video");
+      if (error.response?.status === 401) {
+        toast.error("Please sign in to delete videos");
+      } else {
+        toast.error("Failed to delete video");
+      }
     } finally {
       setDeletingId(null);
     }
   };
 
   const handleDownload = async (videoUrl: string, prompt: string) => {
-    try {
-      // Show loading toast
-      const loadingToast = toast.loading("Preparing download...");
+    if (!isSignedIn) {
+      toast.error("Please sign in to download videos");
+      return;
+    }
 
-      // Fetch the video file
+    try {
+      const loadingToast = toast.loading("Preparing download...");
       const response = await axios.get(videoUrl, {
         responseType: "blob",
       });
 
-      // Create blob from the response
       const blob = new Blob([response.data as BlobPart], { type: "video/mp4" });
-
-      // Create object URL
       const url = window.URL.createObjectURL(blob);
-
-      // Create filename from the prompt (first 30 chars) and timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const filename = `${prompt
         .slice(0, 30)
         .replace(/[^a-z0-9]/gi, "_")
         .toLowerCase()}_${timestamp}.mp4`;
 
-      // Create and click download link
       const link = document.createElement("a");
       link.href = url;
       link.download = filename;
       document.body.appendChild(link);
       link.click();
-
-      // Cleanup
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      // Update toast
       toast.dismiss(loadingToast);
       toast.success("Download started!");
     } catch (error) {
@@ -138,6 +154,24 @@ const VideoGallery = () => {
     setVideoErrors((prev) => ({ ...prev, [videoId]: true }));
     toast.error("Error loading video. Please try refreshing the page.");
   };
+
+  if (!isUserLoaded) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="text-center py-12 bg-card border rounded-lg">
+        <p className="text-muted-foreground">
+          Please sign in to view your videos
+        </p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
