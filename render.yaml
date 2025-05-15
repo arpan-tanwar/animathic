@@ -11,8 +11,32 @@ services:
         texlive-xetex \
         texlive-latex-base \
         texlive-binaries \
-        latexmk
-      pip install -r requirements.txt
+        latexmk \
+        texlive \
+        texlive-latex-extra \
+        texlive-fonts-extra \
+        texlive-latex-recommended \
+        texlive-science \
+        texlive-xetex \
+        texlive-latex-base \
+        texlive-binaries \
+        latexmk \
+        texlive-lang-english \
+        texlive-lang-other \
+        texlive-plain-generic \
+        texlive-generic-recommended \
+        texlive-generic-extra \
+        texlive-fonts-recommended \
+        texlive-fonts-extra \
+        texlive-latex-recommended \
+        texlive-latex-extra \
+        texlive-science \
+        texlive-xetex \
+        texlive-latex-base \
+        texlive-binaries \
+        latexmk \
+        && ln -s /usr/bin/latexmk /usr/local/bin/latex \
+        && pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
