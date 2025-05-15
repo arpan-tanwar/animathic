@@ -2,7 +2,7 @@
 
 Transform your mathematical concepts into stunning visualizations using natural language. Animathic leverages the power of AI to create beautiful mathematical animations through simple text descriptions.
 
-![Animathic Demo](https://via.placeholder.com/800x400?text=Animathic+Demo)
+![Animathic Demo](https://animathic.vercel.app/)
 
 ## ✨ Features
 
@@ -159,5 +159,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For support, please:
 
 - Open an issue in the GitHub repository
-- Contact us at support@animathic.com
-- Join our [Discord community](https://discord.gg/animathic)
