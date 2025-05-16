@@ -63,6 +63,16 @@ class ManimService:
                 Do not add any extra animations, color changes, or movements unless specifically requested.
                 Keep the animation simple, clear, and focused on what the user asked for.
                 
+                IMPORTANT: Do NOT use MathTex or any LaTeX-based objects. Instead, use:
+                - Text() for text
+                - Rectangle() for boxes
+                - Line() for lines
+                - Arrow() for arrows
+                - Circle() for circles
+                - Square() for squares
+                - Triangle() for triangles
+                - VGroup() to group objects
+                
                 Return the COMPLETE Python code including all necessary imports.
                 The code must include a class named 'GeneratedScene' that inherits from Scene.
                 The class must have a 'construct' method with animations using self.play() and self.wait().
@@ -199,31 +209,26 @@ class ManimService:
                     if not os.path.exists(video_file):
                         raise HTTPException(
                             status_code=500,
-                            detail="Video file not found after generation"
+                            detail="Failed to generate video file"
                         )
                     
                     return video_file
                     
                 except subprocess.CalledProcessError as e:
                     print(f"Manim command failed with error: {e.stderr}")
-                    print(f"Command output: {e.stdout}")
                     last_error = e.stderr
                     retry_count += 1
                     continue
-                
+                    
             except Exception as e:
-                print(f"Error in generate_video: {str(e)}")
+                print(f"Error during video generation: {str(e)}")
                 last_error = str(e)
                 retry_count += 1
                 continue
-            finally:
-                # Clean up temporary files
-                if temp_file and os.path.exists(temp_file):
-                    os.remove(temp_file)
-        
+                
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to generate valid video after {max_retries} attempts. Last error: {last_error}"
+            detail=f"Failed to generate video after {max_retries} attempts. Last error: {last_error}"
         )
 
     def get_video_duration(self, video_path: str) -> float:
