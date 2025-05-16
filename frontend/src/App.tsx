@@ -25,6 +25,7 @@ import HowItWorksPage from "@/pages/HowItWorksPage";
 import GeneratePage from "@/pages/GeneratePage";
 import DashboardPage from "@/pages/DashboardPage";
 import NotFoundPage from "@/pages/NotFoundPage";
+import ExamplesPage from "@/pages/ExamplesPage";
 
 // Get publishable key from environment variables
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -41,6 +42,7 @@ const ClerkWithRoutes = () => {
           <Route element={<Layout />}>
             <Route path="/" element={<LandingPage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
+            <Route path="/examples" element={<ExamplesPage />} />
             <Route
               path="/generate"
               element={
