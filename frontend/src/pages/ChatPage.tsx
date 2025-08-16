@@ -628,6 +628,7 @@ export default function ChatPage() {
       className="min-h-screen"
       style={{ backgroundColor: "#0B0F14", color: "#E6EDF7" }}
     >
+      <SidebarProvider>
       {/* Top Bar */}
       <div
         className="sticky top-0 z-30 border-b backdrop-blur"
@@ -744,7 +745,6 @@ export default function ChatPage() {
       </div>
 
       {/* Shell with Sidebar */}
-      <SidebarProvider>
         <Sidebar
           variant="sidebar"
           collapsible="offcanvas"
@@ -932,8 +932,6 @@ export default function ChatPage() {
             </div>
           </div>
         </SidebarInset>
-      </SidebarProvider>
-
       {/* Right utility panel (toggleable) */}
       <Sheet open={showRight} onOpenChange={setShowRight}>
         <SheetTrigger asChild>
@@ -951,6 +949,7 @@ export default function ChatPage() {
 
       {/* Settings */}
       <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
+      </SidebarProvider>
     </div>
   );
 }
