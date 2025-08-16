@@ -160,4 +160,3 @@
 /* Gradient stroke/glow utility (thin, restrained) */
 .glow-stroke { position: relative; }
 .glow-stroke::after { content:""; position:absolute; inset:-1px; border-radius: inherit; pointer-events:none; background: linear-gradient(135deg, color-mix(in oklab, var(--accent-hex) 12%, transparent), color-mix(in oklab, var(--accent-alt-hex) 12%, transparent)); }
-}

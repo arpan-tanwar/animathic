@@ -368,19 +368,19 @@ export default function ChatPage() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="History" className="h-10 w-10"><History className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" aria-label="History" className="h-11 w-11"><History className="h-5 w-5" /></Button>
                 </TooltipTrigger>
                 <TooltipContent>History</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Settings" onClick={() => setSettingsOpen(true)} className="h-10 w-10"><Settings2 className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" aria-label="Settings" onClick={() => setSettingsOpen(true)} className="h-11 w-11"><Settings2 className="h-5 w-5" /></Button>
                 </TooltipTrigger>
                 <TooltipContent>Settings</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="Utility panel" onClick={() => setShowRight((v) => !v)} className="h-10 w-10"><Info className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" aria-label="Utility panel" onClick={() => setShowRight((v) => !v)} className="h-11 w-11"><Info className="h-5 w-5" /></Button>
                 </TooltipTrigger>
                 <TooltipContent>Utility panel</TooltipContent>
               </Tooltip>
