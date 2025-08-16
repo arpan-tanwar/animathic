@@ -29,17 +29,33 @@ export function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
+    <header
+      className="sticky top-0 z-40 w-full border-b backdrop-blur-md"
+      style={{ backgroundColor: "rgba(14,20,32,0.7)" }}
+    >
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <Link
             to="/"
-            className="flex items-center gap-2 transition-opacity hover:opacity-80"
+            className="group flex items-center gap-2 transition-opacity hover:opacity-90"
           >
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-              <div className="text-white font-bold text-sm">A</div>
+            <div className="relative">
+              <div
+                className="absolute -inset-1 rounded-xl opacity-20 blur-sm group-hover:opacity-30"
+                style={{
+                  background: "linear-gradient(135deg, #2563EB, #7C3AED)",
+                }}
+              />
+              <div
+                className="relative h-8 w-8 rounded-xl flex items-center justify-center"
+                style={{
+                  background: "linear-gradient(135deg, #2563EB, #7C3AED)",
+                }}
+              >
+                <div className="text-white font-bold text-sm">A</div>
+              </div>
             </div>
-            <span className="hidden font-bold sm:inline-block text-xl">
+            <span className="hidden font-semibold sm:inline-block text-lg tracking-tight">
               Animathic
             </span>
           </Link>
@@ -80,7 +96,7 @@ export function Header() {
           )}
         </nav>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <ThemeToggle />
 
           <SignedOut>
@@ -132,7 +148,7 @@ export function Header() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(
-                    "px-2 py-1 text-sm font-medium rounded-md",
+                    "px-2 py-1 text-sm font-medium rounded-md transition-colors",
                     location.pathname === link.href
                       ? "bg-accent text-accent-foreground"
                       : "text-muted-foreground hover:bg-accent/50"
@@ -146,7 +162,7 @@ export function Header() {
                   key={link.name}
                   to={link.href}
                   className={cn(
-                    "px-2 py-1 text-sm font-medium rounded-md",
+                    "px-2 py-1 text-sm font-medium rounded-md transition-colors",
                     location.pathname === link.href
                       ? "bg-accent text-accent-foreground"
                       : "text-muted-foreground hover:bg-accent/50"
@@ -161,7 +177,7 @@ export function Header() {
               <Link
                 to="/dashboard"
                 className={cn(
-                  "px-2 py-1 text-sm font-medium rounded-md",
+                  "px-2 py-1 text-sm font-medium rounded-md transition-colors",
                   location.pathname === "/dashboard"
                     ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground hover:bg-accent/50"

@@ -24,7 +24,10 @@ export function Footer() {
   ];
 
   return (
-    <footer className="w-full border-t bg-background/80 backdrop-blur-md">
+    <footer
+      className="w-full border-t backdrop-blur-md"
+      style={{ backgroundColor: "rgba(14,20,32,0.6)" }}
+    >
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Left Section */}
@@ -35,8 +38,18 @@ export function Footer() {
               className="group flex items-center gap-2 transition-all hover:opacity-80"
             >
               <div className="relative">
-                <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 opacity-20 blur-sm group-hover:opacity-30 transition-opacity"></div>
-                <div className="relative h-7 w-7 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+                <div
+                  className="absolute -inset-1 rounded-full opacity-20 blur-sm group-hover:opacity-30 transition-opacity"
+                  style={{
+                    background: "linear-gradient(135deg, #2563EB, #7C3AED)",
+                  }}
+                ></div>
+                <div
+                  className="relative h-7 w-7 rounded-full flex items-center justify-center"
+                  style={{
+                    background: "linear-gradient(135deg, #2563EB, #7C3AED)",
+                  }}
+                >
                   <div className="text-white font-bold text-xs">A</div>
                 </div>
               </div>
