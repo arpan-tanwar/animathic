@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -35,11 +36,13 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Local development
         "https://animathic.vercel.app",  # Production frontend URL
-        "https://*.vercel.app"  # Any Vercel preview deployments
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all methods to simplify preflight handling
+    allow_headers=["*"],  # Allow all custom headers
+    expose_headers=["*"],
+    max_age=600,
 )
 
 # Mount the media directory for serving generated videos
@@ -68,9 +71,11 @@ class StatusResponse(BaseModel):
     error: Optional[str] = None
 
 @app.post("/api/generate", response_model=VideoResponse)
-async def generate_video(request: GenerateRequest, user_id: str = Header(...)):
+async def generate_video(request: GenerateRequest, user_id: Optional[str] = Header(None)):
     """Generate a video based on the provided prompt."""
     try:
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Missing user_id header")
         logger.info(f"Received request with prompt: {request.prompt} from user: {user_id}")
         
         # Generate the video using Manim
@@ -144,11 +149,13 @@ async def generate_video(request: GenerateRequest, user_id: str = Header(...)):
         )
 
 @app.get("/api/status/{video_id}", response_model=StatusResponse)
-async def get_video_status(video_id: str, user_id: str = Header(...)):
+async def get_video_status(video_id: str, user_id: Optional[str] = Header(None)):
     """Get the status of a video generation."""
     try:
         if not video_id or video_id == "undefined":
             raise HTTPException(status_code=400, detail="Invalid video ID")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Missing user_id header")
             
         if video_id not in video_statuses:
             # Try to get the video from storage
@@ -174,9 +181,11 @@ async def get_video_status(video_id: str, user_id: str = Header(...)):
         )
 
 @app.get("/api/videos/{video_id}", response_model=VideoResponse)
-async def get_video(video_id: str, user_id: str = Header(...)):
+async def get_video(video_id: str, user_id: Optional[str] = Header(None)):
     """Get a specific video by ID."""
     try:
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Missing user_id header")
         video = await storage_service.get_video(user_id, video_id)
         return VideoResponse(
             id=video_id,
@@ -192,9 +201,11 @@ async def get_video(video_id: str, user_id: str = Header(...)):
         )
 
 @app.get("/api/videos", response_model=list)
-async def list_videos(user_id: str = Header(...)):
+async def list_videos(user_id: Optional[str] = Header(None)):
     """List all videos for a user."""
     try:
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Missing user_id header")
         logger.info(f"Fetching videos for user: {user_id}")
         videos = await storage_service.list_user_videos(user_id)
         logger.info(f"Found {len(videos)} videos")
@@ -234,10 +245,22 @@ async def list_videos(user_id: str = Header(...)):
             detail=f"Failed to list videos: {str(e)}"
         )
 
+@app.options("/api/videos")
+async def options_videos() -> Response:
+    # Explicitly handle CORS preflight
+    return Response(status_code=200)
+
+@app.options("/api/videos/{video_id}")
+async def options_video_item(video_id: str) -> Response:
+    # Explicitly handle CORS preflight
+    return Response(status_code=200)
+
 @app.delete("/api/videos/{video_id}")
-async def delete_video(video_id: str, user_id: str = Header(...)):
+async def delete_video(video_id: str, user_id: Optional[str] = Header(None)):
     """Delete a video by ID."""
     try:
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Missing user_id header")
         success = await storage_service.delete_video(user_id, video_id)
         if not success:
             raise HTTPException(status_code=500, detail="Failed to delete video")

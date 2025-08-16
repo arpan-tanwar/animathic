@@ -36,6 +36,21 @@
     --ring: 222 84% 5%;
 
     --radius: 0.75rem;
+
+    /* Custom design tokens (dark-first) */
+    --bg-0: #0B0F14; /* app background */
+    --bg-1: #0E1420; /* subtle elevation */
+    --surface-0: #121A2A; /* cards/bubbles */
+    --surface-1: #161F31; /* hover/elevated */
+    --border-hex: #233046; /* use with 28% opacity hairlines */
+    --text-primary-hex: #E6EDF7;
+    --text-secondary-hex: #A3B3C7;
+    --text-muted-hex: #8A97AB;
+    --accent-hex: #2563EB; /* primary blue-600 */
+    --accent-alt-hex: #7C3AED; /* violet-600 */
+    --success-hex: #34D399; --warning-hex: #F59E0B; --danger-hex: #F43F5E;
+    --radius-sm: 12px; --radius-lg: 16px; --radius-pill: 999px;
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
   }
 
   .dark {
@@ -66,6 +81,8 @@
     --border: 217 33% 18%;
     --input: 217 33% 18%;
     --ring: 213 27% 84%;
+
+    /* Ensure custom tokens remain same in dark (design is dark-first) */
   }
 }
 
@@ -77,6 +94,9 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
+    /* Apply calm dark background using custom tokens when .dark */
+    background-color: var(--bg-0);
+    color: var(--text-primary-hex);
   }
 }
 
@@ -93,4 +113,51 @@
   .text-gradient {
     @apply bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent;
   }
+
+  /* Hairline borders and subtle/elevated shadows per spec */
+  .hairline-border { border: 1px solid color-mix(in oklab, var(--border-hex) 28%, transparent); }
+  .shadow-subtle { box-shadow: 0 1px 0 0 rgba(255,255,255,0.02), 0 8px 24px -12px rgba(0,0,0,0.6); }
+  .shadow-elevated { box-shadow: 0 1px 0 0 rgba(255,255,255,0.02), 0 8px 24px -12px rgba(0,0,0,0.6), 0 2px 12px -6px rgba(0,0,0,0.5); }
+
+  /* Surfaces */
+  .surface-0 { background-color: var(--surface-0); }
+  .surface-1 { background-color: var(--surface-1); }
+  .text-primary { color: var(--text-primary-hex); }
+  .text-secondary { color: var(--text-secondary-hex); }
+  .text-muted { color: var(--text-muted-hex); }
+  .accent-bg { background-color: var(--accent-hex); color: white; }
+  .accent-alt-bg { background-color: var(--accent-alt-hex); color: white; }
+  .accent-stroke { outline: 2px solid color-mix(in oklab, var(--accent-hex) 60%, transparent); }
+
+  /* Focus ring: 2px outer + 1px inner using accent at 60% */
+  .focus-ring:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent-hex) 60%, transparent); outline-offset: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,0.06) inset; }
+
+  /* Animations and motion utilities */
+}
+
+/* Accessible motion defaults */
+@media (prefers-reduced-motion:no-preference){
+  .fade-in-up { animation: fiu 160ms cubic-bezier(0.2,0,0,1) both; }
+  @keyframes fiu { from { opacity:0; transform:translateY(8px) scale(0.99); } to { opacity:1; transform:translateY(0) scale(1); } }
+  .typing-dot { animation: td 900ms ease-in-out infinite; }
+  .typing-dot:nth-child(2){ animation-delay:150ms; }
+  .typing-dot:nth-child(3){ animation-delay:300ms; }
+  @keyframes td { 0%,80%,100% { opacity:.4; transform:scaleY(.8);} 40% { opacity:1; transform:scaleY(1);} }
+  .hover-lift { transition: transform 160ms cubic-bezier(0.2,0,0,1), box-shadow 160ms cubic-bezier(0.2,0,0,1); }
+  .hover-lift:hover { transform: translateY(-1px); }
+  .press { transition: transform 140ms cubic-bezier(0.2,0,0,1); }
+  .press:active { transform: scale(0.995); }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .fade-in-up { animation: none; opacity: 1; transform: none; }
+  .hover-lift, .press { transition: none; }
+}
+
+/* Soft scroll shadows for code blocks / scroll areas */
+.soft-scroll { mask-image: linear-gradient(to bottom, transparent, black 12px, black calc(100% - 12px), transparent); }
+
+/* Gradient stroke/glow utility (thin, restrained) */
+.glow-stroke { position: relative; }
+.glow-stroke::after { content:""; position:absolute; inset:-1px; border-radius: inherit; pointer-events:none; background: linear-gradient(135deg, color-mix(in oklab, var(--accent-hex) 12%, transparent), color-mix(in oklab, var(--accent-alt-hex) 12%, transparent)); }
 }

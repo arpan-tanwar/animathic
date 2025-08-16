@@ -1,4 +1,4 @@
-#!/Users/arpan/Desktop/Coding/Projects/AIVideo/backend/venv/bin/python3.12
+#!/Users/arpan/Desktop/Coding/Projects/Animathic/backend/venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys

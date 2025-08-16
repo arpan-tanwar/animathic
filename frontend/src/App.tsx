@@ -26,6 +26,7 @@ import GeneratePage from "@/pages/GeneratePage";
 import DashboardPage from "@/pages/DashboardPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import ExamplesPage from "@/pages/ExamplesPage";
+import ChatPage from "@/pages/ChatPage";
 
 // Get publishable key from environment variables
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -39,8 +40,10 @@ const ClerkWithRoutes = () => {
     <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
       <ThemeProvider defaultTheme="dark">
         <Routes>
+          {/* Chat canvas as default route, uses its own app shell */}
+          <Route path="/" element={<ChatPage />} />
+          {/* Marketing/site routes using the global layout */}
           <Route element={<Layout />}>
-            <Route path="/" element={<LandingPage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/examples" element={<ExamplesPage />} />
             <Route
