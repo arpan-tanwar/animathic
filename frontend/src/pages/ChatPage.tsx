@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarSeparator, SidebarTrigger } from "@/components/ui/sidebar";
 import { useTheme } from "@/components/ThemeProvider";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { Copy, Check, Mic, Paperclip, Send, Settings2, Sparkles, History, ChevronDown, Info, ThumbsUp, ThumbsDown, Quote, ExternalLink } from "lucide-react";
 
@@ -376,6 +377,18 @@ export default function ChatPage() {
                   <Button variant="ghost" size="icon" aria-label="Settings" onClick={() => setSettingsOpen(true)} className="h-10 w-10"><Settings2 className="h-5 w-5" /></Button>
                 </TooltipTrigger>
                 <TooltipContent>Settings</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Utility panel" onClick={() => setShowRight((v) => !v)} className="h-10 w-10"><Info className="h-5 w-5" /></Button>
+                </TooltipTrigger>
+                <TooltipContent>Utility panel</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div><ThemeToggle /></div>
+                </TooltipTrigger>
+                <TooltipContent>Theme</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <SignedOut>
