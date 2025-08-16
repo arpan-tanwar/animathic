@@ -130,9 +130,9 @@ export default function ExamplesPage() {
                   key={category.id}
                   onClick={() => setSelectedCategory(category.id)}
                   className={`
-                    px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 interactive focus-ring
+                    px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 hover-lift hover-scale focus-ring
                     ${selectedCategory === category.id
-                      ? "bg-accent-primary text-white border border-accent-primary"
+                      ? "bg-accent-primary text-white border border-accent-primary hover-glow animate-scale-in"
                       : "surface-secondary border border-subtle text-secondary hover:text-primary hover:border-emphasis"
                     }
                   `}
@@ -153,7 +153,7 @@ export default function ExamplesPage() {
             {filteredExamples.map((example, index) => (
               <div
                 key={example.id}
-                className={`surface-primary rounded-2xl overflow-hidden border border-subtle interactive group transition-all duration-700 ${mounted ? "animate-scale-up" : "opacity-0"}`}
+                className={`surface-primary rounded-2xl overflow-hidden border border-subtle hover-lift hover-scale group transition-all duration-700 ${mounted ? "animate-scale-up" : "opacity-0"}`}
                 style={{ animationDelay: `${(index + 4) * 100}ms` }}
               >
                 {/* Video Preview */}

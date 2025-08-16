@@ -67,15 +67,15 @@ export function Header() {
           <div className="flex items-center gap-3">
             <Link 
               to="/" 
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity duration-200 focus-ring rounded-lg px-2 py-1"
+              className="flex items-center gap-3 hover:opacity-80 hover-scale transition-all duration-200 focus-ring rounded-lg px-2 py-1"
             >
               <div className="relative">
-                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center hover-glow transition-all duration-300">
+                  <Sparkles className="w-5 h-5 text-white group-hover:animate-wiggle" />
                 </div>
                 <div className="absolute inset-0 rounded-lg bg-gradient-primary opacity-20 blur-sm"></div>
               </div>
-              <span className="text-xl font-bold text-gradient-primary">
+              <span className="text-xl font-bold text-gradient-primary hover:scale-105 transition-transform duration-200">
                 Animathic
               </span>
             </Link>
@@ -88,10 +88,10 @@ export function Header() {
                 key={link.name}
                 to={link.href}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 focus-ring",
+                  "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 focus-ring hover-lift",
                   isActivePage(link.href)
-                    ? "text-primary bg-surface-secondary border border-subtle"
-                    : "text-secondary hover:text-primary hover:bg-surface-primary"
+                    ? "text-primary bg-surface-secondary border border-subtle hover-scale"
+                    : "text-secondary hover:text-primary hover:bg-surface-primary hover-scale"
                 )}
               >
                 {link.icon}
@@ -111,7 +111,7 @@ export function Header() {
               <Button 
                 asChild 
                 size="sm"
-                className="btn-primary"
+                className="btn-primary hover-lift hover-glow"
               >
                 <Link to="/generate">
                   Get Started

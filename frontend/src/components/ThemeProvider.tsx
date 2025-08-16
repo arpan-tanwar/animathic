@@ -48,13 +48,19 @@ export function ThemeProvider({
     
     root.classList.add(theme);
     
-    // Ensure body background is set correctly
-    if (theme === "dark") {
+    // Ensure body background is set correctly based on theme
+    const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    
+    if (isDark) {
       document.body.style.backgroundColor = "#0a0d12";
       document.body.style.color = "#f0f6fc";
+      root.classList.add("dark");
+      root.classList.remove("light");
     } else {
       document.body.style.backgroundColor = "#ffffff";
-      document.body.style.color = "#000000";
+      document.body.style.color = "#0d1117";
+      root.classList.add("light");
+      root.classList.remove("dark");
     }
   }, [theme]);
 

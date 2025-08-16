@@ -86,21 +86,23 @@ export default function LandingPage() {
             {/* Demo video placeholder */}
             <div className={`relative mt-12 transition-all duration-700 animate-delay-500 ${mounted ? "animate-scale-up" : "opacity-0"}`}>
               <div className="relative mx-auto max-w-4xl">
-                <div className="aspect-video rounded-2xl bg-gradient-to-br from-surface-secondary to-surface-tertiary border border-emphasis p-8 flex items-center justify-center group cursor-pointer interactive">
+                <div className="aspect-video rounded-2xl bg-gradient-to-br from-surface-secondary to-surface-tertiary border border-emphasis p-8 flex items-center justify-center group cursor-pointer hover-lift hover-scale transition-all duration-300">
                   <div className="text-center space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-accent-primary/20 flex items-center justify-center mx-auto group-hover:bg-accent-primary/30 transition-colors duration-300">
-                      <Play className="w-8 h-8 text-accent-primary ml-1" />
+                    <div className="w-16 h-16 rounded-full bg-accent-primary/20 flex items-center justify-center mx-auto group-hover:bg-accent-primary/30 hover-glow transition-all duration-300 animate-pulse-glow">
+                      <Play className="w-8 h-8 text-accent-primary ml-1 group-hover:scale-110 transition-transform duration-300" />
                     </div>
                     <div>
-                      <p className="text-lg font-medium text-primary">Watch Demo</p>
+                      <p className="text-lg font-medium text-primary group-hover:text-accent-primary transition-colors duration-300">Watch Demo</p>
                       <p className="text-sm text-secondary">See Animathic in action</p>
                     </div>
                   </div>
                 </div>
                 
-                {/* Floating elements */}
-                <div className="absolute -top-4 -right-4 w-8 h-8 rounded-full bg-accent-primary/20 animate-float"></div>
-                <div className="absolute -bottom-4 -left-4 w-6 h-6 rounded-full bg-accent-tertiary/20 animate-float" style={{ animationDelay: "1s" }}></div>
+                {/* Floating elements with enhanced animations */}
+                <div className="absolute -top-4 -right-4 w-8 h-8 rounded-full bg-accent-primary/20 animate-float hover-glow"></div>
+                <div className="absolute -bottom-4 -left-4 w-6 h-6 rounded-full bg-accent-tertiary/20 animate-float hover-glow" style={{ animationDelay: "1s" }}></div>
+                <div className="absolute top-1/2 -left-8 w-4 h-4 rounded-full bg-accent-secondary/15 animate-float" style={{ animationDelay: "2s" }}></div>
+                <div className="absolute top-1/4 -right-8 w-5 h-5 rounded-full bg-accent-quaternary/15 animate-float" style={{ animationDelay: "0.5s" }}></div>
               </div>
             </div>
           </div>
@@ -125,10 +127,10 @@ export default function LandingPage() {
               {features.map((feature, index) => (
                 <div
                   key={index}
-                  className={`surface-primary rounded-2xl p-6 lg:p-8 text-center space-y-4 interactive transition-all duration-700 ${mounted ? "animate-slide-up" : "opacity-0"}`}
+                  className={`surface-primary rounded-2xl p-6 lg:p-8 text-center space-y-4 hover-lift hover-scale transition-all duration-700 ${mounted ? "animate-slide-up" : "opacity-0"}`}
                   style={{ animationDelay: `${(index + 2) * 100}ms` }}
                 >
-                  <div className="w-12 h-12 rounded-xl bg-accent-primary/10 flex items-center justify-center mx-auto text-accent-primary">
+                  <div className="w-12 h-12 rounded-xl bg-accent-primary/10 flex items-center justify-center mx-auto text-accent-primary hover-glow transition-all duration-300">
                     {feature.icon}
                   </div>
                   <div className="space-y-2">
