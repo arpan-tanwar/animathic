@@ -34,13 +34,28 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # Local development
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3000",  # Alternative React dev server
+        "http://localhost:8080",  # Alternative dev server
+        "http://127.0.0.1:5173",  # Local IP variations
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080",
         "https://animathic.vercel.app",  # Production frontend URL
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods to simplify preflight handling
-    allow_headers=["*"],  # Allow all custom headers
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
+    allow_headers=[
+        "Content-Type", 
+        "Authorization", 
+        "user-id", 
+        "User-Id",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
     expose_headers=["*"],
     max_age=600,
 )
@@ -247,13 +262,47 @@ async def list_videos(user_id: Optional[str] = Header(None)):
 
 @app.options("/api/videos")
 async def options_videos() -> Response:
-    # Explicitly handle CORS preflight
-    return Response(status_code=200)
+    """Handle CORS preflight for videos list endpoint."""
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, user-id, User-Id",
+        "Access-Control-Max-Age": "600",
+    }
+    return Response(status_code=200, headers=headers)
 
 @app.options("/api/videos/{video_id}")
 async def options_video_item(video_id: str) -> Response:
-    # Explicitly handle CORS preflight
-    return Response(status_code=200)
+    """Handle CORS preflight for individual video endpoints."""
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, user-id, User-Id",
+        "Access-Control-Max-Age": "600",
+    }
+    return Response(status_code=200, headers=headers)
+
+@app.options("/api/generate")
+async def options_generate() -> Response:
+    """Handle CORS preflight for generate endpoint."""
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, user-id, User-Id",
+        "Access-Control-Max-Age": "600",
+    }
+    return Response(status_code=200, headers=headers)
+
+@app.options("/api/status/{video_id}")
+async def options_status(video_id: str) -> Response:
+    """Handle CORS preflight for status endpoint."""
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, user-id, User-Id",
+        "Access-Control-Max-Age": "600",
+    }
+    return Response(status_code=200, headers=headers)
 
 @app.delete("/api/videos/{video_id}")
 async def delete_video(video_id: str, user_id: Optional[str] = Header(None)):
@@ -275,4 +324,32 @@ async def delete_video(video_id: str, user_id: Optional[str] = Header(None)):
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "Welcome to AI Manim Generator API"} 
+    return {"message": "Welcome to AI Manim Generator API"}
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
+    }
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    """Log all incoming requests for debugging."""
+    logger.info(f"Incoming request: {request.method} {request.url}")
+    logger.info(f"Headers: {dict(request.headers)}")
+    
+    # Handle CORS preflight requests
+    if request.method == "OPTIONS":
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, user-id, User-Id, X-Requested-With, Accept, Origin"
+        response.headers["Access-Control-Max-Age"] = "600"
+        return response
+    
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    return response 

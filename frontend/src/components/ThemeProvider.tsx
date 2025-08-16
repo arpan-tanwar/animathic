@@ -23,8 +23,8 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
-  storageKey = "manim-ai-theme",
+  defaultTheme = "dark",
+  storageKey = "animathic-theme",
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(
@@ -47,6 +47,15 @@ export function ThemeProvider({
     }
     
     root.classList.add(theme);
+    
+    // Ensure body background is set correctly
+    if (theme === "dark") {
+      document.body.style.backgroundColor = "#0a0d12";
+      document.body.style.color = "#f0f6fc";
+    } else {
+      document.body.style.backgroundColor = "#ffffff";
+      document.body.style.color = "#000000";
+    }
   }, [theme]);
 
   const value = {

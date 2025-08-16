@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useUser, useAuth } from "@clerk/clerk-react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "./ui/button";
@@ -269,7 +270,7 @@ const VideoGallery = () => {
             </div>
             
             <Button asChild className="btn-primary interactive">
-              <a href="/generate">Create Animation</a>
+              <Link to="/generate">Create Animation</Link>
             </Button>
           </div>
         </div>

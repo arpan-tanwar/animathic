@@ -127,6 +127,14 @@
     --ring: 213 27% 84%;
   }
 
+  /* Force dark mode styles */
+  html.dark,
+  html.dark body,
+  .dark {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+  }
+
   * {
     @apply border-border;
   }
