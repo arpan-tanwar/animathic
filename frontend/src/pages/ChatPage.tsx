@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -12,12 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarRail, SidebarSeparator, SidebarTrigger } from "@/components/ui/sidebar";
 import { useTheme } from "@/components/ThemeProvider";
 import { cn } from "@/lib/utils";
-import { Copy, Check, Menu, Mic, Paperclip, Send, Settings2, Sparkles, History, ChevronDown, Info, RefreshCw, ThumbsUp, ThumbsDown, Quote, ExternalLink } from "lucide-react";
+import { Copy, Check, Mic, Paperclip, Send, Settings2, Sparkles, History, ChevronDown, Info, ThumbsUp, ThumbsDown, Quote, ExternalLink } from "lucide-react";
 
 type Role = "user" | "assistant" | "system";
 
@@ -285,12 +283,27 @@ export default function ChatPage() {
   const [model, setModel] = useState("GPT-4o mini");
   const [isFocused, setIsFocused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [typing, setTyping] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const demo = params.get("demo");
+    if (demo === "thread") {
+      setMessages(longThread);
+    } else if (demo === "error") {
+      setMessages([
+        { id: "e1", role: "user", content: "Show an error example.", time: "09:10" },
+        { id: "e2", role: "assistant", content: "Encountered an API error.", time: "09:10", error: true },
+      ]);
+    }
+  }, [location.search]);
 
   const empty = messages.length === 0;
 
@@ -310,6 +323,7 @@ export default function ChatPage() {
     // Simulate assistant streaming
     const assistantBase: Message = { id: crypto.randomUUID(), role: "assistant", content: "", time };
     setMessages((prev) => [...prev, assistantBase]);
+    setTyping(true);
     const chunks = [
       "Certainly. Here's a concise answer with key points.",
       "\n\n- Point A\n- Point B\n- Point C",
@@ -318,7 +332,7 @@ export default function ChatPage() {
     const iv = setInterval(() => {
       i += 1;
       setMessages((prev) => prev.map((m) => (m.id === assistantBase.id ? { ...m, content: chunks.slice(0, i).join("") } : m)));
-      if (i >= chunks.length) clearInterval(iv);
+      if (i >= chunks.length) { clearInterval(iv); setTimeout(() => setTyping(false), 200); }
     }, 280);
   }
 
@@ -429,10 +443,20 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {/* Long thread demo route trigger */}
+              {/* Thread */}
               {!empty && messages.map((m) => (
                 <MessageBubble key={m.id} message={m} />
               ))}
+
+              {typing && (
+                <div className="self-start rounded-xl px-4 py-3 surface-0 hairline-border shadow-subtle fade-in-up" style={{ width: 72, color: "#A3B3C7" }}>
+                  <div className="flex items-end gap-1 h-5">
+                    <span className="typing-dot inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#A3B3C7" }} />
+                    <span className="typing-dot inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#A3B3C7" }} />
+                    <span className="typing-dot inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#A3B3C7" }} />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
