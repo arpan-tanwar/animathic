@@ -1,192 +1,226 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu } from "lucide-react";
 import {
   SignedIn,
   SignedOut,
-  UserButton,
   SignInButton,
+  UserButton,
 } from "@clerk/clerk-react";
-
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Menu, X, Sparkles, Play, BookOpen, Grid3x3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavLink {
   name: string;
   href: string;
+  icon?: React.ReactNode;
   external?: boolean;
 }
 
 export function Header() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
 
   const navLinks: NavLink[] = [
-    { name: "Home", href: "/" },
-    { name: "How it Works", href: "/how-it-works" },
-    { name: "Examples", href: "/examples" },
+    {
+      name: "Examples",
+      href: "/examples",
+      icon: <Grid3x3 className="w-4 h-4" />
+    },
+    {
+      name: "How it Works",
+      href: "/how-it-works", 
+      icon: <BookOpen className="w-4 h-4" />
+    },
+    {
+      name: "Generate",
+      href: "/generate",
+      icon: <Play className="w-4 h-4" />
+    }
   ];
 
-  return (
-    <header
-      className="sticky top-0 z-40 w-full border-b backdrop-blur-md"
-      style={{ backgroundColor: "rgba(14,20,32,0.7)" }}
-    >
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <Link
-            to="/"
-            className="group flex items-center gap-2 transition-opacity hover:opacity-90"
-          >
-            <div className="relative">
-              <div
-                className="absolute -inset-1 rounded-xl opacity-20 blur-sm group-hover:opacity-30"
-                style={{
-                  background: "linear-gradient(135deg, #2563EB, #7C3AED)",
-                }}
-              />
-              <div
-                className="relative h-8 w-8 rounded-xl flex items-center justify-center"
-                style={{
-                  background: "linear-gradient(135deg, #2563EB, #7C3AED)",
-                }}
-              >
-                <div className="text-white font-bold text-sm">A</div>
-              </div>
-            </div>
-            <span className="hidden font-semibold sm:inline-block text-lg tracking-tight">
-              Animathic
-            </span>
-          </Link>
-        </div>
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
 
-        {/* Desktop Nav */}
-        <nav className="hidden items-center gap-6 md:flex">
-          {navLinks.map((link) =>
-            link.external ? (
-              <a
-                key={link.name}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  "text-sm font-medium transition-colors hover:text-primary",
-                  location.pathname === link.href
-                    ? "text-primary"
-                    : "text-muted-foreground"
-                )}
-              >
-                {link.name}
-              </a>
-            ) : (
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const isActivePage = (href: string) => {
+    return location.pathname === href;
+  };
+
+  return (
+    <header className={cn(
+      "sticky top-0 z-50 w-full transition-all duration-300",
+      scrolled 
+        ? "glass-effect shadow-lg" 
+        : "bg-transparent"
+    )}>
+      <div className="container-wide">
+        <div className="flex h-16 items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <Link 
+              to="/" 
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity duration-200 focus-ring rounded-lg px-2 py-1"
+            >
+              <div className="relative">
+                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div className="absolute inset-0 rounded-lg bg-gradient-primary opacity-20 blur-sm"></div>
+              </div>
+              <span className="text-xl font-bold text-gradient-primary">
+                Animathic
+              </span>
+            </Link>
+          </div>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-1">
+            {navLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.href}
                 className={cn(
-                  "text-sm font-medium transition-colors hover:text-primary",
-                  location.pathname === link.href
-                    ? "text-primary"
-                    : "text-muted-foreground"
+                  "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 focus-ring",
+                  isActivePage(link.href)
+                    ? "text-primary bg-surface-secondary border border-subtle"
+                    : "text-secondary hover:text-primary hover:bg-surface-primary"
                 )}
               >
-                {link.name}
+                {link.icon}
+                <span>{link.name}</span>
               </Link>
-            )
-          )}
-        </nav>
+            ))}
+          </nav>
 
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button size="sm" variant="default">
-                Log In
-              </Button>
-            </SignInButton>
-          </SignedOut>
-
-          <SignedIn>
-            <Link to="/dashboard">
-              <Button
-                variant="ghost"
+          {/* Desktop Actions */}
+          <div className="hidden md:flex items-center gap-3">
+            <SignedOut>
+              <SignInButton>
+                <Button variant="ghost" size="sm" className="text-secondary hover:text-primary">
+                  Sign In
+                </Button>
+              </SignInButton>
+              <Button 
+                asChild 
                 size="sm"
-                className={cn(
-                  "mr-2",
-                  location.pathname === "/dashboard" ? "bg-accent" : ""
-                )}
+                className="btn-primary"
               >
-                Dashboard
+                <Link to="/generate">
+                  Get Started
+                </Link>
               </Button>
-            </Link>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
+            </SignedOut>
+            
+            <SignedIn>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                asChild
+                className="text-secondary hover:text-primary"
+              >
+                <Link to="/dashboard">Dashboard</Link>
+              </Button>
+              <UserButton 
+                appearance={{
+                  elements: {
+                    avatarBox: "w-8 h-8"
+                  }
+                }}
+              />
+            </SignedIn>
+            
+            <ThemeToggle />
+          </div>
 
           {/* Mobile menu button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle menu</span>
-          </Button>
+          <div className="md:hidden">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="text-secondary hover:text-primary"
+            >
+              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Mobile Nav */}
-      {mobileMenuOpen && (
-        <div className="md:hidden">
-          <div className="flex flex-col space-y-3 p-4 border-t">
-            {navLinks.map((link) =>
-              link.external ? (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    "px-2 py-1 text-sm font-medium rounded-md transition-colors",
-                    location.pathname === link.href
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent/50"
-                  )}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {link.name}
-                </a>
-              ) : (
+      {/* Mobile Navigation */}
+      {isMenuOpen && (
+        <div className="md:hidden border-t border-subtle bg-surface-primary/95 backdrop-blur-lg">
+          <div className="container-wide py-4">
+            <nav className="space-y-2">
+              {navLinks.map((link) => (
                 <Link
                   key={link.name}
                   to={link.href}
+                  onClick={() => setIsMenuOpen(false)}
                   className={cn(
-                    "px-2 py-1 text-sm font-medium rounded-md transition-colors",
-                    location.pathname === link.href
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent/50"
+                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
+                    isActivePage(link.href)
+                      ? "text-primary bg-surface-secondary border border-subtle"
+                      : "text-secondary hover:text-primary hover:bg-surface-secondary"
                   )}
-                  onClick={() => setMobileMenuOpen(false)}
                 >
-                  {link.name}
+                  {link.icon}
+                  <span>{link.name}</span>
                 </Link>
-              )
-            )}
-            <SignedIn>
-              <Link
-                to="/dashboard"
-                className={cn(
-                  "px-2 py-1 text-sm font-medium rounded-md transition-colors",
-                  location.pathname === "/dashboard"
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/50"
-                )}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Dashboard
-              </Link>
-            </SignedIn>
+              ))}
+            </nav>
+
+            {/* Mobile Actions */}
+            <div className="pt-4 mt-4 border-t border-subtle space-y-3">
+              <SignedOut>
+                <SignInButton>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start text-secondary hover:text-primary"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Sign In
+                  </Button>
+                </SignInButton>
+                <Button 
+                  asChild 
+                  className="w-full btn-primary"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Link to="/generate">
+                    Get Started
+                  </Link>
+                </Button>
+              </SignedOut>
+              
+              <SignedIn>
+                <Button 
+                  variant="ghost" 
+                  asChild
+                  className="w-full justify-start text-secondary hover:text-primary"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Link to="/dashboard">Dashboard</Link>
+                </Button>
+                <div className="flex items-center justify-between">
+                  <UserButton 
+                    appearance={{
+                      elements: {
+                        avatarBox: "w-8 h-8"
+                      }
+                    }}
+                  />
+                  <ThemeToggle />
+                </div>
+              </SignedIn>
+            </div>
           </div>
         </div>
       )}

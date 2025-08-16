@@ -40,10 +40,9 @@ const ClerkWithRoutes = () => {
     <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
       <ThemeProvider defaultTheme="dark">
         <Routes>
-          {/* Chat canvas as default route, uses its own app shell */}
-          <Route path="/" element={<ChatPage />} />
           {/* Marketing/site routes using the global layout */}
           <Route element={<Layout />}>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/examples" element={<ExamplesPage />} />
             <Route
@@ -64,6 +63,8 @@ const ClerkWithRoutes = () => {
             />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
+          {/* Chat canvas as separate route if needed */}
+          <Route path="/chat" element={<ChatPage />} />
         </Routes>
         <SonnerToaster position="bottom-right" />
       </ThemeProvider>

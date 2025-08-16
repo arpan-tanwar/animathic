@@ -3,7 +3,7 @@ import { useUser, useAuth } from "@clerk/clerk-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "./ui/button";
-import { Trash2, Loader2, Download, RefreshCw } from "lucide-react";
+import { Trash2, Loader2, Download, RefreshCw, Play, Calendar, AlertCircle } from "lucide-react";
 import { API_BASE_URL } from "../config";
 import {
   AlertDialog,
@@ -189,20 +189,35 @@ const VideoGallery = () => {
     toast.error("Error loading video. Please try refreshing the page.");
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+
   if (!isUserLoaded) {
     return (
       <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-accent-primary mx-auto" />
+          <p className="text-secondary">Loading videos...</p>
+        </div>
       </div>
     );
   }
 
   if (!isSignedIn) {
     return (
-      <div className="text-center py-12 bg-card border rounded-lg">
-        <p className="text-muted-foreground">
-          Please sign in to view your videos
-        </p>
+      <div className="text-center py-16 surface-primary rounded-2xl border border-subtle">
+        <div className="space-y-4">
+          <AlertCircle className="w-12 h-12 text-muted mx-auto" />
+          <p className="text-secondary">Please sign in to view your videos</p>
+        </div>
       </div>
     );
   }
@@ -210,88 +225,136 @@ const VideoGallery = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-accent-primary mx-auto" />
+          <p className="text-secondary">Loading your videos...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header with refresh button */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h3 className="text-lg font-semibold text-primary">Recent Animations</h3>
+          <p className="text-sm text-secondary">{videos.length} total videos</p>
+        </div>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="interactive focus-ring"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
       {videos.length === 0 ? (
-        <div className="text-center py-12 bg-card border rounded-lg">
-          <p className="text-muted-foreground">
-            No videos yet. Create your first animation!
-          </p>
+        <div className="text-center py-16 surface-primary rounded-2xl border border-subtle">
+          <div className="space-y-6 max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-full bg-accent-primary/10 flex items-center justify-center mx-auto">
+              <Play className="w-8 h-8 text-accent-primary" />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold text-primary">No animations yet</h3>
+              <p className="text-secondary">
+                Create your first mathematical animation to get started!
+              </p>
+            </div>
+            
+            <Button asChild className="btn-primary interactive">
+              <a href="/generate">Create Animation</a>
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {videos.map((video) => (
+          {videos.map((video, index) => (
             <div
               key={video.id}
-              className="bg-card border rounded-lg overflow-hidden shadow-sm"
+              className="surface-primary rounded-2xl overflow-hidden border border-subtle interactive group animate-scale-up"
+              style={{ animationDelay: `${index * 100}ms` }}
             >
-              <div className="aspect-video bg-black/20 relative">
+              {/* Video preview */}
+              <div className="aspect-video bg-surface-tertiary relative">
                 {videoErrors[video.id] ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                    <p className="text-white text-sm">Error loading video</p>
+                  <div className="absolute inset-0 flex items-center justify-center bg-surface-secondary">
+                    <div className="text-center space-y-2">
+                      <AlertCircle className="w-8 h-8 text-muted mx-auto" />
+                      <p className="text-sm text-secondary">Error loading video</p>
+                    </div>
                   </div>
                 ) : (
                   <video
                     src={video.video_url}
                     controls
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain bg-black/20"
                     onError={() => handleVideoError(video.id)}
+                    preload="metadata"
                   />
                 )}
               </div>
-              <div className="p-4">
-                <p className="text-sm text-muted-foreground mb-2">
-                  {new Date(video.created_at).toLocaleString()}
-                </p>
-                <p className="font-medium mb-4 line-clamp-2">{video.prompt}</p>
-                <div className="flex gap-2">
+
+              {/* Content */}
+              <div className="p-5 space-y-4">
+                {/* Date */}
+                <div className="flex items-center gap-2 text-xs text-muted">
+                  <Calendar className="w-3 h-3" />
+                  <span>{formatDate(video.created_at)}</span>
+                </div>
+
+                {/* Prompt */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-primary line-clamp-3 leading-relaxed">
+                    {video.prompt}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 pt-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1"
-                    onClick={() =>
-                      handleDownload(video.video_url, video.prompt)
-                    }
+                    className="flex-1 interactive focus-ring"
+                    onClick={() => handleDownload(video.video_url, video.prompt)}
                   >
-                    <Download className="h-4 w-4 mr-2" />
+                    <Download className="h-3 w-3 mr-2" />
                     Download
                   </Button>
+                  
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="flex-1"
                         disabled={deletingId === video.id}
+                        className="interactive focus-ring"
                       >
                         {deletingId === video.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
-                          <>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </>
+                          <Trash2 className="h-3 w-3" />
                         )}
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="surface-elevated">
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Video</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete this video? This
-                          action cannot be undone.
+                        <AlertDialogTitle className="text-primary">Delete Animation</AlertDialogTitle>
+                        <AlertDialogDescription className="text-secondary">
+                          Are you sure you want to delete this animation? This action cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel className="btn-ghost">Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => handleDelete(video.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          className="bg-red-600 text-white hover:bg-red-700"
                         >
                           Delete
                         </AlertDialogAction>
