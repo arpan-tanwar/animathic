@@ -30,6 +30,7 @@ import ChatPage from "@/pages/ChatPage";
 
 // Get publishable key from environment variables
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const CLERK_DOMAIN = import.meta.env.VITE_CLERK_DOMAIN;
 
 if (!PUBLISHABLE_KEY) {
   throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY environment variable");
@@ -37,7 +38,10 @@ if (!PUBLISHABLE_KEY) {
 
 const ClerkWithRoutes = () => {
   return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+    <ClerkProvider
+      publishableKey={PUBLISHABLE_KEY}
+      {...(CLERK_DOMAIN && { domain: CLERK_DOMAIN })}
+    >
       <ThemeProvider defaultTheme="dark">
         <Routes>
           {/* Marketing/site routes using the global layout */}

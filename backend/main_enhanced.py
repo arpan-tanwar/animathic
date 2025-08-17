@@ -53,9 +53,9 @@ app.add_middleware(
         "http://127.0.0.1:5173",  # Local IP variations
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8080",
-        "https://animathic.vercel.app",  # Production frontend URL
+        "https://animathic.com",  # Production frontend URL
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=r"https://.*\.animathic\.com",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
     allow_headers=[

@@ -22,7 +22,7 @@ services:
       - key: PORT
         value: 8000
       - key: CORS_ORIGINS
-        value: https://animathic.vercel.app
+        value: https://animathic.com
       - key: JWT_SECRET
         sync: false
       - key: MONGODB_URI
@@ -32,6 +32,6 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_REDIRECT_URI
-        value: https://animathic.vercel.app/api/auth/callback/google
+        value: https://animathic.com/api/auth/callback/google
       - key: NODE_ENV
         value: production

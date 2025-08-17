@@ -2,7 +2,7 @@
 
 Transform your mathematical concepts into stunning visualizations using natural language. Animathic leverages the power of AI to create beautiful mathematical animations through simple text descriptions.
 
-[Animathic Demo](https://animathic.vercel.app/)
+[Animathic Demo](https://animathic.com/)
 
 ## ✨ Features
 

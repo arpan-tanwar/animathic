@@ -27,18 +27,18 @@ export function Header() {
     {
       name: "Examples",
       href: "/examples",
-      icon: <Grid3x3 className="w-4 h-4" />
+      icon: <Grid3x3 className="w-4 h-4" />,
     },
     {
       name: "How it Works",
-      href: "/how-it-works", 
-      icon: <BookOpen className="w-4 h-4" />
+      href: "/how-it-works",
+      icon: <BookOpen className="w-4 h-4" />,
     },
     {
       name: "Generate",
       href: "/generate",
-      icon: <Play className="w-4 h-4" />
-    }
+      icon: <Play className="w-4 h-4" />,
+    },
   ];
 
   useEffect(() => {
@@ -55,18 +55,18 @@ export function Header() {
   };
 
   return (
-    <header className={cn(
-      "sticky top-0 z-50 w-full transition-all duration-300",
-      scrolled 
-        ? "glass-effect shadow-lg" 
-        : "bg-transparent"
-    )}>
+    <header
+      className={cn(
+        "sticky top-0 z-50 w-full transition-all duration-300",
+        scrolled ? "glass-effect shadow-lg" : "bg-transparent"
+      )}
+    >
       <div className="container-wide">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className="flex items-center gap-3 hover:opacity-80 hover-scale transition-all duration-200 focus-ring rounded-lg px-2 py-1"
             >
               <div className="relative">
@@ -104,39 +104,41 @@ export function Header() {
           <div className="hidden md:flex items-center gap-3">
             <SignedOut>
               <SignInButton>
-                <Button variant="ghost" size="sm" className="text-secondary hover:text-primary">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-secondary hover:text-primary"
+                >
                   Sign In
                 </Button>
               </SignInButton>
-              <Button 
-                asChild 
+              <Button
+                asChild
                 size="sm"
                 className="btn-primary hover-lift hover-glow"
               >
-                <Link to="/generate">
-                  Get Started
-                </Link>
+                <Link to="/generate">Get Started</Link>
               </Button>
             </SignedOut>
-            
+
             <SignedIn>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 asChild
                 className="text-secondary hover:text-primary"
               >
                 <Link to="/dashboard">Dashboard</Link>
               </Button>
-              <UserButton 
+              <UserButton
                 appearance={{
                   elements: {
-                    avatarBox: "w-8 h-8"
-                  }
+                    avatarBox: "w-8 h-8",
+                  },
                 }}
               />
             </SignedIn>
-            
+
             <ThemeToggle />
           </div>
 
@@ -148,7 +150,11 @@ export function Header() {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-secondary hover:text-primary"
             >
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {isMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
             </Button>
           </div>
         </div>
@@ -181,28 +187,26 @@ export function Header() {
             <div className="pt-4 mt-4 border-t border-subtle space-y-3">
               <SignedOut>
                 <SignInButton>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     className="w-full justify-start text-secondary hover:text-primary"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Sign In
                   </Button>
                 </SignInButton>
-                <Button 
-                  asChild 
+                <Button
+                  asChild
                   className="w-full btn-primary"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <Link to="/generate">
-                    Get Started
-                  </Link>
+                  <Link to="/generate">Get Started</Link>
                 </Button>
               </SignedOut>
-              
+
               <SignedIn>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   asChild
                   className="w-full justify-start text-secondary hover:text-primary"
                   onClick={() => setIsMenuOpen(false)}
@@ -210,11 +214,11 @@ export function Header() {
                   <Link to="/dashboard">Dashboard</Link>
                 </Button>
                 <div className="flex items-center justify-between">
-                  <UserButton 
+                  <UserButton
                     appearance={{
                       elements: {
-                        avatarBox: "w-8 h-8"
-                      }
+                        avatarBox: "w-8 h-8",
+                      },
                     }}
                   />
                   <ThemeToggle />
