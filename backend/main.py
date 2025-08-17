@@ -37,12 +37,27 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Alternative React dev server
+        "http://localhost:8080",  # Alternative dev server
+        "http://127.0.0.1:5173",  # Local IP variations
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080",
         "https://animathic.vercel.app",  # Production frontend URL
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
+    allow_headers=[
+        "Content-Type", 
+        "Authorization", 
+        "user-id", 
+        "User-Id",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+        "Access-Control-Request-Method",
+        "Access-Control-Request-Headers",
+    ],
+    expose_headers=["*"],
     max_age=600,
 )
 
@@ -283,6 +298,17 @@ async def health_check():
 async def log_requests(request, call_next):
     """Log incoming requests for debugging."""
     logger.info(f"Incoming request: {request.method} {request.url}")
+    
+    # Handle CORS preflight requests explicitly if needed
+    if request.method == "OPTIONS":
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, user-id, User-Id, X-Requested-With, Accept, Origin"
+        response.headers["Access-Control-Max-Age"] = "600"
+        logger.info(f"Response status: {response.status_code}")
+        return response
+    
     response = await call_next(request)
     logger.info(f"Response status: {response.status_code}")
     return response 
