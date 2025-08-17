@@ -86,6 +86,8 @@ class ManimService:
         """Generate Manim animation code using Gemini AI."""
         gemini_prompt = self._build_generation_prompt(prompt)
         
+        print(f"Generating animation code (attempt {attempt + 1})")
+        
         # Optimized generation config for 2.5 Flash
         generation_config = genai.GenerationConfig(
             temperature=0.2,  # Lower for more consistent code
@@ -93,12 +95,23 @@ class ManimService:
             max_output_tokens=2048,
         )
         
-        response = self.model.generate_content(
-            gemini_prompt,
-            generation_config=generation_config
-        )
-        
-        return self._clean_code_response(response.text)
+        try:
+            response = self.model.generate_content(
+                gemini_prompt,
+                generation_config=generation_config
+            )
+            
+            print(f"Raw AI response type: {type(response)}")
+            
+            # Handle the new Gemini 2.5 Flash response structure
+            response_text = self._extract_response_text(response)
+            print(f"Extracted response text length: {len(response_text)}")
+            
+            return self._clean_code_response(response_text)
+            
+        except Exception as e:
+            print(f"Error in generate_content: {str(e)}")
+            raise
 
     def _build_generation_prompt(self, prompt: str) -> str:
         """Build the prompt for Gemini AI code generation."""
@@ -122,6 +135,46 @@ class ManimService:
                 # Your animation code here
                 pass
         """
+
+    def _extract_response_text(self, response) -> str:
+        """Extract text from Gemini 2.5 Flash response, handling different response structures."""
+        print(f"Response attributes: {dir(response)}")
+        
+        try:
+            # Try the simple text accessor first
+            if hasattr(response, 'text'):
+                print("Using response.text accessor")
+                return response.text
+        except Exception as e:
+            print(f"Failed to use response.text: {str(e)}")
+        
+        try:
+            # Use the parts accessor for complex responses
+            if hasattr(response, 'parts') and response.parts:
+                print("Using response.parts accessor")
+                return ''.join(part.text for part in response.parts if hasattr(part, 'text'))
+        except Exception as e:
+            print(f"Failed to use response.parts: {str(e)}")
+        
+        try:
+            # Use the full candidates accessor as fallback
+            if (hasattr(response, 'candidates') and 
+                response.candidates and 
+                hasattr(response.candidates[0], 'content') and
+                hasattr(response.candidates[0].content, 'parts')):
+                print("Using response.candidates[0].content.parts accessor")
+                parts = response.candidates[0].content.parts
+                text_parts = []
+                for part in parts:
+                    if hasattr(part, 'text'):
+                        text_parts.append(part.text)
+                return ''.join(text_parts)
+        except Exception as e:
+            print(f"Failed to use response.candidates: {str(e)}")
+        
+        # Final fallback - convert to string
+        print("Using string conversion fallback")
+        return str(response)
 
     def _clean_code_response(self, response: str) -> str:
         """Clean and format the AI response to extract pure Python code."""
