@@ -5,3 +5,5 @@ file 'file:/Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/t
 file 'file:/Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/temp_scene_0/720p30/partial_movie_files/GeneratedScene/uncached_00003.mp4'
 file 'file:/Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/temp_scene_0/720p30/partial_movie_files/GeneratedScene/uncached_00004.mp4'
 file 'file:/Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/temp_scene_0/720p30/partial_movie_files/GeneratedScene/uncached_00005.mp4'
+file 'file:/Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/temp_scene_0/720p30/partial_movie_files/GeneratedScene/uncached_00006.mp4'
+file 'file:/Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/temp_scene_0/720p30/partial_movie_files/GeneratedScene/uncached_00007.mp4'

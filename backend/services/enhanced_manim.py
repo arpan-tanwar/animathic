@@ -1,13 +1,21 @@
+"""
+Enhanced Manim service with database integration and comprehensive logging
+"""
 import os
 import sys
 import re
 import subprocess
-from typing import Optional, Tuple
+import time
+from typing import Optional, Tuple, Dict, Any
 from fastapi import HTTPException
 from manim import config
 import google.generativeai as genai
 
-class ManimService:
+from services.enhanced_storage import EnhancedStorageService
+
+class EnhancedManimService:
+    """Enhanced Manim service with database integration and analytics"""
+    
     def __init__(self):
         # Use absolute path to avoid path conflicts
         self.media_dir = os.path.abspath(os.getenv("MEDIA_DIR", "media"))
@@ -54,9 +62,149 @@ class ManimService:
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
             ]
         )
+        
+        # Initialize enhanced storage service
+        self.storage_service = EnhancedStorageService()
+
+    async def generate_video_with_database(
+        self,
+        user_id: str,
+        prompt: str,
+        title: Optional[str] = None,
+        email: str = None,
+        name: str = None
+    ) -> Dict[str, Any]:
+        """Generate a video with complete database integration and logging."""
+        start_time = time.time()
+        
+        # Start video generation process in database
+        generation_info = await self.storage_service.start_video_generation(
+            user_id=user_id,
+            prompt=prompt,
+            title=title,
+            email=email,
+            name=name
+        )
+        
+        video_id = generation_info["video_id"]
+        log_id = generation_info["log_id"]
+        
+        print(f"🎬 Starting video generation for user {user_id}")
+        print(f"📝 Video ID: {video_id}")
+        print(f"📋 Log ID: {log_id}")
+        
+        max_retries = 3
+        generation_time = None
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"=== ATTEMPT {attempt + 1} ===")
+                
+                # Update progress: code generation started
+                await self.storage_service.update_generation_progress(
+                    video_id=video_id,
+                    log_id=log_id,
+                    status="code_generated",
+                    attempt_number=attempt + 1
+                )
+                
+                # Generate animation code
+                scene_code = await self._generate_animation_code(prompt, attempt)
+                
+                # Update progress with generated code
+                await self.storage_service.update_generation_progress(
+                    video_id=video_id,
+                    log_id=log_id,
+                    status="code_generated",
+                    generated_code=scene_code,
+                    attempt_number=attempt + 1
+                )
+                
+                if not self._validate_scene_code(scene_code):
+                    print("Code validation failed, retrying...")
+                    continue
+                
+                # Update progress: rendering started
+                await self.storage_service.update_generation_progress(
+                    video_id=video_id,
+                    log_id=log_id,
+                    status="rendering",
+                    attempt_number=attempt + 1
+                )
+                
+                # Render animation
+                video_file = await self._render_animation(scene_code, attempt)
+                
+                # Calculate generation time
+                generation_time = time.time() - start_time
+                
+                # Update progress: rendering completed
+                await self.storage_service.update_generation_progress(
+                    video_id=video_id,
+                    log_id=log_id,
+                    status="completed",
+                    execution_time=generation_time,
+                    attempt_number=attempt + 1
+                )
+                
+                # Complete upload and update database
+                result = await self.storage_service.complete_video_upload(
+                    video_id=video_id,
+                    user_id=user_id,
+                    prompt=prompt,
+                    video_path=video_file,
+                    generation_time=generation_time,
+                    title=title
+                )
+                
+                print("🎉 SUCCESS: Video generation complete!")
+                return result
+                
+            except subprocess.CalledProcessError as e:
+                error_msg = f"Manim rendering failed (attempt {attempt + 1}): {e.stderr}"
+                print(error_msg)
+                
+                # Update progress with error
+                await self.storage_service.update_generation_progress(
+                    video_id=video_id,
+                    log_id=log_id,
+                    status="failed",
+                    error_message=error_msg,
+                    attempt_number=attempt + 1
+                )
+                
+                if attempt == max_retries - 1:
+                    raise HTTPException(status_code=500, detail=f"Failed to render video: {e.stderr}")
+                    
+            except Exception as e:
+                error_msg = f"Error during video generation (attempt {attempt + 1}): {str(e)}"
+                print(error_msg)
+                
+                # Update progress with error
+                await self.storage_service.update_generation_progress(
+                    video_id=video_id,
+                    log_id=log_id,
+                    status="failed",
+                    error_message=error_msg,
+                    attempt_number=attempt + 1
+                )
+                
+                if attempt == max_retries - 1:
+                    raise HTTPException(status_code=500, detail=f"Failed to generate video: {str(e)}")
+        
+        # If we get here, all attempts failed
+        final_error = f"Failed to generate video after {max_retries} attempts"
+        await self.storage_service.update_generation_progress(
+            video_id=video_id,
+            log_id=log_id,
+            status="failed",
+            error_message=final_error
+        )
+        
+        raise HTTPException(status_code=500, detail=final_error)
 
     async def generate_video(self, prompt: str) -> str:
-        """Generate a video using Manim based on the prompt."""
+        """Legacy method for backward compatibility."""
         max_retries = 3
         
         for attempt in range(max_retries):
