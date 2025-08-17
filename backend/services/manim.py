@@ -90,9 +90,11 @@ class ManimService:
         
         # Optimized generation config for 2.5 Flash
         generation_config = genai.GenerationConfig(
-            temperature=0.2,  # Lower for more consistent code
-            top_p=0.8,
-            max_output_tokens=2048,
+            temperature=0.3,  # Slightly higher for better generation
+            top_p=0.9,
+            top_k=40,
+            max_output_tokens=4096,  # Increase token limit
+            candidate_count=1,  # Ensure single candidate
         )
         
         try:
@@ -103,9 +105,24 @@ class ManimService:
             
             print(f"Raw AI response type: {type(response)}")
             
+            # Check if response is valid
+            if not response:
+                raise Exception("Empty response from Gemini API")
+            
             # Handle the new Gemini 2.5 Flash response structure
             response_text = self._extract_response_text(response)
             print(f"Extracted response text length: {len(response_text)}")
+            
+            if not response_text or len(response_text.strip()) == 0:
+                print("Got empty response text, trying alternative extraction...")
+                # Try resolving the response first
+                if hasattr(response, 'resolve'):
+                    response.resolve()
+                    response_text = self._extract_response_text(response)
+                    print(f"After resolve - extracted text length: {len(response_text)}")
+            
+            if not response_text or len(response_text.strip()) == 0:
+                raise Exception("Failed to extract any text content from Gemini response")
             
             return self._clean_code_response(response_text)
             
@@ -152,7 +169,14 @@ class ManimService:
             # Use the parts accessor for complex responses
             if hasattr(response, 'parts') and response.parts:
                 print("Using response.parts accessor")
-                return ''.join(part.text for part in response.parts if hasattr(part, 'text'))
+                print(f"Response.parts length: {len(response.parts)}")
+                text_content = ""
+                for i, part in enumerate(response.parts):
+                    print(f"Part {i} attributes: {dir(part)}")
+                    if hasattr(part, 'text'):
+                        print(f"Part {i} text length: {len(part.text)}")
+                        text_content += part.text
+                return text_content
         except Exception as e:
             print(f"Failed to use response.parts: {str(e)}")
         
@@ -160,21 +184,48 @@ class ManimService:
             # Use the full candidates accessor as fallback
             if (hasattr(response, 'candidates') and 
                 response.candidates and 
-                hasattr(response.candidates[0], 'content') and
-                hasattr(response.candidates[0].content, 'parts')):
-                print("Using response.candidates[0].content.parts accessor")
-                parts = response.candidates[0].content.parts
-                text_parts = []
-                for part in parts:
-                    if hasattr(part, 'text'):
-                        text_parts.append(part.text)
-                return ''.join(text_parts)
+                len(response.candidates) > 0):
+                
+                print(f"Number of candidates: {len(response.candidates)}")
+                candidate = response.candidates[0]
+                print(f"Candidate attributes: {dir(candidate)}")
+                
+                if hasattr(candidate, 'content'):
+                    content = candidate.content
+                    print(f"Content attributes: {dir(content)}")
+                    
+                    if hasattr(content, 'parts') and content.parts:
+                        print(f"Content.parts length: {len(content.parts)}")
+                        text_parts = []
+                        
+                        for i, part in enumerate(content.parts):
+                            print(f"Content part {i} attributes: {dir(part)}")
+                            print(f"Content part {i} type: {type(part)}")
+                            
+                            # Try different ways to access text
+                            if hasattr(part, 'text') and part.text:
+                                print(f"Found text in part {i}, length: {len(part.text)}")
+                                text_parts.append(part.text)
+                            elif hasattr(part, '_pb') and hasattr(part._pb, 'text'):
+                                print(f"Found _pb.text in part {i}")
+                                text_parts.append(part._pb.text)
+                            else:
+                                print(f"Part {i} content: {str(part)}")
+                        
+                        result = ''.join(text_parts)
+                        print(f"Final extracted text length: {len(result)}")
+                        return result
+                        
         except Exception as e:
             print(f"Failed to use response.candidates: {str(e)}")
+            import traceback
+            print(f"Full traceback: {traceback.format_exc()}")
         
         # Final fallback - convert to string
         print("Using string conversion fallback")
-        return str(response)
+        result = str(response)
+        print(f"String conversion result length: {len(result)}")
+        return result
 
     def _clean_code_response(self, response: str) -> str:
         """Clean and format the AI response to extract pure Python code."""
