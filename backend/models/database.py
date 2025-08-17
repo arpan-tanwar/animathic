@@ -25,7 +25,8 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_activity = Column(DateTime, default=datetime.utcnow)
-    metadata = Column(JSON, default={})
+    # Use a non-reserved attribute name; keep the DB column name as "metadata"
+    metadata_json = Column("metadata", JSON, default=dict)
     
     # Relationships
     videos = relationship("Video", back_populates="user", cascade="all, delete-orphan")
@@ -51,8 +52,8 @@ class Video(Base):
     generation_time = Column(Float, nullable=True)  # Time taken to generate in seconds
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    metadata = Column(JSON, default={})
-    tags = Column(ARRAY(String), default=[])
+    metadata_json = Column("metadata", JSON, default=dict)
+    tags = Column(ARRAY(String), default=list)
     
     # Relationships
     user = relationship("User", back_populates="videos")
@@ -87,7 +88,7 @@ class GenerationLog(Base):
     ai_model = Column(String, default='gemini-2.5-flash')
     generated_code = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    metadata = Column(JSON, default={})
+    metadata_json = Column("metadata", JSON, default=dict)
     
     # Relationships
     video = relationship("Video", back_populates="generation_logs")

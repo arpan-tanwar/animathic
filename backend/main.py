@@ -55,6 +55,8 @@ try:
     logger.info("✅ Enhanced database features enabled")
 except ImportError:
     logger.info("📝 Using basic storage (enhanced database not available)")
+except Exception as e:
+    logger.warning(f"📝 Database initialization skipped: {e}")
 
 
 
