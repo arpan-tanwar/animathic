@@ -4,38 +4,16 @@ services:
     env: python
     buildCommand: |
       apt-get update && apt-get install -y --no-install-recommends \
-        texlive-latex-extra \
-        texlive-fonts-extra \
-        texlive-latex-recommended \
-        texlive-science \
-        texlive-xetex \
         texlive-latex-base \
-        texlive-binaries \
-        latexmk \
-        texlive \
-        texlive-latex-extra \
-        texlive-fonts-extra \
         texlive-latex-recommended \
-        texlive-science \
-        texlive-xetex \
-        texlive-latex-base \
-        texlive-binaries \
-        latexmk \
-        texlive-lang-english \
-        texlive-lang-other \
-        texlive-plain-generic \
-        texlive-generic-recommended \
-        texlive-generic-extra \
+        texlive-latex-extra \
         texlive-fonts-recommended \
         texlive-fonts-extra \
-        texlive-latex-recommended \
-        texlive-latex-extra \
         texlive-science \
         texlive-xetex \
-        texlive-latex-base \
         texlive-binaries \
+        texlive-lang-english \
         latexmk \
-        && ln -s /usr/bin/latexmk /usr/local/bin/latex \
         && pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:

@@ -4,7 +4,16 @@ import { useUser } from "@clerk/clerk-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/button";
-import { ArrowLeft, Loader2, Check, Download, Play, Sparkles, Clock, AlertCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  Check,
+  Download,
+  Play,
+  Sparkles,
+  Clock,
+  AlertCircle,
+} from "lucide-react";
 import { API_BASE_URL } from "../config";
 import { PromptInput } from "@/components/PromptInput";
 
@@ -38,7 +47,9 @@ const GeneratePage = () => {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [jobId, setJobId] = useState<string | null>(null);
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(
+    null
+  );
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [elapsedTime, setElapsedTime] = useState<string>("0:00");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -48,23 +59,23 @@ const GeneratePage = () => {
     {
       title: "Analyzing Prompt",
       description: "Understanding your mathematical concept and requirements",
-      icon: <Sparkles className="w-5 h-5" />
+      icon: <Sparkles className="w-5 h-5" />,
     },
     {
-      title: "Generating Code", 
+      title: "Generating Code",
       description: "Creating optimized Manim script for your animation",
-      icon: <Check className="w-5 h-5" />
+      icon: <Check className="w-5 h-5" />,
     },
     {
       title: "Rendering Video",
       description: "Processing animation with high-quality output",
-      icon: <Play className="w-5 h-5" />
+      icon: <Play className="w-5 h-5" />,
     },
     {
       title: "Finalizing",
       description: "Preparing your animation for download",
-      icon: <Download className="w-5 h-5" />
-    }
+      icon: <Download className="w-5 h-5" />,
+    },
   ];
 
   useEffect(() => {
@@ -99,7 +110,7 @@ const GeneratePage = () => {
       const elapsed = Date.now() - startTime.getTime();
       const minutes = Math.floor(elapsed / 60000);
       const seconds = Math.floor((elapsed % 60000) / 1000);
-      setElapsedTime(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+      setElapsedTime(`${minutes}:${seconds.toString().padStart(2, "0")}`);
     }, 1000);
 
     return () => clearInterval(timer);
@@ -110,7 +121,7 @@ const GeneratePage = () => {
       toast.error("Please enter a prompt");
       return;
     }
-    
+
     setPrompt(promptText);
     setShowPromptInput(false);
     setStartTime(new Date());
@@ -124,7 +135,7 @@ const GeneratePage = () => {
       setHasError(false);
       setCurrentStep(0);
       setIsGenerating(true);
-      
+
       // Step 1: Send the prompt to generate the video
       const response = await axios.post<GenerateResponse>(
         `${API_BASE_URL}/api/generate`,
@@ -278,7 +289,7 @@ const GeneratePage = () => {
                 ? "Generation Failed"
                 : "Creating Your Animation"}
             </h1>
-            
+
             {!showPromptInput && (
               <div className="flex items-center gap-4 text-sm text-secondary">
                 <div className="flex items-center gap-2">
@@ -304,11 +315,14 @@ const GeneratePage = () => {
               <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center mx-auto">
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
-              
+
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-primary">What would you like to create?</h2>
+                <h2 className="text-2xl font-bold text-primary">
+                  What would you like to create?
+                </h2>
                 <p className="text-secondary max-w-2xl mx-auto">
-                  Describe your mathematical concept and we'll transform it into a beautiful animation using AI and Manim.
+                  Describe your mathematical concept and we'll transform it into
+                  a beautiful animation using AI and Manim.
                 </p>
               </div>
             </div>
@@ -320,7 +334,9 @@ const GeneratePage = () => {
 
             <div className="text-center">
               <p className="text-sm text-muted">
-                💡 <strong>Tip:</strong> Be specific about mathematical concepts, visual elements, and any step-by-step requirements for the best results.
+                💡 <strong>Tip:</strong> Be specific about mathematical
+                concepts, visual elements, and any step-by-step requirements for
+                the best results.
               </p>
             </div>
           </div>
@@ -328,7 +344,9 @@ const GeneratePage = () => {
           <>
             {/* Prompt display */}
             <div className="surface-primary rounded-2xl p-6 border border-subtle mb-8">
-              <h2 className="text-sm font-medium text-muted mb-2">Your Prompt:</h2>
+              <h2 className="text-sm font-medium text-muted mb-2">
+                Your Prompt:
+              </h2>
               <p className="text-primary leading-relaxed">{prompt}</p>
             </div>
 
@@ -338,32 +356,35 @@ const GeneratePage = () => {
                 <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
                   <AlertCircle className="w-8 h-8 text-red-400" />
                 </div>
-                
+
                 <div className="space-y-3">
-                  <h2 className="text-2xl font-bold text-primary">Generation Failed</h2>
+                  <h2 className="text-2xl font-bold text-primary">
+                    Generation Failed
+                  </h2>
                   <p className="text-secondary">
-                    {errorMessage || "Something went wrong while creating your animation."}
+                    {errorMessage ||
+                      "Something went wrong while creating your animation."}
                   </p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                  <Button 
+                  <Button
                     onClick={handleRetry}
                     className="btn-primary interactive"
                   >
                     Try Again
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     onClick={handleNewAnimation}
                     className="interactive focus-ring"
                   >
                     New Animation
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     onClick={() => navigate("/dashboard")}
                     className="interactive focus-ring"
                   >
@@ -378,11 +399,14 @@ const GeneratePage = () => {
                   <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
                     <Check className="w-8 h-8 text-green-400" />
                   </div>
-                  
+
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold text-primary">Animation Ready!</h2>
+                    <h2 className="text-2xl font-bold text-primary">
+                      Animation Ready!
+                    </h2>
                     <p className="text-secondary">
-                      Your mathematical animation has been generated successfully.
+                      Your mathematical animation has been generated
+                      successfully.
                     </p>
                   </div>
                 </div>
@@ -400,26 +424,26 @@ const GeneratePage = () => {
                       }}
                     />
                   </div>
-                  
+
                   <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <Button 
-                      onClick={handleDownload} 
+                    <Button
+                      onClick={handleDownload}
                       className="btn-primary interactive"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download MP4
                     </Button>
-                    
-                    <Button 
-                      variant="outline" 
+
+                    <Button
+                      variant="outline"
                       onClick={handleNewAnimation}
                       className="interactive focus-ring"
                     >
                       New Animation
                     </Button>
-                    
-                    <Button 
-                      variant="outline" 
+
+                    <Button
+                      variant="outline"
                       onClick={() => navigate("/dashboard")}
                       className="interactive focus-ring"
                     >
@@ -458,19 +482,29 @@ const GeneratePage = () => {
                           ) : index === currentStep ? (
                             <Loader2 className="h-5 w-5 animate-spin" />
                           ) : (
-                            <span className="text-sm font-semibold">{index + 1}</span>
+                            <span className="text-sm font-semibold">
+                              {index + 1}
+                            </span>
                           )}
                         </div>
-                        
+
                         <div className="flex-1 space-y-1">
-                          <h3 className={`font-medium ${
-                            index <= currentStep ? "text-primary" : "text-muted"
-                          }`}>
+                          <h3
+                            className={`font-medium ${
+                              index <= currentStep
+                                ? "text-primary"
+                                : "text-muted"
+                            }`}
+                          >
                             {step.title}
                           </h3>
-                          <p className={`text-sm ${
-                            index <= currentStep ? "text-secondary" : "text-muted"
-                          }`}>
+                          <p
+                            className={`text-sm ${
+                              index <= currentStep
+                                ? "text-secondary"
+                                : "text-muted"
+                            }`}
+                          >
                             {step.description}
                           </p>
                         </div>
@@ -482,14 +516,17 @@ const GeneratePage = () => {
                 {/* Progress indicator */}
                 <div className="text-center space-y-4">
                   <div className="w-full bg-surface-secondary rounded-full h-2 overflow-hidden">
-                    <div 
+                    <div
                       className="h-full bg-gradient-primary transition-all duration-500 ease-out"
-                      style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                      style={{
+                        width: `${((currentStep + 1) / steps.length) * 100}%`,
+                      }}
                     />
                   </div>
-                  
+
                   <p className="text-sm text-secondary">
-                    Please wait while we generate your animation. This may take 2-5 minutes.
+                    Please wait while we generate your animation. This may take
+                    2-5 minutes.
                   </p>
                 </div>
               </div>

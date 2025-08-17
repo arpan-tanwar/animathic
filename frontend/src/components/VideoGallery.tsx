@@ -4,7 +4,15 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "./ui/button";
-import { Trash2, Loader2, Download, RefreshCw, Play, Calendar, AlertCircle } from "lucide-react";
+import {
+  Trash2,
+  Loader2,
+  Download,
+  RefreshCw,
+  Play,
+  Calendar,
+  AlertCircle,
+} from "lucide-react";
 import { API_BASE_URL } from "../config";
 import {
   AlertDialog,
@@ -50,14 +58,12 @@ const VideoGallery = () => {
         throw new Error("No authentication token available");
       }
 
-      console.log("Fetching videos for user:", user.id);
       const response = await axios.get<Video[]>(`${API_BASE_URL}/api/videos`, {
         headers: {
           "user-id": user.id,
           Authorization: `Bearer ${token}`,
         },
       });
-      console.log("Received videos:", response.data);
 
       // Sort videos by created_at in descending order (newest first)
       const sortedVideos = response.data.sort(
@@ -66,7 +72,7 @@ const VideoGallery = () => {
       );
       setVideos(sortedVideos);
       setRetryCount(0); // Reset retry count on successful fetch
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error fetching videos:", error);
       if (error.response?.status === 401) {
         toast.error("Please sign in to view your videos");
@@ -128,7 +134,7 @@ const VideoGallery = () => {
       });
       setVideos((prev) => prev.filter((v) => v.id !== videoId));
       toast.success("Video deleted successfully");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting video:", error);
       if (error.response?.status === 401) {
         toast.error("Please sign in to delete videos");
@@ -197,7 +203,7 @@ const VideoGallery = () => {
       month: "short",
       day: "numeric",
       hour: "2-digit",
-      minute: "2-digit"
+      minute: "2-digit",
     });
   };
 
@@ -239,10 +245,12 @@ const VideoGallery = () => {
       {/* Header with refresh button */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h3 className="text-lg font-semibold text-primary">Recent Animations</h3>
+          <h3 className="text-lg font-semibold text-primary">
+            Recent Animations
+          </h3>
           <p className="text-sm text-secondary">{videos.length} total videos</p>
         </div>
-        
+
         <Button
           variant="outline"
           size="sm"
@@ -250,7 +258,9 @@ const VideoGallery = () => {
           disabled={refreshing}
           className="interactive focus-ring"
         >
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+          />
           Refresh
         </Button>
       </div>
@@ -261,14 +271,16 @@ const VideoGallery = () => {
             <div className="w-16 h-16 rounded-full bg-accent-primary/10 flex items-center justify-center mx-auto">
               <Play className="w-8 h-8 text-accent-primary" />
             </div>
-            
+
             <div className="space-y-2">
-              <h3 className="text-lg font-semibold text-primary">No animations yet</h3>
+              <h3 className="text-lg font-semibold text-primary">
+                No animations yet
+              </h3>
               <p className="text-secondary">
                 Create your first mathematical animation to get started!
               </p>
             </div>
-            
+
             <Button asChild className="btn-primary interactive">
               <Link to="/generate">Create Animation</Link>
             </Button>
@@ -288,7 +300,9 @@ const VideoGallery = () => {
                   <div className="absolute inset-0 flex items-center justify-center bg-surface-secondary">
                     <div className="text-center space-y-2">
                       <AlertCircle className="w-8 h-8 text-muted mx-auto" />
-                      <p className="text-sm text-secondary">Error loading video</p>
+                      <p className="text-sm text-secondary">
+                        Error loading video
+                      </p>
                     </div>
                   </div>
                 ) : (
@@ -323,12 +337,14 @@ const VideoGallery = () => {
                     variant="outline"
                     size="sm"
                     className="flex-1 interactive focus-ring"
-                    onClick={() => handleDownload(video.video_url, video.prompt)}
+                    onClick={() =>
+                      handleDownload(video.video_url, video.prompt)
+                    }
                   >
                     <Download className="h-3 w-3 mr-2" />
                     Download
                   </Button>
-                  
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
@@ -346,13 +362,18 @@ const VideoGallery = () => {
                     </AlertDialogTrigger>
                     <AlertDialogContent className="surface-elevated">
                       <AlertDialogHeader>
-                        <AlertDialogTitle className="text-primary">Delete Animation</AlertDialogTitle>
+                        <AlertDialogTitle className="text-primary">
+                          Delete Animation
+                        </AlertDialogTitle>
                         <AlertDialogDescription className="text-secondary">
-                          Are you sure you want to delete this animation? This action cannot be undone.
+                          Are you sure you want to delete this animation? This
+                          action cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel className="btn-ghost">Cancel</AlertDialogCancel>
+                        <AlertDialogCancel className="btn-ghost">
+                          Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => handleDelete(video.id)}
                           className="bg-red-600 text-white hover:bg-red-700"

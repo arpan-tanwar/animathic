@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 
 export default function SignInPage() {
   const location = useLocation();
-  const from = (location.state as any)?.from?.pathname || "/dashboard";
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/dashboard";
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">

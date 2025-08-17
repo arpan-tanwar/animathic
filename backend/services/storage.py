@@ -1,10 +1,11 @@
 import os
+import uuid
 from datetime import datetime
 from typing import Optional, Dict, Any
-from supabase import create_client, Client
+
 from fastapi import HTTPException
-import uuid
 from slugify import slugify
+from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()

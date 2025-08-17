@@ -8,18 +8,18 @@ export function Footer() {
     {
       name: "GitHub",
       href: "https://github.com",
-      icon: <Github className="w-5 h-5" />
+      icon: <Github className="w-5 h-5" />,
     },
     {
-      name: "Twitter", 
+      name: "Twitter",
       href: "https://twitter.com",
-      icon: <Twitter className="w-5 h-5" />
+      icon: <Twitter className="w-5 h-5" />,
     },
     {
       name: "Email",
       href: "mailto:hello@animathic.com",
-      icon: <Mail className="w-5 h-5" />
-    }
+      icon: <Mail className="w-5 h-5" />,
+    },
   ];
 
   return (
@@ -41,10 +41,10 @@ export function Footer() {
                   Animathic
                 </span>
               </div>
-              
+
               <p className="text-secondary leading-relaxed max-w-md mx-auto">
-                Create beautiful mathematical animations with AI. 
-                Transform complex concepts into engaging visual content.
+                Create beautiful mathematical animations with AI. Transform
+                complex concepts into engaging visual content.
               </p>
             </div>
 
@@ -75,13 +75,14 @@ export function Footer() {
             <div className="pt-8 border-t border-subtle w-full">
               <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-sm text-muted">
-                  <span>&copy; {currentYear} Animathic. All rights reserved.</span>
+                  <span>
+                    &copy; {currentYear} Animathic. All rights reserved.
+                  </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2 text-sm text-muted">
                   <span>Made with</span>
                   <Heart className="w-4 h-4 text-red-400 fill-current animate-pulse-glow" />
-                  <span>for educators worldwide</span>
                 </div>
               </div>
             </div>

@@ -1,11 +1,11 @@
 import os
-from manim import Scene, config
-from fastapi import HTTPException
+import sys
+import re
 import subprocess
 from typing import Optional, Tuple
-import sys
+from fastapi import HTTPException
+from manim import config
 import google.generativeai as genai
-import re
 
 class ManimService:
     def __init__(self):
@@ -37,7 +37,8 @@ class ManimService:
             raise ValueError("Please set GOOGLE_API_KEY in your .env file")
         
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
+        # Use the latest Gemini 2.5 Flash free model for faster and cost-effective processing
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
 
     async def generate_video(self, prompt: str) -> str:
         """
@@ -49,187 +50,141 @@ class ManimService:
         Returns:
             Path to the generated video file
         """
-        temp_file = None
         max_retries = 3
-        retry_count = 0
-        last_error = None
         
-        while retry_count < max_retries:
+        for attempt in range(max_retries):
             try:
-                # Generate the animation code
-                gemini_prompt = f"""You are a Manim expert. Create a Manim animation for this prompt: {prompt}
-
-                Analyze the prompt carefully and create an animation that EXACTLY matches the user's intent.
-                Do not add any extra animations, color changes, or movements unless specifically requested.
-                Keep the animation simple, clear, and focused on what the user asked for.
-                
-                IMPORTANT: Do NOT use MathTex or any LaTeX-based objects. Instead, use:
-                - Text() for text
-                - Rectangle() for boxes
-                - Line() for lines
-                - Arrow() for arrows
-                - Circle() for circles
-                - Square() for squares
-                - Triangle() for triangles
-                - VGroup() to group objects
-                
-                Return the COMPLETE Python code including all necessary imports.
-                The code must include a class named 'GeneratedScene' that inherits from Scene.
-                The class must have a 'construct' method with animations using self.play() and self.wait().
-                Do not include any explanations or markdown, just the Python code.
-
-                Here are some examples of different animations:
-
-                Example 1 - Transform circle to square (exactly as requested):
-                from manim import *
-                class GeneratedScene(Scene):
-                    def construct(self):
-                        circle = Circle(radius=2, color=BLUE)
-                        self.play(Create(circle))
-                        self.wait(1)
-                        square = Square(side_length=3, color=RED)
-                        self.play(Transform(circle, square))
-                        self.wait(1)
-
-                Example 2 - Rotate triangle (exactly as requested):
-                from manim import *
-                class GeneratedScene(Scene):
-                    def construct(self):
-                        triangle = Triangle(color=GREEN)
-                        self.play(Create(triangle))
-                        self.wait(1)
-                        self.play(Rotate(triangle, angle=PI))
-                        self.wait(1)
-
-                Example 3 - Scale and move rectangle (exactly as requested):
-                from manim import *
-                class GeneratedScene(Scene):
-                    def construct(self):
-                        rect = Rectangle(height=2, width=4, color=YELLOW)
-                        self.play(Create(rect))
-                        self.wait(1)
-                        self.play(rect.animate.scale(1.5).shift(RIGHT * 2))
-                        self.wait(1)
-                """
-                
-                # If this is a retry, include the previous error
-                if last_error:
-                    gemini_prompt += f"\n\nPrevious error: {last_error}\nPlease fix this error in your code."
-                
-                print(f"Generating animation code (attempt {retry_count + 1})")
-                print(f"Using prompt: {gemini_prompt}")
-                
-                # Configure the model for better code generation
-                generation_config = {
-                    "temperature": 0.3,  # Lower temperature for more focused output
-                    "top_p": 0.9,  # Higher top_p for more diverse output
-                    "top_k": 50,  # Higher top_k for more diverse token selection
-                    "max_output_tokens": 2048,  # Ensure we get enough tokens for the code
-                }
-                
-                # Generate the code
-                response = self.model.generate_content(
-                    gemini_prompt,
-                    generation_config=generation_config
-                )
-                
-                print(f"Raw AI response: {response}")
-                
-                # Extract code from response
-                if hasattr(response, 'text'):
-                    scene_code = response.text
-                    print(f"Response has text attribute: {scene_code}")
-                else:
-                    scene_code = str(response)
-                    print(f"Response converted to string: {scene_code}")
-                
-                # Clean up the code - preserve newlines and indentation
-                scene_code = re.sub(r'```python\n?', '', scene_code)
-                scene_code = re.sub(r'```\n?', '', scene_code)
-                scene_code = scene_code.strip()
-                
-                print(f"Cleaned scene code: {scene_code}")
-                
-                # Validate the code
-                if not scene_code or not scene_code.strip():
-                    print("Empty code received")
-                    retry_count += 1
+                scene_code = await self._generate_animation_code(prompt, attempt)
+                if not self._validate_scene_code(scene_code):
                     continue
                     
-                if "class GeneratedScene" not in scene_code:
-                    print("Missing GeneratedScene class")
-                    retry_count += 1
-                    continue
-                    
-                if "def construct" not in scene_code:
-                    print("Missing construct method")
-                    retry_count += 1
-                    continue
-                    
-                if "from manim import" not in scene_code:
-                    print("Missing Manim imports")
-                    retry_count += 1
-                    continue
+                video_file = await self._render_animation(scene_code, attempt)
+                return video_file
                 
-                # Create a temporary Python file with the Manim code
-                temp_file = os.path.join(self.media_dir, f"temp_scene_{retry_count}.py")
-                
-                # Write the code directly to file
-                print(f"Writing code to file: {scene_code}")
-                with open(temp_file, "w") as f:
-                    f.write(scene_code)
-                
-                # Run Manim
-                output_dir = os.path.join(self.media_dir, "videos", f"temp_scene_{retry_count}")
-                os.makedirs(output_dir, exist_ok=True)
-                
-                # Run Manim with optimized settings
-                try:
-                    # First, verify Python path
-                    python_path = sys.executable
-                    print(f"Using Python at: {python_path}")
-                    
-                    # Run Manim with optimized settings
-                    result = subprocess.run(
-                        [
-                            python_path, "-m", "manim",
-                            "-qm",  # Medium quality
-                            "--disable_caching",  # Disable caching
-                            temp_file,
-                            "GeneratedScene"
-                        ],
-                        capture_output=True,
-                        text=True,
-                        check=True
+            except subprocess.CalledProcessError as e:
+                print(f"Manim command failed (attempt {attempt + 1}): {e.stderr}")
+                if attempt == max_retries - 1:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to render video: {e.stderr}"
                     )
-                    print("Manim output:", result.stdout)
-                    
-                    # Find the generated video file
-                    video_file = os.path.join(output_dir, "720p30", "GeneratedScene.mp4")
-                    if not os.path.exists(video_file):
-                        raise HTTPException(
-                            status_code=500,
-                            detail="Failed to generate video file"
-                        )
-                    
-                    return video_file
-                    
-                except subprocess.CalledProcessError as e:
-                    print(f"Manim command failed with error: {e.stderr}")
-                    last_error = e.stderr
-                    retry_count += 1
-                    continue
                     
             except Exception as e:
-                print(f"Error during video generation: {str(e)}")
-                last_error = str(e)
-                retry_count += 1
-                continue
+                print(f"Error during video generation (attempt {attempt + 1}): {str(e)}")
+                if attempt == max_retries - 1:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to generate video: {str(e)}"
+                    )
                 
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to generate video after {max_retries} attempts. Last error: {last_error}"
+            detail=f"Failed to generate video after {max_retries} attempts"
         )
+
+    async def _generate_animation_code(self, prompt: str, attempt: int = 0) -> str:
+        """Generate Manim animation code using Gemini AI."""
+        gemini_prompt = self._build_generation_prompt(prompt)
+        
+        # Optimized generation config for 2.5 Flash
+        generation_config = genai.GenerationConfig(
+            temperature=0.2,  # Lower for more consistent code
+            top_p=0.8,
+            max_output_tokens=2048,
+        )
+        
+        response = self.model.generate_content(
+            gemini_prompt,
+            generation_config=generation_config
+        )
+        
+        return self._clean_code_response(response.text)
+
+    def _build_generation_prompt(self, prompt: str) -> str:
+        """Build the prompt for Gemini AI code generation."""
+        return f"""You are a Manim expert. Create a Manim animation for this prompt: {prompt}
+
+        Requirements:
+        - Create an animation that EXACTLY matches the user's intent
+        - Keep it simple, clear, and focused
+        - Use basic Manim objects: Text(), Rectangle(), Line(), Arrow(), Circle(), Square(), Triangle(), VGroup()
+        - DO NOT use MathTex or LaTeX-based objects
+        
+        Return ONLY the complete Python code with:
+        - All necessary imports
+        - A class named 'GeneratedScene' inheriting from Scene
+        - A 'construct' method with animations using self.play() and self.wait()
+        
+        Example structure:
+        from manim import *
+        class GeneratedScene(Scene):
+            def construct(self):
+                # Your animation code here
+                pass
+        """
+
+    def _clean_code_response(self, response: str) -> str:
+        """Clean and format the AI response to extract pure Python code."""
+        # Remove markdown code blocks
+        code = re.sub(r'```python\n?', '', response)
+        code = re.sub(r'```\n?', '', code)
+        return code.strip()
+
+    def _validate_scene_code(self, scene_code: str) -> bool:
+        """Validate the generated scene code."""
+        required_elements = [
+            "class GeneratedScene",
+            "def construct",
+            "from manim import"
+        ]
+        
+        if not scene_code or not scene_code.strip():
+            print("Empty code received")
+            return False
+            
+        for element in required_elements:
+            if element not in scene_code:
+                print(f"Missing required element: {element}")
+                return False
+                
+        return True
+
+    async def _render_animation(self, scene_code: str, attempt: int) -> str:
+        """Render the animation from the generated code."""
+        # Create temporary file
+        temp_file = os.path.join(self.media_dir, f"temp_scene_{attempt}.py")
+        
+        with open(temp_file, "w", encoding='utf-8') as f:
+            f.write(scene_code)
+        
+        # Setup output directory
+        output_dir = os.path.join(self.media_dir, "videos", f"temp_scene_{attempt}")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Run Manim
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "manim",
+                "-qm", "--disable_caching",
+                temp_file, "GeneratedScene"
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=self.media_dir
+        )
+        
+        print("Manim output:", result.stdout)
+        
+        # Find generated video
+        video_file = os.path.join(output_dir, "720p30", "GeneratedScene.mp4")
+        if not os.path.exists(video_file):
+            raise HTTPException(
+                status_code=500,
+                detail="Generated video file not found"
+            )
+        
+        return video_file
 
     def get_video_duration(self, video_path: str) -> float:
         """Get the duration of a video file in seconds."""
