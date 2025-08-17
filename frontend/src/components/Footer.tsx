@@ -7,17 +7,17 @@ export function Footer() {
   const socialLinks = [
     {
       name: "GitHub",
-      href: "https://github.com",
+      href: "https://github.com/arpan-tanwar",
       icon: <Github className="w-5 h-5" />,
     },
     {
       name: "Twitter",
-      href: "https://twitter.com",
+      href: "https://x.com/whyisarpan",
       icon: <Twitter className="w-5 h-5" />,
     },
     {
       name: "Email",
-      href: "mailto:hello@animathic.com",
+      href: "mailto:arpanatanwar.at@gmail.com",
       icon: <Mail className="w-5 h-5" />,
     },
   ];
