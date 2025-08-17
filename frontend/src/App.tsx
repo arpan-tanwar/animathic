@@ -1,18 +1,6 @@
-import {
-  ClerkProvider,
-  SignedIn,
-  SignedOut,
-  RedirectToSignIn,
-} from "@clerk/clerk-react";
-import {
-  Outlet,
-  BrowserRouter,
-  Route,
-  Routes,
-  Navigate,
-  useLocation,
-} from "react-router-dom";
-import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { ClerkProvider } from "@clerk/clerk-react";
+import { Outlet, BrowserRouter, Route, Routes } from "react-router-dom";
+import { Toaster as SonnerToaster } from "sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
