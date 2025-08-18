@@ -18,6 +18,8 @@ import asyncio
 from datetime import datetime
 from typing import Optional, Dict, Any
 from collections import defaultdict, deque
+from pathlib import Path
+import uuid
 
 from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from fastapi.responses import JSONResponse
@@ -27,15 +29,8 @@ from pydantic import BaseModel, validator
 from dotenv import load_dotenv
 import psutil
 
-# Import services - with fallback to basic service if enhanced unavailable
-try:
-    from services.optimized_manim import OptimizedManimService as ManimService
-    from services.enhanced_storage import EnhancedStorageService as StorageService
-    enhanced_features = True
-except ImportError:
-    from services.manim import ManimService
-    from services.storage import StorageService
-    enhanced_features = False
+# Load environment variables FIRST - before any imports that need them
+load_dotenv()
 
 # Configure logging first
 logging.basicConfig(
@@ -47,6 +42,16 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Import services
+try:
+    from services.manim import get_manim_service, generate_video_from_prompt
+    from services.storage import StorageService
+    enhanced_features = True
+    logger.info("✅ Using optimized Manim service")
+except ImportError as e:
+    logger.error(f"❌ Failed to import services: {e}")
+    enhanced_features = False
 
 # Try to initialize database if available
 try:
@@ -60,8 +65,7 @@ except Exception as e:
 
 
 
-# Load environment variables
-load_dotenv()
+# Environment variables already loaded above
 
 class RateLimiter:
     """Rate limiting for API endpoints"""
@@ -126,6 +130,9 @@ class PerformanceMonitor:
 rate_limiter = RateLimiter(max_requests=5, window_minutes=1)
 performance_monitor = PerformanceMonitor()
 
+# In-memory video storage for status tracking
+video_storage = {}
+
 # Create FastAPI app
 app = FastAPI(
     title="Animathic - AI Mathematical Animation Generator",
@@ -188,12 +195,18 @@ app.mount("/media", StaticFiles(directory="media"), name="media")
 
 # Initialize services with error handling
 try:
-    storage_service = StorageService()
-    manim_service = ManimService()
-    logger.info("✅ All services initialized successfully")
+    if enhanced_features:
+        storage_service = StorageService()
+        logger.info("✅ Supabase storage service initialized successfully")
+    else:
+        storage_service = None
+        logger.info("📝 Enhanced features disabled, using basic storage")
 except Exception as e:
-    logger.error(f"❌ Failed to initialize services: {e}")
-    raise
+    logger.warning(f"⚠️ Supabase storage service failed to initialize: {e}")
+    logger.info("📝 Falling back to local storage only")
+    storage_service = None
+
+logger.info("✅ All services initialized successfully")
 
 # Pydantic models with validation
 class GenerateRequest(BaseModel):
@@ -266,51 +279,165 @@ async def generate_video(
     try:
         logger.info(f"Generating video for user {user_id}: {request.prompt}")
         
-        # Generate video using optimized service
-        if enhanced_features and hasattr(manim_service, 'generate_video_with_database'):
-            result = await manim_service.generate_video_with_database(
-                user_id=user_id,
-                prompt=request.prompt
-            )
-            generation_time = time.time() - start_time
-            
-            return VideoResponse(
-                id=result["video_id"],
-                video_url=result["video_url"],
-                metadata=result["metadata"],
-                status="completed",
-                generation_time=round(generation_time, 2)
-            )
-        else:
-            # Use basic service
-            video_path = await manim_service.generate_video(request.prompt)
-            
-            if not os.path.exists(video_path):
-                raise HTTPException(status_code=500, detail="Generated video file not found")
-            
-            # Upload to storage
-            result = await storage_service.upload_video(
-                user_id=user_id,
+        # Generate video using new optimized service
+        if enhanced_features:
+            result = await generate_video_from_prompt(
                 prompt=request.prompt,
-                video_path=video_path
+                media_dir="./media"
             )
-            
-            # Clean up temporary file
-            try:
-                if os.path.exists(video_path):
-                    os.remove(video_path)
-            except Exception as e:
-                logger.warning(f"Failed to clean up temporary file: {e}")
             
             generation_time = time.time() - start_time
             
-            return VideoResponse(
-                id=result["metadata"]["id"],
-                video_url=result["video_url"],
-                metadata=result["metadata"],
-                status="completed",
-                generation_time=round(generation_time, 2)
-            )
+            if result.success:
+                try:
+                    # Upload video to Supabase storage
+                    if storage_service and result.video_path:
+                        logger.info(f"Uploading video to Supabase: {result.video_path}")
+                        
+                        # Prepare metadata for Supabase
+                        upload_metadata = {
+                            "duration": result.duration,
+                            "resolution": result.resolution,
+                            "generation_time": round(generation_time, 2),
+                            "code_used": result.code_used[:500] if result.code_used else None
+                        }
+                        
+                        # Upload to Supabase
+                        upload_result = await storage_service.upload_video(
+                            user_id=user_id,
+                            prompt=request.prompt,
+                            video_path=result.video_path,
+                            metadata=upload_metadata
+                        )
+                        
+                        video_id = upload_result["metadata"]["id"]
+                        video_url = upload_result["video_url"]
+                        
+                        logger.info(f"Video uploaded successfully. ID: {video_id}")
+                        
+                        # Clean up local file after successful upload
+                        try:
+                            if os.path.exists(result.video_path):
+                                os.remove(result.video_path)
+                                logger.info(f"Cleaned up local file: {result.video_path}")
+                        except Exception as cleanup_error:
+                            logger.warning(f"Failed to cleanup local file: {cleanup_error}")
+                        
+                        return VideoResponse(
+                            id=video_id,
+                            video_url=video_url,
+                            metadata={
+                                "duration": result.duration,
+                                "resolution": result.resolution,
+                                "prompt": request.prompt,
+                                "generation_time": round(generation_time, 2),
+                                "code_used": result.code_used[:500] if result.code_used else None
+                            },
+                            status="completed",
+                            generation_time=round(generation_time, 2)
+                        )
+                    else:
+                        # Fallback to local storage if Supabase unavailable
+                        logger.warning("Supabase storage not available, using local storage")
+                        
+                        video_url = None
+                        if result.video_path:
+                            relative_path = os.path.relpath(result.video_path, "./media")
+                            video_url = f"/media/{relative_path}"
+                        
+                        # Generate video ID and store metadata in memory
+                        video_id = str(uuid.uuid4())
+                        video_metadata = {
+                            "id": video_id,
+                            "user_id": user_id,
+                            "video_url": video_url,
+                            "video_path": result.video_path,
+                            "status": "completed",
+                            "prompt": request.prompt,
+                            "duration": result.duration,
+                            "resolution": result.resolution,
+                            "generation_time": round(generation_time, 2),
+                            "code_used": result.code_used[:500] if result.code_used else None,
+                            "created_at": datetime.now().isoformat()
+                        }
+                        
+                        # Store in memory for status checking
+                        video_storage[video_id] = video_metadata
+                        
+                        return VideoResponse(
+                            id=video_id,
+                            video_url=video_url,
+                            metadata={
+                                "duration": result.duration,
+                                "resolution": result.resolution,
+                                "prompt": request.prompt,
+                                "generation_time": round(generation_time, 2),
+                                "code_used": result.code_used[:500] if result.code_used else None
+                            },
+                            status="completed",
+                            generation_time=round(generation_time, 2)
+                        )
+                        
+                except Exception as upload_error:
+                    logger.error(f"Failed to upload video to Supabase: {upload_error}")
+                    # Fallback to local storage
+                    video_url = None
+                    if result.video_path:
+                        relative_path = os.path.relpath(result.video_path, "./media")
+                        video_url = f"/media/{relative_path}"
+                    
+                    # Generate video ID and store metadata in memory
+                    video_id = str(uuid.uuid4())
+                    video_metadata = {
+                        "id": video_id,
+                        "user_id": user_id,
+                        "video_url": video_url,
+                        "video_path": result.video_path,
+                        "status": "completed",
+                        "prompt": request.prompt,
+                        "duration": result.duration,
+                        "resolution": result.resolution,
+                        "generation_time": round(generation_time, 2),
+                        "code_used": result.code_used[:500] if result.code_used else None,
+                        "created_at": datetime.now().isoformat()
+                    }
+                    
+                    # Store in memory for status checking
+                    video_storage[video_id] = video_metadata
+                    
+                    return VideoResponse(
+                        id=video_id,
+                        video_url=video_url,
+                        metadata={
+                            "duration": result.duration,
+                            "resolution": result.resolution,
+                            "prompt": request.prompt,
+                            "generation_time": round(generation_time, 2),
+                            "code_used": result.code_used[:500] if result.code_used else None,
+                            "upload_error": "Failed to upload to cloud storage, using local storage"
+                        },
+                        status="completed",
+                        generation_time=round(generation_time, 2)
+                    )
+            else:
+                # Handle different error types with appropriate status codes
+                if "API key not found" in result.error or "GOOGLE_AI_API_KEY" in result.error:
+                    raise HTTPException(
+                        status_code=503, 
+                        detail="Video generation service unavailable: Google AI API key not configured"
+                    )
+                elif "initialization failed" in result.error or "network connection" in result.error:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Video generation service temporarily unavailable"
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=422, 
+                        detail=f"Video generation failed: {result.error}"
+                    )
+        else:
+            raise HTTPException(status_code=503, detail="Video generation service not available")
         
     except HTTPException:
         raise
@@ -326,14 +453,35 @@ async def get_video_status(video_id: str, user_id: str = Depends(verify_user)):
         if not video_id or video_id == "undefined":
             raise HTTPException(status_code=400, detail="Invalid video ID")
         
-        video = await storage_service.get_video(user_id, video_id)
+        # Check in-memory storage first
+        if video_id in video_storage:
+            video = video_storage[video_id]
+            # Verify user owns this video
+            if video["user_id"] != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
+            
+            return StatusResponse(
+                status=video["status"],
+                video_url=video["video_url"],
+                error=None
+            )
         
-        return StatusResponse(
-            status="completed",
-            video_url=video["video_url"],
-            error=None
-        )
+        # Fallback to storage service if available
+        if storage_service:
+            try:
+                video = await storage_service.get_video(user_id, video_id)
+                return StatusResponse(
+                    status="completed",
+                    video_url=video["video_url"],
+                    error=None
+                )
+            except Exception:
+                pass  # Continue to 404
         
+        raise HTTPException(status_code=404, detail="Video not found")
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get video status: {e}")
         raise HTTPException(status_code=404, detail="Video not found")
@@ -342,48 +490,131 @@ async def get_video_status(video_id: str, user_id: str = Depends(verify_user)):
 async def get_video(video_id: str, user_id: str = Depends(verify_user)):
     """Get specific video by ID"""
     try:
-        video = await storage_service.get_video(user_id, video_id)
+        # Check in-memory storage first
+        if video_id in video_storage:
+            video = video_storage[video_id]
+            # Verify user owns this video
+            if video["user_id"] != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
+            
+            return VideoResponse(
+                id=video_id,
+                video_url=video["video_url"],
+                metadata={
+                    "duration": video["duration"],
+                    "resolution": video["resolution"],
+                    "prompt": video["prompt"],
+                    "generation_time": video["generation_time"],
+                    "code_used": video["code_used"]
+                },
+                status=video["status"],
+                generation_time=video["generation_time"]
+            )
         
-        return VideoResponse(
-            id=video_id,
-            video_url=video["video_url"],
-            metadata=video["metadata"],
-            status="completed"
-        )
+        # Fallback to storage service if available
+        if storage_service:
+            try:
+                video = await storage_service.get_video(user_id, video_id)
+                return VideoResponse(
+                    id=video_id,
+                    video_url=video["video_url"],
+                    metadata=video["metadata"],
+                    status="completed"
+                )
+            except Exception:
+                pass  # Continue to 404
         
+        raise HTTPException(status_code=404, detail="Video not found")
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to get video: {e}")
         raise HTTPException(status_code=404, detail="Video not found")
+
+@app.get("/api/service-status")
+async def service_status():
+    """Check service status and configuration"""
+    try:
+        # Check if AI service is available
+        from services.manim import get_manim_service
+        service = get_manim_service()
+        
+        ai_available = service.model is not None
+        api_key_configured = bool(os.getenv('GOOGLE_AI_API_KEY'))
+        
+        return {
+            "status": "healthy" if ai_available else "degraded",
+            "ai_service": {
+                "available": ai_available,
+                "api_key_configured": api_key_configured,
+                "message": "AI video generation ready" if ai_available else "API key required for AI features"
+            },
+            "storage_service": {
+                "available": storage_service is not None,
+                "message": "Storage service ready" if storage_service else "Storage service unavailable"
+            }
+        }
+    except Exception as e:
+        logger.error(f"Service status check failed: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 @app.get("/api/videos")
 async def list_videos(user_id: str = Depends(verify_user)):
     """List all videos for authenticated user"""
     try:
-        videos = await storage_service.list_user_videos(user_id)
+        # First check in-memory storage
+        user_videos = []
+        for video_id, video_data in video_storage.items():
+            if video_data["user_id"] == user_id:
+                user_videos.append({
+                    "id": video_id,
+                    "video_url": video_data["video_url"],
+                    "prompt": video_data["prompt"],
+                    "created_at": video_data["created_at"],
+                    "status": video_data["status"],
+                    "duration": video_data.get("duration"),
+                    "resolution": video_data.get("resolution")
+                })
         
-        # Transform videos for frontend
-        transformed_videos = []
-        for video in videos:
+        # If we have in-memory videos, return them
+        if user_videos:
+            return user_videos
+        
+        # Fallback to storage service if available and no videos in memory
+        if storage_service:
             try:
-                # Generate fresh signed URL
-                signed_url_response = storage_service.supabase.storage.from_(
-                    storage_service.bucket_name
-                ).create_signed_url(video["file_path"], 3600)
-                
-                signed_url = signed_url_response.get('signedURL', '')
-                if signed_url:
-                    transformed_videos.append({
-                        "id": video["id"],
-                        "video_url": signed_url,
-                        "prompt": video["prompt"],
-                        "created_at": video["created_at"],
-                        "status": video.get("status", "completed")
-                    })
+                videos = await storage_service.list_user_videos(user_id)
+                # Transform videos for frontend
+                transformed_videos = []
+                for video in videos:
+                    try:
+                        # Generate fresh signed URL
+                        signed_url_response = storage_service.supabase.storage.from_(
+                            storage_service.bucket_name
+                        ).create_signed_url(video["file_path"], 3600)
+                        
+                        signed_url = signed_url_response.get('signedURL', '')
+                        if signed_url:
+                            transformed_videos.append({
+                                "id": video["id"],
+                                "video_url": signed_url,
+                                "prompt": video["prompt"],
+                                "created_at": video["created_at"],
+                                "status": video.get("status", "completed")
+                            })
+                    except Exception as e:
+                        logger.error(f"Error processing video {video.get('id')}: {e}")
+                        continue
+                return transformed_videos
             except Exception as e:
-                logger.error(f"Error processing video {video.get('id')}: {e}")
-                continue
+                logger.error(f"Storage service error: {e}")
         
-        return transformed_videos
+        # Return empty list if no videos found
+        return []
         
     except Exception as e:
         logger.error(f"Failed to list videos: {e}")
@@ -470,8 +701,19 @@ async def cleanup_task():
     """Background task to clean up old files"""
     while True:
         try:
-            if hasattr(manim_service, 'cleanup_old_files'):
-                manim_service.cleanup_old_files(max_age_hours=24)
+            # Clean up old media files (simple cleanup)
+            media_dir = Path("./media")
+            if media_dir.exists():
+                # Remove files older than 24 hours
+                cutoff_time = time.time() - (24 * 3600)
+                for file_path in media_dir.glob("**/*"):
+                    if file_path.is_file() and file_path.stat().st_mtime < cutoff_time:
+                        try:
+                            file_path.unlink()
+                            logger.debug(f"Cleaned up old file: {file_path}")
+                        except Exception as e:
+                            logger.warning(f"Failed to remove old file {file_path}: {e}")
+            
             await asyncio.sleep(3600)  # Run every hour
         except Exception as e:
             logger.error(f"Cleanup task failed: {e}")

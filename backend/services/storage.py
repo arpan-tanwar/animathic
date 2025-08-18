@@ -80,6 +80,7 @@ class StorageService:
             # Upload file
             with open(video_path, "rb") as f:
                 file_data = f.read()
+                file_size = len(file_data)
                 self.supabase.storage.from_(self.bucket_name).upload(
                     path=file_path,
                     file=file_data,
@@ -92,12 +93,33 @@ class StorageService:
                 "file_path": file_path,
                 "prompt": prompt,
                 "created_at": datetime.utcnow().isoformat(),
-                "status": "completed"
+                "status": "completed",
+                "mime_type": "video/mp4"
             }
 
-            # Add any additional metadata if provided
+            # Add any additional metadata if provided, mapping to correct column names
             if metadata:
-                video_data.update(metadata)
+                # Map common metadata fields to database columns
+                if "duration" in metadata:
+                    video_data["duration"] = metadata["duration"]
+                if "resolution" in metadata and metadata["resolution"]:
+                    # Parse resolution like "1280x720" into separate width/height
+                    try:
+                        width, height = metadata["resolution"].split("x")
+                        video_data["resolution_width"] = int(width)
+                        video_data["resolution_height"] = int(height)
+                    except (ValueError, AttributeError):
+                        pass  # Skip if resolution format is invalid
+                
+                # Add file size if available
+                if "file_size" in metadata:
+                    video_data["file_size"] = metadata["file_size"]
+            
+            # Always add file size from upload
+            video_data["file_size"] = file_size
+                
+                # Note: Custom fields like generation_time, code_used are not stored in DB
+                # They can be returned in the response metadata but not persisted
 
             try:
                 result = self.supabase.table("videos").insert(video_data).execute()

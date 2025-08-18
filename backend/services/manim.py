@@ -1,632 +1,400 @@
-"""
-Consolidated Manim Video Generation Service
-
-This unified service combines the best features from all variants:
-- Enhanced security with input validation and sanitization
-- Memory leak prevention with proper resource management  
-- Improved AI prompts for better video generation
-- Performance optimizations and automated cleanup
-- Comprehensive error handling and logging
-"""
-
 import os
-import sys
 import re
-import subprocess
-import tempfile
-import shutil
-import gc
-import resource
+import ast
+import sys
 import asyncio
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Tuple
 from dataclasses import dataclass
-from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor
 
-try:
-    import psutil
-    PSUTIL_AVAILABLE = True
-except ImportError:
-    PSUTIL_AVAILABLE = False
-
-import google.generativeai as genai
-from fastapi import HTTPException
-
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+try:
+    import google.generativeai as genai
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
+    api_key = os.getenv("GOOGLE_AI_API_KEY")
+    if api_key:
+        genai.configure(api_key=api_key)
+        logger.info("Google AI configured successfully")
+    else:
+        logger.warning("GOOGLE_AI_API_KEY not found in environment variables")
+        genai = None
+except Exception as e:
+    logger.warning(f"Google Generative AI not available: {e}")
+    genai = None
+
 @dataclass
-class VideoGenerationConfig:
-    """Configuration for video generation with security and performance settings"""
-    max_prompt_length: int = 500
-    max_code_length: int = 8192
-    max_execution_time: int = 300  # 5 minutes
-    max_memory_mb: int = 2048      # 2GB (more reasonable default)
-    max_retries: int = 3
-    quality: str = "medium_quality"
-    resolution: tuple = (1280, 720)
-    frame_rate: int = 30
-    max_animation_duration: int = 30  # seconds
-    enable_resource_limits: bool = True  # Can be disabled if limits cause issues
-    
-    def __post_init__(self):
-        """Load configuration from config module if available"""
-        try:
-            from config import config
-            self.max_prompt_length = config.security.max_prompt_length
-            self.max_code_length = config.security.max_code_length
-            self.max_execution_time = config.performance.max_execution_time_seconds
-            self.max_memory_mb = config.performance.max_memory_mb
-            self.max_retries = config.ai.max_retries
-            self.quality = config.performance.video_quality
-            self.resolution = config.performance.video_resolution
-            self.frame_rate = config.performance.video_frame_rate
-        except ImportError:
-            logger.warning("Config module not available, using default values")
-        except Exception as e:
-            logger.warning(f"Failed to load config: {e}, using default values")
-        
-        # Check environment variable to disable resource limits
-        if os.getenv("DISABLE_RESOURCE_LIMITS", "").lower() in ("true", "1", "yes"):
-            self.enable_resource_limits = False
-            logger.info("Resource limits disabled via environment variable")
+class AnimationResult:
+    success: bool
+    video_path: Optional[str] = None
+    error: Optional[str] = None
+    duration: Optional[float] = None
+    resolution: Optional[str] = None
+    code_used: Optional[str] = None
 
 class SecurityValidator:
-    """Security validation for user inputs and generated code"""
-    
-    # Dangerous patterns that should never appear in generated code
-    DANGEROUS_PATTERNS = [
-        r'import\s+os',
-        r'import\s+sys',
-        r'import\s+subprocess',
-        r'import\s+shutil',
-        r'exec\s*\(',
-        r'eval\s*\(',
-        r'__import__',
-        r'open\s*\(',
-        r'file\s*\(',
-        r'input\s*\(',
-        r'raw_input\s*\(',
-        r'compile\s*\(',
-        r'globals\s*\(',
-        r'locals\s*\(',
-    ]
-    
-    # Required patterns for valid Manim code
-    REQUIRED_PATTERNS = [
-        r'from\s+manim\s+import\s+\*',
-        r'class\s+\w+\s*\(\s*Scene\s*\)',
-        r'def\s+construct\s*\(',
-    ]
-    
-    # Allowed Manim objects and methods
     ALLOWED_MANIM_OBJECTS = {
-        'Text', 'Circle', 'Square', 'Rectangle', 'Triangle', 'Line', 'Arrow',
-        'VGroup', 'Dot', 'Point', 'Arc', 'Polygon', 'NumberLine',
+        'Text', 'MathTex', 'Tex', 'Circle', 'Square', 'Rectangle', 'Triangle', 'Line', 'Arrow',
+        'VGroup', 'Dot', 'Point', 'Arc', 'Polygon', 'NumberLine', 'Axes',
+        'DashedVMobject', 'Scene', 'GeneratedScene',
         'Create', 'Transform', 'FadeIn', 'FadeOut', 'Write', 'DrawBorderThenFill',
         'ShowCreation', 'GrowFromCenter', 'ReplacementTransform', 'MoveToTarget',
         'Rotate', 'Scale', 'Shift', 'AnimationGroup', 'Succession',
         'RED', 'BLUE', 'GREEN', 'YELLOW', 'WHITE', 'BLACK', 'ORANGE', 'PURPLE',
-        'PINK', 'GRAY', 'GREY', 'DARK_BLUE', 'LIGHT_BLUE', 'UP', 'DOWN', 'LEFT', 'RIGHT',
-        'ORIGIN', 'PI', 'TAU', 'Scene', 'wait', 'play', 'add', 'remove'
+        'PINK', 'GRAY', 'GREY', 'DARK_BLUE', 'LIGHT_BLUE',
+        'UP', 'DOWN', 'LEFT', 'RIGHT', 'ORIGIN', 'PI', 'TAU',
+        'wait', 'play', 'add', 'remove', 'construct',
+        'np', 'numpy', 'array', 'linspace', 'sin', 'cos', 'tan', 'sqrt', 'abs',
+        'range', 'len', 'enumerate', 'zip', 'min', 'max', 'sum', 'int', 'float',
+        'list', 'dict', 'tuple', 'str', 'bool', 'type', 'isinstance', 'hasattr',
+        'self', 'run_time', 'radius', 'color', 'width', 'height', 'scale', 'shift',
+        'next_to', 'move_to', 'set_color', 'animate', 'stroke_width', 'fill_opacity'
     }
+    DANGEROUS_PATTERNS = [
+        r'\b(exec|eval|__import__|open|file)\b',
+        r'\b(os\.|sys\.|subprocess\.|shutil\.)',
+        r'\b(socket|urllib|http|requests)\b',
+        r'__[a-zA-Z_][a-zA-Z0-9_]*__',
+    ]
     
-    @classmethod
-    def validate_prompt(cls, prompt: str) -> bool:
-        """Validate user prompt for security and length"""
-        if not prompt or len(prompt.strip()) < 5:
-            raise ValueError("Prompt is too short")
-        
-        if len(prompt) > 500:
-            raise ValueError("Prompt is too long (max 500 characters)")
-        
-        # Check for potential injection attempts
-        dangerous_keywords = ['import', 'exec', 'eval', 'open', 'file', 'os.', 'sys.']
-        prompt_lower = prompt.lower()
-        for keyword in dangerous_keywords:
-            if keyword in prompt_lower:
-                raise ValueError(f"Prompt contains potentially dangerous keyword: {keyword}")
-        
-        return True
-    
-    @classmethod
-    def validate_generated_code(cls, code: str) -> bool:
-        """Validate generated code for security and correctness"""
-        if not code or len(code.strip()) < 50:
-            raise ValueError("Generated code is too short")
-        
-        if len(code) > 8192:
-            raise ValueError("Generated code is too long")
-        
-        # Check for dangerous patterns
-        for pattern in cls.DANGEROUS_PATTERNS:
+    def validate_code(self, code: str) -> bool:
+        for pattern in self.DANGEROUS_PATTERNS:
             if re.search(pattern, code, re.IGNORECASE):
-                raise ValueError(f"Code contains dangerous pattern: {pattern}")
-        
-        # Check for required patterns
-        for pattern in cls.REQUIRED_PATTERNS:
-            if not re.search(pattern, code, re.IGNORECASE):
-                raise ValueError(f"Code missing required pattern: {pattern}")
-        
+                logger.error(f"Dangerous pattern found: {pattern}")
+                return False
+        if 'import' in code:
+            allowed = ['from manim import', 'import numpy as np', 'import manim']
+            for line in code.split('\n'):
+                t = line.strip()
+                if t.startswith('import ') or t.startswith('from '):
+                    if not any(a in t for a in allowed):
+                        logger.error(f"Disallowed import: {line}")
+                        return False
+        try:
+            tree = ast.parse(code)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Name):
+                    if node.id not in self.ALLOWED_MANIM_OBJECTS and not node.id.startswith('_'):
+                        if node.id in ['eval', 'exec', 'compile', '__import__', 'globals', 'locals', 'vars']:
+                            logger.error(f"Dangerous identifier: {node.id}")
+                            return False
+        except SyntaxError as e:
+            logger.error(f"Syntax error during validation: {e}")
+            return False
         return True
 
-class ResourceManager:
-    """Manage system resources to prevent memory leaks and overconsumption"""
-    
-    def __init__(self, config: VideoGenerationConfig):
-        self.config = config
-        self.initial_memory = None
-        
-    def __enter__(self):
-        """Set resource limits when entering context"""
-        if PSUTIL_AVAILABLE:
-            self.initial_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
-        
-        # Skip resource limits if disabled or if they cause issues
-        if not self.config.enable_resource_limits:
-            logger.debug("Resource limits disabled")
-            return self
-        
-        try:
-            # Get current limits to avoid setting limits lower than current usage
-            current_mem_soft, current_mem_hard = resource.getrlimit(resource.RLIMIT_AS)
-            current_cpu_soft, current_cpu_hard = resource.getrlimit(resource.RLIMIT_CPU)
-            
-            # Set memory limit (only if higher than current or current is unlimited)
-            new_memory_limit = self.config.max_memory_mb * 1024 * 1024
-            if current_mem_soft == resource.RLIM_INFINITY or new_memory_limit > current_mem_soft:
-                resource.setrlimit(resource.RLIMIT_AS, (
-                    new_memory_limit,  # soft limit
-                    max(new_memory_limit, current_mem_hard) if current_mem_hard != resource.RLIM_INFINITY else new_memory_limit   # hard limit
-                ))
-                logger.debug(f"Set memory limit to {self.config.max_memory_mb}MB")
-            else:
-                logger.debug(f"Memory limit not set (current: {current_mem_soft // 1024 // 1024}MB, requested: {self.config.max_memory_mb}MB)")
-            
-            # Set CPU time limit (only if higher than current or current is unlimited)
-            new_cpu_limit = self.config.max_execution_time
-            if current_cpu_soft == resource.RLIM_INFINITY or new_cpu_limit > current_cpu_soft:
-                resource.setrlimit(resource.RLIMIT_CPU, (
-                    new_cpu_limit,  # soft limit
-                    max(new_cpu_limit + 30, current_cpu_hard) if current_cpu_hard != resource.RLIM_INFINITY else new_cpu_limit + 30  # hard limit
-                ))
-                logger.debug(f"Set CPU time limit to {new_cpu_limit}s")
-            else:
-                logger.debug(f"CPU time limit not set (current: {current_cpu_soft}s, requested: {new_cpu_limit}s)")
-                
-        except (ImportError, OSError, ValueError) as e:
-            logger.warning(f"Could not set resource limits: {e} - disabling resource limits for this session")
-            # Disable resource limits for future calls if they're causing issues
-            self.config.enable_resource_limits = False
-        
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Clean up resources when exiting context"""
-        try:
-            # Force garbage collection
-            gc.collect()
-            
-            # Check for memory leaks
-            if PSUTIL_AVAILABLE and self.initial_memory:
-                current_memory = psutil.Process().memory_info().rss / 1024 / 1024
-                memory_increase = current_memory - self.initial_memory
-                
-                if memory_increase > 100:  # More than 100MB increase
-                    logger.warning(f"Potential memory leak detected: {memory_increase:.2f}MB increase")
-            
-        except Exception as e:
-            logger.error(f"Error during resource cleanup: {e}")
-
-class ManimService:
-    """Consolidated Manim service with all optimizations and security features"""
-    
+class OptimizedManimService:
     def __init__(self):
-        self.config = VideoGenerationConfig()
-        self.config.__post_init__()  # Initialize configuration
         self.validator = SecurityValidator()
+        self.max_attempts = 3
+        self.timeout = 120
+        self.model = None
+        self.model_secondary = None
         
-        # Setup directories with proper permissions
-        self.media_dir = os.path.abspath(os.getenv("MEDIA_DIR", "media"))
-        self.temp_dir = os.path.join(self.media_dir, "temp")
-        os.makedirs(self.media_dir, mode=0o755, exist_ok=True)
-        os.makedirs(self.temp_dir, mode=0o755, exist_ok=True)
-        
-        # Configure Gemini AI
-        self.api_key = os.getenv("GOOGLE_API_KEY")
-        if not self.api_key:
-            raise ValueError("GOOGLE_API_KEY environment variable is required")
-        
-        genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel(
+        if genai:
+            self._init_models()
+        else:
+            logger.warning("Google AI not available - API key missing or library not installed")
+
+    def _init_models(self):
+        try:
+            self.model = genai.GenerativeModel(
             model_name='gemini-2.5-flash',
             generation_config=genai.GenerationConfig(
-                temperature=0.05,  # Lower temperature for more consistent code
-                top_p=0.7,
-                top_k=15,
-                max_output_tokens=4096,
-                candidate_count=1,
-            ),
-            safety_settings=[
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-            ]
-        )
-        
-        # Process pool for isolated execution
-        self.process_pool = ProcessPoolExecutor(max_workers=2)
-        
-        logger.info("ManimService initialized successfully")
-    
-    async def generate_video(self, prompt: str, user_id: str = None) -> str:
-        """Generate video with comprehensive security and performance optimization"""
-        
-        # Validate input
-        self.validator.validate_prompt(prompt)
-        
-        with ResourceManager(self.config) as resource_mgr:
-            for attempt in range(self.config.max_retries):
-                temp_file = None
-                try:
-                    logger.info(f"Generating video (attempt {attempt + 1}/{self.config.max_retries})")
-                    
-                    # Generate animation code
-                    scene_code = await self._generate_animation_code(prompt, attempt)
-
-                    # Ensure required imports and normalize code
-                    scene_code = self._ensure_code_prereqs(scene_code)
-
-                    # Detect scene class name (fallback to GeneratedScene)
-                    scene_name = self._detect_scene_class_name(scene_code) or "GeneratedScene"
-                    
-                    # Validate generated code
-                    self.validator.validate_generated_code(scene_code)
-                    
-                    # Create secure temporary file
-                    temp_file = self._create_secure_temp_file(scene_code, attempt)
-                    
-                    # Render animation
-                    video_path = await self._render_animation(temp_file, attempt, scene_name)
-                    
-                    logger.info("Video generation successful")
-                    return video_path
-                    
-                except Exception as e:
-                    logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
-                    if attempt == self.config.max_retries - 1:
-                        raise HTTPException(status_code=500, detail=f"Video generation failed: {str(e)}")
-                    
-                finally:
-                    # Clean up temporary file
-                    if temp_file and os.path.exists(temp_file):
-                        try:
-                            os.remove(temp_file)
-                        except Exception as e:
-                            logger.warning(f"Failed to clean up temp file: {e}")
-        
-        raise HTTPException(status_code=500, detail="Video generation failed after all attempts")
-    
-    async def _generate_animation_code(self, prompt: str, attempt: int = 0) -> str:
-        """Generate optimized Manim code using enhanced AI prompts"""
-        
-        enhanced_prompt = self._build_enhanced_prompt(prompt, attempt)
-        
-        try:
-            response = await asyncio.to_thread(
-                self.model.generate_content, 
-                enhanced_prompt
+                    temperature=0.1,
+                    top_p=0.8,
+                    top_k=20,
+                    max_output_tokens=2048,
+                    candidate_count=1
+                )
             )
-            
-            # Extract and clean response
-            code = self._extract_and_clean_response(response)
-            
-            if not code or len(code.strip()) < 50:
-                raise ValueError("Generated code is too short or empty")
-            
-            return code
-            
+            logger.info("✅ Gemini primary model initialized (gemini-2.5-flash)")
         except Exception as e:
-            logger.error(f"Code generation failed: {str(e)}")
-            raise
-    
-    def _build_enhanced_prompt(self, prompt: str, attempt: int = 0) -> str:
-        """Build an enhanced prompt with better instructions and examples"""
-        
-        retry_context = ""
-        if attempt > 0:
-            retry_context = f"""
-IMPORTANT: This is retry attempt {attempt + 1}. The previous code had issues.
-- Ensure perfect Python syntax
-- Use only allowed Manim objects
-- Keep animations simple and clear
-- Verify all parentheses and indentation
-"""
-        
-        mathematical_examples = """
-MATHEMATICAL EXAMPLES:
-
-For "show quadratic function":
-```python
-from manim import *
-
-class GeneratedScene(Scene):
-    def construct(self):
-        # Create parabola using points
-        points = [np.array([x, x**2 * 0.5, 0]) for x in np.linspace(-3, 3, 50)]
-        parabola = VGroup(*[Dot(point, radius=0.02) for point in points])
-        parabola.set_color(BLUE)
-        
-        # Create axes
-        x_axis = Line(LEFT * 4, RIGHT * 4).set_color(WHITE)
-        y_axis = Line(DOWN * 2, UP * 4).set_color(WHITE)
-        
-        self.play(Create(x_axis), Create(y_axis))
-        self.play(Create(parabola), run_time=2)
-        self.wait(1)
-```
-
-For "visualize circle":
-```python
-                from manim import *
-
-                class GeneratedScene(Scene):
-                    def construct(self):
-                        circle = Circle(radius=2, color=BLUE)
-                        self.play(Create(circle))
-                        self.wait(1)
-```
-"""
-        
-        return f"""You are an expert Manim animator specializing in mathematical visualizations. Create clean, educational Python code.
-
-USER REQUEST: {prompt}
-
-{mathematical_examples}
-
-STRICT REQUIREMENTS:
-1. ONLY return executable Python code - NO explanations or markdown
-2. Start with "from manim import *" and numpy import if needed
-3. Create class "GeneratedScene(Scene)" with "construct(self)" method
-4. Use ONLY these safe objects:
-   - Shapes: Circle, Square, Rectangle, Triangle, Line, Arrow, Dot, Arc, Polygon
-   - Text: Text (NO MathTex, NO Tex, NO LaTeX)
-   - Groups: VGroup
-   - Animations: Create, Transform, FadeIn, FadeOut, Write, GrowFromCenter
-   - Colors: RED, BLUE, GREEN, YELLOW, WHITE, BLACK, ORANGE, PURPLE
-   - Directions: UP, DOWN, LEFT, RIGHT, ORIGIN
-5. Keep animations 5-20 seconds total
-6. Use simple mathematical relationships (no complex functions)
-7. Ensure perfect Python syntax and indentation
-8. NO imports except "from manim import *" and "import numpy as np"
-
-ANIMATION GUIDELINES:
-- Start simple, build complexity gradually
-- Use clear colors and positioning
-- Add appropriate wait() calls
-- Use run_time parameter for smooth animations
-- Position objects clearly (use shift(), move_to())
-
-{retry_context}
-
-Generate clean, working code for: {prompt}
-
-Remember: Return ONLY the Python code, no explanations."""
-    
-    def _extract_and_clean_response(self, response) -> str:
-        """Extract and clean the response from Gemini AI"""
+            logger.warning(f"Primary model init failed: {e}")
+            self.model = None
+            
         try:
-            # Try different ways to extract text
-            if hasattr(response, 'text') and response.text:
-                text = response.text
-            elif hasattr(response, 'parts') and response.parts:
-                text = ''.join(part.text for part in response.parts if hasattr(part, 'text'))
-            elif hasattr(response, 'candidates') and response.candidates:
-                candidate = response.candidates[0]
-                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                    text = ''.join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
-                else:
-                    text = str(candidate)
-            else:
-                text = str(response)
+            self.model_secondary = genai.GenerativeModel(
+                model_name='gemini-2.0-flash',
+                generation_config=genai.GenerationConfig(
+                    temperature=0.05,
+                    top_p=0.8,
+                    top_k=20,
+                    max_output_tokens=2048,
+                    candidate_count=1
+                )
+            )
+            logger.info("✅ Gemini secondary model initialized (gemini-2.0-flash)")
+        except Exception as e:
+            logger.warning(f"Secondary model init failed: {e}")
+            self.model_secondary = None
+
+    def _extract_response_text(self, response) -> str:
+        try:
+            if hasattr(response, 'candidates') and response.candidates:
+                for candidate in response.candidates:
+                    if hasattr(candidate, 'content'):
+                        content = candidate.content
+                        if hasattr(content, 'parts') and content.parts:
+                            for part in content.parts:
+                                if hasattr(part, 'text'):
+                                    text = str(part.text).strip()
+                                    if text:
+                                        return text
             
-            if not text:
-                raise ValueError("No text content in response")
+            if hasattr(response, 'parts') and response.parts:
+                for part in response.parts:
+                    if hasattr(part, 'text'):
+                        text = str(part.text).strip()
+                        if text:
+                            return text
             
-            # Clean the response
-            text = self._clean_code_response(text)
+            try:
+                if hasattr(response, 'text'):
+                    text = str(response.text).strip()
+                    if text:
+                        return text
+            except Exception:
+                pass
             
-            return text
+            response_str = str(response)
+            patterns = [
+                r"```python\s*([\s\S]*?)```",
+                r"```\s*(from\s+manim[\s\S]*?)```", 
+                r"(from\s+manim\s+import[\s\S]*?self\.wait\([^)]*\))",
+                r"```(?:python)?\s*([\s\S]*?)```"
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, response_str, re.IGNORECASE | re.DOTALL)
+                if match:
+                    code = match.group(1).strip()
+                    if code and 'manim' in code:
+                        return code
+            
+            if 'from manim import' in response_str:
+                return response_str
+            
+            raise ValueError("No extractable text content found in response")
             
         except Exception as e:
             logger.error(f"Failed to extract response: {e}")
             raise ValueError(f"Could not extract code from AI response: {e}")
     
-    def _clean_code_response(self, response_text: str) -> str:
-        """Clean and validate the code response"""
-        # Remove markdown code blocks
-        response_text = re.sub(r'```python\s*', '', response_text)
-        response_text = re.sub(r'```\s*', '', response_text)
+    def _ensure_code_prereqs(self, code: str) -> str:
+        lines = code.split('\n')
+        out = []
         
-        # Remove explanatory text before the code
-        lines = response_text.split('\n')
-        code_started = False
-        cleaned_lines = []
+        if not any(l.strip().startswith('from manim import') for l in lines):
+            out.append('from manim import *')
+            
+        uses_np = any('np.' in l for l in lines)
+        if uses_np and not any(l.strip().startswith('import numpy as np') for l in lines):
+            out.append('import numpy as np')
+            
+        for l in lines:
+            if l.strip() and not (l.strip().startswith('from manim import') or l.strip().startswith('import numpy as np')):
+                out.append(l)
+                
+        code2 = '\n'.join(out)
         
+        if not re.search(r'class\s+\w+\s*\(\s*Scene\s*\):', code2):
+            wrap = ['from manim import *', '']
+            if uses_np:
+                wrap.insert(-1, 'import numpy as np')
+            wrap.extend(['class GeneratedScene(Scene):', '    def construct(self):'])
+            for l in out:
+                if l.strip() and not l.strip().startswith(('from manim import', 'import numpy as np')):
+                    wrap.append('        ' + l.lstrip())
+            wrap.append('        self.wait(1)')
+            return '\n'.join(wrap)
+        else:
+            final_lines = []
+            if not any(l.strip().startswith('from manim import') for l in out):
+                final_lines.append('from manim import *')
+            if uses_np and not any(l.strip().startswith('import numpy as np') for l in out):
+                final_lines.append('import numpy as np')
+            if final_lines:
+                final_lines.append('')
+            final_lines.extend(out)
+            return '\n'.join(final_lines)
+
+    def _sanitize_code(self, raw: str) -> str:
+        raw = re.sub(r'```python\s*', '', raw)
+        raw = re.sub(r'```\s*', '', raw)
+        lines = raw.split('\n')
+        started = False
+        collected = []
         for line in lines:
             if line.strip().startswith('from manim import'):
-                code_started = True
-            
-            if code_started:
-                cleaned_lines.append(line)
-        
-        if not cleaned_lines:
-            # Fallback: try to find code block
-            code_match = re.search(r'(from manim import.*)', response_text, re.DOTALL | re.IGNORECASE)
-            if code_match:
-                cleaned_lines = code_match.group(1).split('\n')
-        
-        # Join and clean up
-        code = '\n'.join(cleaned_lines)
-        code = re.sub(r'\n{3,}', '\n\n', code)  # Remove excessive newlines
-        code = code.strip()
-        
+                started = True
+            if started:
+                if '\\' in line and not ('"' in line or "'" in line):
+                    line = line.replace('\\', '')
+                collected.append(line)
+        code = '\n'.join(collected).strip() or raw.strip()
         return code
 
-    def _ensure_code_prereqs(self, code: str) -> str:
-        """Ensure the generated code has required imports and sane defaults."""
-        lines = code.split("\n")
-        # Ensure numpy import if np. is used
-        uses_np = any("np." in line for line in lines)
-        has_np_import = any(line.strip().startswith("import numpy as np") for line in lines)
-        if uses_np and not has_np_import:
-            # Insert after the manim import
-            for idx, line in enumerate(lines):
-                if line.strip().startswith("from manim import"):
-                    lines.insert(idx + 1, "import numpy as np")
-                    break
-        # Ensure class name exists; if not, wrap minimal Scene
-        if not re.search(r"class\s+\w+\s*\(\s*Scene\s*\)", code):
-            lines.append("")
-            lines.append("class GeneratedScene(Scene):")
-            lines.append("    def construct(self):")
-            lines.append("        self.wait(1)")
-        return "\n".join(lines)
+    def _validate_syntax_thoroughly(self, code: str) -> Tuple[bool, Optional[str]]:
+        try:
+            ast.parse(code)
+            return True, None
+        except SyntaxError as e:
+            return False, f"SyntaxError at line {e.lineno}: {e.msg}"
+        except Exception as e:
+            return False, f"Validation error: {str(e)}"
 
-    def _detect_scene_class_name(self, code: str) -> Optional[str]:
-        """Find the Scene subclass name in the code."""
-        match = re.search(r"class\s+(\w+)\s*\(\s*Scene\s*\)", code)
-        if match:
-            return match.group(1)
-        return None
-    
-    def _create_secure_temp_file(self, code: str, attempt: int) -> str:
-        """Create a secure temporary file for the animation code"""
-        # Create secure temporary file
-        fd, temp_path = tempfile.mkstemp(
-            suffix=f'_attempt_{attempt}.py',
-            prefix='manim_scene_',
-            dir=self.temp_dir,
-            text=True
+    def _force_format_prompt(self, user_prompt: str, previous_error: Optional[str]) -> str:
+        hint = f"\nPrevious error to fix: {previous_error}" if previous_error else ""
+        return (
+            "Return ONLY valid Python code for Manim 0.19. No explanations, no markdown formatting.\n\n"
+            "REQUIREMENTS:\n"
+            "- Start exactly with: from manim import *\n"
+            "- Define: class GeneratedScene(Scene):\n"
+            "- Include: def construct(self):\n"
+            "- Use Text() instead of MathTex/Tex for safety\n"
+            "- Use Axes() for coordinate systems\n"
+            "- Use simple colors like RED, BLUE, GREEN\n"
+            "- Keep animations simple with Create(), Write(), FadeIn()\n"
+            "- End with self.wait(2)\n"
+            "- Avoid complex LaTeX, subscripts, or special formatting\n"
+            "- Use basic Python math functions (no external libraries)\n\n"
+            f"Task: {user_prompt}{hint}\n\n"
+            "Example format:\n"
+            "from manim import *\n\n"
+            "class GeneratedScene(Scene):\n"
+            "    def construct(self):\n"
+            "        # Your animation code here\n"
+            "        self.wait(2)\n"
         )
+
+    async def generate_animation(self, prompt: str, media_dir: str = './media') -> AnimationResult:
+        if not self.model and not self.model_secondary:
+            return AnimationResult(success=False, error='AI model not available')
+            
+        os.makedirs(media_dir, exist_ok=True)
+        temp_dir = os.path.join(media_dir, 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        last_error = None
+        for attempt in range(self.max_attempts):
+            logger.info(f"Generating animation (attempt {attempt+1}/{self.max_attempts})")
+            try:
+                feedback = last_error if attempt > 0 else None
+                prompt_txt = self._force_format_prompt(prompt, feedback)
+                model_to_use = self.model if attempt == 0 and self.model else (self.model_secondary or self.model)
+                
+                response = await asyncio.get_event_loop().run_in_executor(None, model_to_use.generate_content, prompt_txt)
+                raw = self._extract_response_text(response)
+                code = self._ensure_code_prereqs(self._sanitize_code(raw))
+                
+                ok, err = self._validate_syntax_thoroughly(code)
+                if not ok:
+                    last_error = err
+                    logger.error(f"Attempt {attempt+1} failed: {err}")
+                    continue
+                    
+                if not self.validator.validate_code(code):
+                    last_error = 'Code failed security validation'
+                    logger.error(f"Attempt {attempt+1} failed: security validation")
+                    continue
+                    
+                result = await self._render_manim_code(code, temp_dir, attempt)
+                if result.success:
+                    result.code_used = code
+                    return result
+                    
+                last_error = result.error
+                logger.error(f"Attempt {attempt+1} failed: {result.error}")
+                
+            except Exception as e:
+                last_error = str(e)
+                logger.error(f"Attempt {attempt+1} failed with exception: {e}")
+                
+        return AnimationResult(success=False, error=f"Failed after {self.max_attempts} attempts: {last_error}")
+
+    async def _render_manim_code(self, code: str, temp_dir: str, attempt: int) -> AnimationResult:
+        scene_id = f"manim_scene_{hash(code) % 100000:08x}_attempt_{attempt}"
+        temp_file = os.path.join(temp_dir, f"{scene_id}.py")
         
         try:
-            with os.fdopen(fd, 'w') as f:
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 f.write(code)
             
-            # Set restrictive permissions
-            os.chmod(temp_path, 0o600)
+            m = re.search(r'class\s+(\w+)\s*\(\s*Scene\s*\):', code)
+            scene_name = m.group(1) if m else 'GeneratedScene'
             
-            return temp_path
-        
-        except Exception as e:
-            os.close(fd)
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            raise e
-    
-    async def _render_animation(self, code_file: str, attempt: int, scene_name: str) -> str:
-        """Render animation with resource limits"""
-        
-        module_name = os.path.splitext(os.path.basename(code_file))[0]
-        output_dir = os.path.join(self.media_dir, "videos", module_name)
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Manim command with safer CLI flags compatible with manim 0.19
-        width, height = self.config.resolution
-        cmd = [
-            sys.executable, "-m", "manim",
-            "-q", "m",  # medium quality
-            "-r", f"{width},{height}",
-            "-v", "WARNING",
-            "--renderer=cairo",
-            code_file,
+            cmd = [
+                sys.executable, '-m', 'manim',
+                '-q', 'm',
+                '-r', '1280,720',
+                '-v', 'WARNING',
+                '--renderer=cairo',
+                temp_file,
             scene_name,
-            f"--media_dir={self.media_dir}",
-            "--disable_caching",
-        ]
-        
-        try:
-            # Run with timeout
-            result = await asyncio.wait_for(
-                asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    env=dict(os.environ, PYTHONPATH=os.pathsep.join(sys.path))
-                ),
-                timeout=self.config.max_execution_time
+                f'--media_dir={os.path.abspath(temp_dir)}/..',
+                '--disable_caching'
+            ]
+            
+            proc = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
             
-            stdout, stderr = await result.communicate()
-            
-            if result.returncode != 0:
-                decoded_err = stderr.decode(errors="ignore") if stderr else "Unknown rendering error"
-                logger.error("Manim stderr:\n" + decoded_err)
-                raise subprocess.CalledProcessError(result.returncode, cmd, stderr=decoded_err)
-            
-            # Find the generated video file
-            video_file = self._find_generated_video(output_dir, scene_name)
-            
-            if not video_file or not os.path.exists(video_file):
-                raise FileNotFoundError("Generated video file not found")
-            
-            return video_file
-            
-        except asyncio.TimeoutError:
-            raise HTTPException(status_code=500, detail="Video rendering timed out")
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self.timeout)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                return AnimationResult(success=False, error='Rendering timeout')
+                
+            if proc.returncode == 0:
+                media_root = os.path.abspath(os.path.join(temp_dir, '..'))
+                videos_root = os.path.join(media_root, 'videos')
+                latest_mp4 = None
+                latest_mtime = -1
+                
+                if os.path.isdir(videos_root):
+                    for root, _, files in os.walk(videos_root):
+                        for fname in files:
+                            if fname.lower().endswith('.mp4'):
+                                fpath = os.path.join(root, fname)
+                                try:
+                                    mtime = os.path.getmtime(fpath)
+                                    if mtime > latest_mtime:
+                                        latest_mtime = mtime
+                                        latest_mp4 = fpath
+                                except Exception:
+                                    continue
+                                    
+                if latest_mp4:
+                    return AnimationResult(success=True, video_path=latest_mp4, resolution='1280x720', duration=None)
+                return AnimationResult(success=False, error='Video file not found after successful render')
+            else:
+                err = (stderr or b'').decode('utf-8', errors='ignore')
+                return AnimationResult(success=False, error=f'Manim render failed: {err[:300]}')
+                
         except Exception as e:
-            logger.error(f"Rendering failed: {e}")
-            raise
-    
-    def _find_generated_video(self, output_dir: str, scene_name: str) -> Optional[str]:
-        """Find the generated video file in the output directory"""
-        filename = f"{scene_name}.mp4"
-        possible_paths = [
-            os.path.join(output_dir, "720p30", filename),
-            os.path.join(output_dir, "1080p60", filename),
-            os.path.join(output_dir, "480p15", filename),
-            os.path.join(output_dir, filename),
-        ]
-        
-        # Also search recursively
-        for root, dirs, files in os.walk(output_dir):
-            for file in files:
-                if file.endswith('.mp4') and scene_name in file:
-                    possible_paths.append(os.path.join(root, file))
-        
-        for path in possible_paths:
-            if os.path.exists(path) and os.path.getsize(path) > 1000:  # At least 1KB
-                return path
-        
-        return None
-    
-    def cleanup_old_files(self, max_age_hours: int = 24):
-        """Clean up old temporary files to prevent disk space issues"""
-        import time
-        current_time = time.time()
-        
-        for root, dirs, files in os.walk(self.temp_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                try:
-                    if current_time - os.path.getctime(file_path) > max_age_hours * 3600:
-                        os.remove(file_path)
-                        logger.info(f"Cleaned up old file: {file_path}")
-                except Exception as e:
-                    logger.warning(f"Failed to clean up {file_path}: {e}")
-    
-    def __del__(self):
-        """Cleanup resources when service is destroyed"""
-        try:
-            if hasattr(self, 'process_pool'):
-                self.process_pool.shutdown(wait=True)
-        except Exception as e:
-            logger.warning(f"Error during cleanup: {e}")
+            return AnimationResult(success=False, error=f'Rendering exception: {str(e)}')
+        finally:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except Exception:
+                pass
 
-# Legacy class names for compatibility
-OptimizedManimService = ManimService
-EnhancedManimService = ManimService
+_service_instance: Optional[OptimizedManimService] = None
+
+def get_manim_service() -> OptimizedManimService:
+    global _service_instance
+    if _service_instance is None:
+        _service_instance = OptimizedManimService()
+    return _service_instance
+
+async def generate_video_from_prompt(prompt: str, media_dir: str = './media') -> AnimationResult:
+    svc = get_manim_service()
+    return await svc.generate_animation(prompt, media_dir)
