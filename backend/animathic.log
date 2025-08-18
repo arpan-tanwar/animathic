@@ -1155,3 +1155,610 @@
 2025-08-18 02:45:09,747 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
 2025-08-18 02:45:09,845 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
 2025-08-18 02:45:22,303 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 12:58:15,040 - services.manim - INFO - Google AI configured successfully
+2025-08-18 12:58:15,314 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 12:58:15,314 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 12:58:15,366 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 12:58:15,366 - main - INFO - ✅ All services initialized successfully
+2025-08-18 12:58:15,372 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 12:58:15,372 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 12:58:23,131 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 12:58:23,837 - services.manim - INFO - Google AI configured successfully
+2025-08-18 12:58:23,978 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 12:58:23,979 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 12:58:24,027 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 12:58:24,027 - main - INFO - ✅ All services initialized successfully
+2025-08-18 12:58:24,033 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 12:58:24,033 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 12:58:36,281 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 12:58:37,484 - services.manim - INFO - Google AI configured successfully
+2025-08-18 12:58:37,629 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 12:58:37,629 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 12:58:37,683 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 12:58:37,683 - main - INFO - ✅ All services initialized successfully
+2025-08-18 12:58:37,688 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 12:58:37,688 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 12:58:55,441 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 12:58:55,605 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 12:58:55,698 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 12:58:55,887 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 12:58:56,013 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 12:58:56,105 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 12:58:56,197 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 12:58:56,301 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 12:58:56,421 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 12:58:57,906 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 12:58:59,294 - services.manim - INFO - Google AI configured successfully
+2025-08-18 12:58:59,475 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 12:58:59,476 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 12:58:59,583 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 12:58:59,583 - main - INFO - ✅ All services initialized successfully
+2025-08-18 12:58:59,611 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 12:58:59,611 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 12:59:12,652 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 12:59:13,344 - services.manim - INFO - Google AI configured successfully
+2025-08-18 12:59:13,485 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 12:59:13,486 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 12:59:13,534 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 12:59:13,534 - main - INFO - ✅ All services initialized successfully
+2025-08-18 12:59:13,540 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 12:59:13,540 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 12:59:32,679 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 12:59:33,808 - services.manim - INFO - Google AI configured successfully
+2025-08-18 12:59:34,074 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 12:59:34,075 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 12:59:34,131 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 12:59:34,131 - main - INFO - ✅ All services initialized successfully
+2025-08-18 12:59:34,138 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 12:59:34,138 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:00:57,012 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:00:57,176 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:00:57,176 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:00:57,225 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:00:57,225 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:01:14,599 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:01:15,430 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:01:15,576 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:01:15,577 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:01:15,625 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:01:15,625 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:01:15,631 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:01:15,631 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:01:17,609 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:01:18,170 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:01:18,287 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:01:18,288 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:01:18,336 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:01:18,337 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:01:18,343 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:01:18,343 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:01:21,565 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:01:21,668 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:01:21,807 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:01:21,938 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:01:22,070 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:01:22,186 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:01:22,271 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:01:22,378 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:01:22,483 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:01:29,513 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: Animate matrix transformation
+2025-08-18 13:01:29,514 - services.manim - INFO - ✅ Gemini primary model initialized (gemini-2.5-flash)
+2025-08-18 13:01:29,514 - services.manim - INFO - ✅ Gemini secondary model initialized (gemini-2.0-flash)
+2025-08-18 13:01:29,514 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 13:01:46,226 - main - INFO - Uploading video to Supabase: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_000095fe_attempt_0/720p30/GeneratedScene.mp4
+2025-08-18 13:01:47,415 - main - INFO - Video uploaded successfully. ID: 8f1fc2e7-68ed-42ac-9f7b-cfcb52a80a15
+2025-08-18 13:01:47,416 - main - INFO - Cleaned up local file: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_000095fe_attempt_0/720p30/GeneratedScene.mp4
+2025-08-18 13:02:01,320 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:01,424 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:01,706 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:02,042 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:02,216 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:02,566 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:02,676 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:02,826 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:02,918 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:23,755 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: create a graph
+2025-08-18 13:02:23,756 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 13:02:29,639 - main - INFO - Uploading video to Supabase: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_00015f54_attempt_0/720p30/GeneratedScene.mp4
+2025-08-18 13:02:30,387 - main - INFO - Video uploaded successfully. ID: cb4a5069-7f1e-4df2-bb9e-54c3b1c23f5b
+2025-08-18 13:02:30,388 - main - INFO - Cleaned up local file: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_00015f54_attempt_0/720p30/GeneratedScene.mp4
+2025-08-18 13:02:37,331 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:37,490 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:37,577 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:37,712 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:37,841 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:37,937 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:38,058 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:38,139 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:02:38,224 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:03:05,597 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: create an 5x5 x,y 2d graph empty
+2025-08-18 13:03:05,598 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 13:03:11,483 - services.manim - ERROR - Attempt 1 failed: Manim render failed: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                      
+2025-08-18 13:03:11,484 - services.manim - INFO - Generating animation (attempt 2/3)
+2025-08-18 13:03:17,063 - services.manim - WARNING - ⚠️ Content validation failed - may contain HTML/SVG, retrying...
+2025-08-18 13:03:17,064 - services.manim - INFO - Generating animation (attempt 3/3)
+2025-08-18 13:03:23,834 - services.manim - WARNING - ⚠️ Content validation failed - may contain HTML/SVG, retrying...
+2025-08-18 13:03:23,834 - services.manim - INFO - 🔄 All attempts failed, trying minimal fallback generation...
+2025-08-18 13:03:23,834 - services.manim - INFO - ✅ Generated minimal fallback code
+2025-08-18 13:03:25,596 - main - INFO - Uploading video to Supabase: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_000152b7_attempt_-1/720p30/GeneratedScene.mp4
+2025-08-18 13:03:26,576 - main - INFO - Video uploaded successfully. ID: 3acd69e1-56a6-4742-b1c3-ff9845c60adc
+2025-08-18 13:03:26,576 - main - INFO - Cleaned up local file: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_000152b7_attempt_-1/720p30/GeneratedScene.mp4
+2025-08-18 13:03:33,760 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:03:33,827 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:03:34,010 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:03:34,100 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:03:34,230 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:03:34,373 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:03:34,480 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:03:34,611 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:03:34,742 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:05:15,566 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:05:18,383 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:05:18,530 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:05:18,531 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:05:18,579 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:05:18,579 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:05:18,585 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:05:18,585 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:05:38,798 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:05:39,540 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:05:39,672 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:05:39,673 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:05:39,727 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:05:39,727 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:05:39,734 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:05:39,734 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:05:55,946 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:05:56,784 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:05:56,929 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:05:56,929 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:05:56,978 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:05:56,978 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:05:56,984 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:05:56,984 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:06:10,691 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:06:11,446 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:06:11,588 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:06:11,589 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:06:11,655 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:06:11,656 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:06:11,663 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:06:11,663 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:06:26,259 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:06:27,129 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:06:27,273 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:06:27,273 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:06:27,325 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:06:27,325 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:06:27,331 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:06:27,331 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:06:40,492 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:06:41,223 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:06:41,362 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:06:41,363 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:06:41,410 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:06:41,410 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:06:41,416 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:06:41,416 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:06:57,407 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:06:58,164 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:06:58,298 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:06:58,299 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:06:58,345 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:06:58,345 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:06:58,350 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:06:58,351 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:07:17,366 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:07:18,388 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:07:18,524 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:07:18,524 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:07:18,571 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:07:18,571 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:07:18,577 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:07:18,577 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:08:22,261 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:08:23,039 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:08:23,187 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:08:23,187 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:08:23,235 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:08:23,236 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:08:23,242 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:08:23,242 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:10:35,680 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:10:35,839 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:10:35,839 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:10:35,888 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:10:35,888 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:10:45,188 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:10:45,995 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:10:46,133 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:10:46,133 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:10:46,183 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:10:46,183 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:10:46,189 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:10:46,189 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:10:48,778 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 13:10:49,365 - services.manim - INFO - Google AI configured successfully
+2025-08-18 13:10:49,815 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 13:10:49,815 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 13:10:49,874 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 13:10:49,874 - main - INFO - ✅ All services initialized successfully
+2025-08-18 13:10:49,880 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 13:10:49,880 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 13:11:05,685 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:05,846 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:06,113 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:06,201 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:06,390 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:06,522 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:06,613 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:06,715 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:06,839 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:16,048 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: create an 5x5 x,y 2d graph empty
+2025-08-18 13:11:16,049 - services.manim - INFO - ✅ Gemini primary model initialized (gemini-2.5-flash)
+2025-08-18 13:11:16,049 - services.manim - INFO - ✅ Gemini secondary model initialized (gemini-2.0-flash)
+2025-08-18 13:11:16,049 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 13:11:29,235 - services.manim - ERROR - Manim render failed with return code 1
+2025-08-18 13:11:29,236 - services.manim - ERROR - Stderr: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                       │
+│                                                                                                  │
+│   122 │   │   │   try:                                                                           │
+│   123 │   │   │   │   with tempconfig({}):                                                       │
+│   124 │   │   │   │   │   scene = SceneClass()                                                   │
+│ ❱ 125 │   │   │   │   │   scene.render()                                                         │
+│   126 │   │   │   except Exception:                                                              │
+│   127 │   │   │   │   error_console.print_exception()                                            │
+│   128 │   │   │   │   sys.exit(1)                                                                │
+│                                                                                                  │
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/scene/scen │
+│ e.py:237 in render                                                                               │
+│                                                                                                  │
+│    234 │   │   """                                                                               │
+│    235 │   │   self.setup()                                                                      │
+│    236 │   │   try:                                                                              │
+│ ❱  237 │   │   │   self.construct()                                                              │
+│    238 │   │   except EndSceneEarlyException:                                                    │
+│    239 │   │   │   pass                                                                          │
+│    240 │   │   except RerunSceneException:                                                       │
+│                                                                                                  │
+│ /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/temp/manim_scene_00009e21_attempt_0 │
+│ .py:18 in construct                                                                              │
+│                                                                                                  │
+│   15 │   │   )                                                                                   │
+│   16 │   │   # Get the grid lines from the axes                                                  │
+│   17 │   │   # Set color to WHITE and stroke_opacity for a subtle grid effect                    │
+│ ❱ 18 │   │   grid = axes.get_grid(color=WHITE, stroke_opacity=0.5)                               │
+│   19 │   │   # Position the axes and grid to be centered on the screen                           │
+│   20 │   │   axes.center()                                                                       │
+│   21 │   │   grid.center()                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+TypeError: Mobject.__getattr__.<locals>.getter() got an unexpected keyword argument 'color'
+
+2025-08-18 13:11:29,236 - services.manim - ERROR - Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:11:29,237 - services.manim - ERROR - Attempt 1 failed: Manim render failed: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                       │
+│                                                                                                  │
+│   122 │   │   │   try:                                                                        
+
+Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:11:29,237 - services.manim - INFO - Generating animation (attempt 2/3)
+2025-08-18 13:11:32,251 - main - INFO - Uploading video to Supabase: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_00001809_attempt_1/720p30/GeneratedScene.mp4
+2025-08-18 13:11:32,980 - main - INFO - Video uploaded successfully. ID: cb24be45-be4f-438c-a6f1-dd047f86a4aa
+2025-08-18 13:11:32,980 - main - INFO - Cleaned up local file: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_00001809_attempt_1/720p30/GeneratedScene.mp4
+2025-08-18 13:11:46,499 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:46,645 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:46,742 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:46,931 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:47,034 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:47,373 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:47,488 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:47,601 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:11:47,755 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:12:00,297 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: Create a 2d x,y graph for different time complexities.
+2025-08-18 13:12:00,297 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 13:12:14,636 - services.manim - ERROR - Manim render failed with return code 1
+2025-08-18 13:12:14,636 - services.manim - ERROR - Stderr: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                       │
+│                                                                                                  │
+│   122 │   │   │   try:                                                                           │
+│   123 │   │   │   │   with tempconfig({}):                                                       │
+│   124 │   │   │   │   │   scene = SceneClass()                                                   │
+│ ❱ 125 │   │   │   │   │   scene.render()                                                         │
+│   126 │   │   │   except Exception:                                                              │
+│   127 │   │   │   │   error_console.print_exception()                                            │
+│   128 │   │   │   │   sys.exit(1)                                                                │
+│                                                                                                  │
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/scene/scen │
+│ e.py:237 in render                                                                               │
+│                                                                                                  │
+│    234 │   │   """                                                                               │
+│    235 │   │   self.setup()                                                                      │
+│    236 │   │   try:                                                                              │
+│ ❱  237 │   │   │   self.construct()                                                              │
+│    238 │   │   except EndSceneEarlyException:                                                    │
+│    239 │   │   │   pass                                                                          │
+│    240 │   │   except RerunSceneException:                                                       │
+│                                                                                                  │
+│ /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/temp/manim_scene_0000fea4_attempt_0 │
+│ .py:13 in construct                                                                              │
+│                                                                                                  │
+│   10 │   │   │   y_length=5,                                                                     │
+│   11 │   │   │   axis_config={"color": WHITE}                                                    │
+│   12 │   │   ).add_coordinates()                                                                 │
+│ ❱ 13 │   │   axes.to_center()                                                                    │
+│   14 │   │   # Labels for the axes                                                               │
+│   15 │   │   x_label = Text("Input Size (n)", font_size=28, color=BLUE).next_to(axes.x_axis,     │
+│   16 │   │   y_label = Text("Time", font_size=28, color=RED).next_to(axes.y_axis, LEFT)          │
+│                                                                                                  │
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/mobject/mo │
+│ bject.py:723 in __getattr__                                                                      │
+│                                                                                                  │
+│    720 │   │   │   return types.MethodType(setter, self)                                         │
+│    721 │   │                                                                                     │
+│    722 │   │   # Unhandled attribute, therefore error                                            │
+│ ❱  723 │   │   raise AttributeError(f"{type(self).__name__} object has no attribute '{attr}'")   │
+│    724 │                                                                                         │
+│    725 │   @property                                                                             │
+│    726 │   def width(self) -> float:                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+AttributeError: Axes object has no attribute 'to_center'
+
+2025-08-18 13:12:14,637 - services.manim - ERROR - Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:12:14,637 - services.manim - ERROR - Attempt 1 failed: Manim render failed: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                       │
+│                                                                                                  │
+│   122 │   │   │   try:                                                                        
+
+Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:12:14,637 - services.manim - INFO - Generating animation (attempt 2/3)
+2025-08-18 13:12:18,868 - services.manim - ERROR - Manim render failed with return code 1
+2025-08-18 13:12:18,868 - services.manim - ERROR - Stderr: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                       │
+│                                                                                                  │
+│   122 │   │   │   try:                                                                           │
+│   123 │   │   │   │   with tempconfig({}):                                                       │
+│   124 │   │   │   │   │   scene = SceneClass()                                                   │
+│ ❱ 125 │   │   │   │   │   scene.render()                                                         │
+│   126 │   │   │   except Exception:                                                              │
+│   127 │   │   │   │   error_console.print_exception()                                            │
+│   128 │   │   │   │   sys.exit(1)                                                                │
+│                                                                                                  │
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/scene/scen │
+│ e.py:237 in render                                                                               │
+│                                                                                                  │
+│    234 │   │   """                                                                               │
+│    235 │   │   self.setup()                                                                      │
+│    236 │   │   try:                                                                              │
+│ ❱  237 │   │   │   self.construct()                                                              │
+│    238 │   │   except EndSceneEarlyException:                                                    │
+│    239 │   │   │   pass                                                                          │
+│    240 │   │   except RerunSceneException:                                                       │
+│                                                                                                  │
+│ /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/temp/manim_scene_00002124_attempt_1 │
+│ .py:12 in construct                                                                              │
+│                                                                                                  │
+│    9 │   │   │   x_axis_config={"numbers_to_include": [1, 2, 3, 4]},                             │
+│   10 │   │   │   y_axis_config={"numbers_to_include": [5, 10, 15, 20, 25]}                       │
+│   11 │   │   )                                                                                   │
+│ ❱ 12 │   │   ax.add_coordinate_labels()                                                          │
+│   13 │   │   self.play(Create(ax))                                                               │
+│   14 │   │   linear_func = ax.plot(lambda x: x, x_range=[0, 5], color=GREEN)                     │
+│   15 │   │   quadratic_func = ax.plot(lambda x: x**2, x_range=[0, 5], color=BLUE)                │
+│                                                                                                  │
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/mobject/mo │
+│ bject.py:723 in __getattr__                                                                      │
+│                                                                                                  │
+│    720 │   │   │   return types.MethodType(setter, self)                                         │
+│    721 │   │                                                                                     │
+│    722 │   │   # Unhandled attribute, therefore error                                            │
+│ ❱  723 │   │   raise AttributeError(f"{type(self).__name__} object has no attribute '{attr}'")   │
+│    724 │                                                                                         │
+│    725 │   @property                                                                             │
+│    726 │   def width(self) -> float:                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+AttributeError: Axes object has no attribute 'add_coordinate_labels'
+
+2025-08-18 13:12:18,869 - services.manim - ERROR - Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:12:18,869 - services.manim - ERROR - Attempt 2 failed: Manim render failed: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                       │
+│                                                                                                  │
+│   122 │   │   │   try:                                                                        
+
+Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:12:18,869 - services.manim - INFO - Generating animation (attempt 3/3)
+2025-08-18 13:12:23,613 - services.manim - ERROR - Manim render failed with return code 1
+2025-08-18 13:12:23,613 - services.manim - ERROR - Stderr: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                       │
+│                                                                                                  │
+│   122 │   │   │   try:                                                                           │
+│   123 │   │   │   │   with tempconfig({}):                                                       │
+│   124 │   │   │   │   │   scene = SceneClass()                                                   │
+│ ❱ 125 │   │   │   │   │   scene.render()                                                         │
+│   126 │   │   │   except Exception:                                                              │
+│   127 │   │   │   │   error_console.print_exception()                                            │
+│   128 │   │   │   │   sys.exit(1)                                                                │
+│                                                                                                  │
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/scene/scen │
+│ e.py:237 in render                                                                               │
+│                                                                                                  │
+│    234 │   │   """                                                                               │
+│    235 │   │   self.setup()                                                                      │
+│    236 │   │   try:                                                                              │
+│ ❱  237 │   │   │   self.construct()                                                              │
+│    238 │   │   except EndSceneEarlyException:                                                    │
+│    239 │   │   │   pass                                                                          │
+│    240 │   │   except RerunSceneException:                                                       │
+│                                                                                                  │
+│ /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/temp/manim_scene_00013d83_attempt_2 │
+│ .py:14 in construct                                                                              │
+│                                                                                                  │
+│   11 │   │   │   y_length=5,                                                                     │
+│   12 │   │   │   axis_config={"include_numbers": True},                                          │
+│   13 │   │   )                                                                                   │
+│ ❱ 14 │   │   axes.add_coordinate_labels()                                                        │
+│   15 │   │   axes.x_axis.set_x(axes.x_axis.get_x() - 0.5)                                        │
+│   16 │   │   axes.y_axis.set_y(axes.y_axis.get_y() - 0.5)                                        │
+│   17 │   │   x_label = axes.get_x_axis_label("Input Size (n)")                                   │
+│                                                                                                  │
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/mobject/mo │
+│ bject.py:723 in __getattr__                                                                      │
+│                                                                                                  │
+│    720 │   │   │   return types.MethodType(setter, self)                                         │
+│    721 │   │                                                                                     │
+│    722 │   │   # Unhandled attribute, therefore error                                            │
+│ ❱  723 │   │   raise AttributeError(f"{type(self).__name__} object has no attribute '{attr}'")   │
+│    724 │                                                                                         │
+│    725 │   @property                                                                             │
+│    726 │   def width(self) -> float:                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+AttributeError: Axes object has no attribute 'add_coordinate_labels'
+
+2025-08-18 13:12:23,614 - services.manim - ERROR - Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:12:23,614 - services.manim - ERROR - Attempt 3 failed: Manim render failed: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                       │
+│                                                                                                  │
+│   122 │   │   │   try:                                                                        
+
+Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:12:39,208 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: Create a 2d x,y graph for different time complexities.
+2025-08-18 13:12:39,209 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 13:12:56,452 - main - INFO - Uploading video to Supabase: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0001647c_attempt_0/720p30/GeneratedScene.mp4
+2025-08-18 13:12:57,422 - main - INFO - Video uploaded successfully. ID: c2868e96-d8c6-4d19-ac3d-23abde08a18a
+2025-08-18 13:12:57,422 - main - INFO - Cleaned up local file: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0001647c_attempt_0/720p30/GeneratedScene.mp4
+2025-08-18 13:13:16,089 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:13:16,264 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:13:16,387 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:13:16,501 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:13:16,618 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:13:16,727 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:13:16,812 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:13:16,898 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:13:17,056 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:13:28,410 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: Create a 2d x,y graph for different time complexities in detail
+2025-08-18 13:13:28,411 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 13:13:49,913 - main - INFO - Uploading video to Supabase: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0000930a_attempt_0/720p30/GeneratedScene.mp4
+2025-08-18 13:13:51,469 - main - INFO - Video uploaded successfully. ID: 7e7f0538-2753-49f0-b082-46c8d6584829
+2025-08-18 13:13:51,470 - main - INFO - Cleaned up local file: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0000930a_attempt_0/720p30/GeneratedScene.mp4
+2025-08-18 13:14:17,513 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:14:17,703 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:14:17,823 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:14:18,016 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:14:18,152 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:14:18,250 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:14:18,363 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:14:18,480 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:14:18,582 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:14:35,946 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: Graph the quadratic formula step by step
+2025-08-18 13:14:35,948 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 13:14:56,411 - services.manim - ERROR - Attempt 1 failed: SyntaxError at line 15: '(' was never closed
+2025-08-18 13:14:56,411 - services.manim - INFO - Generating animation (attempt 2/3)
+2025-08-18 13:15:14,438 - main - INFO - Uploading video to Supabase: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0000ff09_attempt_1/720p30/QuadraticFormula.mp4
+2025-08-18 13:15:15,542 - main - INFO - Video uploaded successfully. ID: 8e0d1f5b-b203-4b77-991b-0b06010ef824
+2025-08-18 13:15:15,542 - main - INFO - Cleaned up local file: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0000ff09_attempt_1/720p30/QuadraticFormula.mp4
+2025-08-18 13:15:56,210 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:15:56,361 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:15:56,471 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:15:56,642 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:15:56,807 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:15:56,889 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:15:57,005 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:15:57,103 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:15:57,204 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:11,075 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:11,172 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:11,267 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:11,398 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:11,552 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:11,704 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:11,848 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:11,956 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:12,064 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:16:32,040 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: Animate a dot moving along the curve y = x^2 from x = -3 to x = 3
+2025-08-18 13:16:32,044 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 13:16:39,343 - services.manim - ERROR - Manim render failed with return code 1
+2025-08-18 13:16:39,344 - services.manim - ERROR - Stderr: Animation 0: Create(Axes of 2 submobjects):   0%|          | 0/30 [00:00<?, ?it/s]Animation 0: Create(Axes of 2 submobjects):  73%|███████▎  | 22/30 [00:00<00:00, 217.78it/s]                                                                                            ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                       │
+│                                                                                                  │
+│   122 │   │   │   try:                                                                           │
+│   123 │   │   │   │   with tempconfig({}):                                                       │
+│   124 │   │   │   │   │   scene = SceneClass()                                                   │
+│ ❱ 125 │   │   │   │   │   scene.render()                                                         │
+│   126 │   │   │   except Exception:                                                              │
+│   127 │   │   │   │   error_console.print_exception()                                            │
+│   128 │   │   │   │   sys.exit(1)                                                                │
+│                                                                                                  │
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/scene/scen │
+│ e.py:237 in render                                                                               │
+│                                                                                                  │
+│    234 │   │   """                                                                               │
+│    235 │   │   self.setup()                                                                      │
+│    236 │   │   try:                                                                              │
+│ ❱  237 │   │   │   self.construct()                                                              │
+│    238 │   │   except EndSceneEarlyException:                                                    │
+│    239 │   │   │   pass                                                                          │
+│    240 │   │   except RerunSceneException:                                                       │
+│                                                                                                  │
+│ /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/temp/manim_scene_0000f697_attempt_0 │
+│ .py:18 in construct                                                                              │
+│                                                                                                  │
+│   15 │   │   def func(x):                                                                        │
+│   16 │   │   │   return x**2                                                                     │
+│   17 │   │   # Get the graph of the function                                                     │
+│ ❱ 18 │   │   parabola = axes.get_graph(func, x_range=[-3, 3], color=BLUE)                        │
+│   19 │   │   self.play(Create(parabola))                                                         │
+│   20 │   │   # Create a dot                                                                      │
+│   21 │   │   dot = Circle(radius=0.1, color=RED, fill_opacity=1)                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+TypeError: Mobject.__getattr__.<locals>.getter() got an unexpected keyword argument 'x_range'
+
+2025-08-18 13:16:39,344 - services.manim - ERROR - Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:16:39,345 - services.manim - ERROR - Attempt 1 failed: Manim render failed: Animation 0: Create(Axes of 2 submobjects):   0%|          | 0/30 [00:00<?, ?it/s]Animation 0: Create(Axes of 2 submobjects):  73%|███████▎  | 22/30 [00:00<00:00, 217.78it/s]                                                                                            ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render
+
+Stdout: Manim Community v0.19.0
+
+
+2025-08-18 13:16:39,345 - services.manim - INFO - Generating animation (attempt 2/3)
+2025-08-18 13:16:43,325 - main - INFO - Uploading video to Supabase: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_00018616_attempt_1/720p30/GeneratedScene.mp4
+2025-08-18 13:16:44,547 - main - INFO - Video uploaded successfully. ID: 1e629cdb-25b0-4ac4-82f5-92cfeacebe8d
+2025-08-18 13:16:44,547 - main - INFO - Cleaned up local file: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_00018616_attempt_1/720p30/GeneratedScene.mp4
+2025-08-18 13:17:01,340 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:17:01,835 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:17:02,671 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:17:02,770 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:17:02,868 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:17:03,078 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:17:03,232 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:17:03,329 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:17:03,457 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 13:17:26,004 - main - INFO - ⏹️  Shutting down Animathic API

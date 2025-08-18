@@ -109,7 +109,7 @@ class OptimizedManimService:
                     temperature=0.1,
                     top_p=0.8,
                     top_k=20,
-                    max_output_tokens=2048,
+                    max_output_tokens=4096,
                     candidate_count=1
                 )
             )
@@ -125,7 +125,7 @@ class OptimizedManimService:
                     temperature=0.05,
                     top_p=0.8,
                     top_k=20,
-                    max_output_tokens=2048,
+                    max_output_tokens=4096,
                     candidate_count=1
                 )
             )
@@ -137,9 +137,26 @@ class OptimizedManimService:
     def _extract_response_text(self, response) -> str:
         """Extract text content from Gemini API response with multiple fallback methods"""
         try:
-            # Method 1: Try candidates[0].content.parts[0].text (most common)
+            # Check for truncated responses first
             if hasattr(response, 'candidates') and response.candidates:
                 for candidate in response.candidates:
+                    # Check if response was truncated
+                    if hasattr(candidate, 'finish_reason'):
+                        finish_reason = str(candidate.finish_reason)
+                        if 'MAX_TOKENS' in finish_reason:
+                            logger.warning("⚠️ Response truncated due to MAX_TOKENS limit")
+                            # Try to extract partial content anyway
+                            if hasattr(candidate, 'content'):
+                                content = candidate.content
+                                if hasattr(content, 'parts') and content.parts:
+                                    for part in content.parts:
+                                        if hasattr(part, 'text'):
+                                            text = str(part.text).strip()
+                                            if text:
+                                                logger.debug("✅ Extracted partial content from truncated response")
+                                                return text
+                    
+                    # Method 1: Try candidates[0].content.parts[0].text (most common)
                     if hasattr(candidate, 'content'):
                         content = candidate.content
                         if hasattr(content, 'parts') and content.parts:
@@ -333,21 +350,107 @@ class OptimizedManimService:
         code = '\n'.join(collected).strip() or raw.strip()
         return code
 
+    def _is_truncated_response(self, response) -> bool:
+        """Check if the response was truncated due to token limits"""
+        try:
+            if hasattr(response, 'candidates') and response.candidates:
+                for candidate in response.candidates:
+                    if hasattr(candidate, 'finish_reason'):
+                        finish_reason = str(candidate.finish_reason)
+                        if 'MAX_TOKENS' in finish_reason:
+                            return True
+            return False
+        except Exception:
+            return False
+
+
+
+    def _fix_common_syntax_errors(self, code: str) -> str:
+        """Fix common syntax errors in generated Manim code"""
+        try:
+            # Fix common indentation issues
+            lines = code.split('\n')
+            fixed_lines = []
+            in_class = False
+            in_method = False
+            
+            for line in lines:
+                stripped = line.strip()
+                
+                # Skip empty lines
+                if not stripped:
+                    fixed_lines.append('')
+                    continue
+                
+                # Handle class definition
+                if stripped.startswith('class '):
+                    in_class = True
+                    in_method = False
+                    fixed_lines.append(line)
+                    continue
+                
+                # Handle method definition
+                if stripped.startswith('def '):
+                    in_method = True
+                    fixed_lines.append('    ' + stripped)
+                    continue
+                
+                # Handle content inside method
+                if in_method and stripped and not stripped.startswith(('if ', 'for ', 'while ', 'try:', 'except:', 'finally:', 'with ')):
+                    if not stripped.startswith('#'):  # Not a comment
+                        fixed_lines.append('        ' + stripped)
+                    else:
+                        fixed_lines.append('    ' + stripped)
+                    continue
+                
+                # Handle control structures
+                if in_method and stripped.startswith(('if ', 'for ', 'while ', 'try:', 'except:', 'finally:', 'with ')):
+                    fixed_lines.append('    ' + stripped)
+                    continue
+                
+                # Handle else/elif
+                if in_method and stripped.startswith(('else:', 'elif ')):
+                    fixed_lines.append('    ' + stripped)
+                    continue
+                
+                # Default case
+                fixed_lines.append(line)
+            
+            fixed_code = '\n'.join(fixed_lines)
+            
+            # Fix common string issues
+            fixed_code = fixed_code.replace('\\n', '\n')
+            fixed_code = fixed_code.replace('\\t', '    ')
+            
+            # Ensure proper imports
+            if 'from manim import *' not in fixed_code:
+                fixed_code = 'from manim import *\n\n' + fixed_code
+            
+            return fixed_code
+            
+        except Exception as e:
+            logger.warning(f"Failed to fix syntax errors: {e}")
+            return code
+
     def _is_valid_python_content(self, content: str) -> bool:
-        """Check if content contains valid Python code structure, not HTML/SVG"""
+        """Check if content contains valid Python code structure"""
         content_lower = content.lower()
         
         # Check for unwanted content types
         if any(unwanted in content_lower for unwanted in ['<html', '<svg', '<div', '```html', '```svg']):
             return False
         
-        # Check for required Python keywords
-        required_keywords = ['from manim import', 'class', 'def construct', 'self.']
+        # Check for required Python keywords - be more flexible
+        required_keywords = ['from manim import', 'class', 'def construct']
         if not all(keyword in content_lower for keyword in required_keywords):
             return False
         
         # Check that it's not just an explanation
-        if content_lower.count('```') > 2:  # Too many code blocks
+        if content_lower.count('```') > 3:  # Allow more code blocks
+            return False
+            
+        # Check for basic Python syntax
+        if not ('(' in content and ')' in content and ':' in content):
             return False
             
         return True
@@ -362,56 +465,51 @@ class OptimizedManimService:
             return False, f"Validation error: {str(e)}"
 
     def _force_format_prompt(self, user_prompt: str, previous_error: Optional[str]) -> str:
-        hint = f"\nPrevious error to fix: {previous_error}" if previous_error else ""
+        hint = f"\nFix: {previous_error}" if previous_error else ""
         return (
-            "SYSTEM: You are a Python code generator for Manim animations. You MUST return ONLY Python code.\n\n"
-            "CRITICAL RULES:\n"
-            "1. Return ONLY Python code - no explanations, no markdown, no HTML, no SVG\n"
-            "2. Start EXACTLY with: from manim import *\n"
-            "3. Define: class GeneratedScene(Scene):\n"
-            "4. Include: def construct(self):\n"
-            "5. Use Text() instead of MathTex/Tex for safety\n"
-            "6. Use Axes() for coordinate systems\n"
-            "7. Use simple colors like RED, BLUE, GREEN\n"
-            "8. Keep animations simple with Create(), Write(), FadeIn()\n"
-            "9. End with self.wait(2)\n"
-            "10. Avoid complex LaTeX, subscripts, or special formatting\n"
-            "11. Use basic Python math functions (no external libraries)\n"
-            "12. NO explanations, NO markdown, NO HTML, NO SVG, NO comments outside the code\n\n"
-            f"TASK: {user_prompt}{hint}\n\n"
-            "RESPONSE FORMAT (Python code only):\n"
+            "Generate working Python code for Manim. Return ONLY executable code.\n\n"
+            "CRITICAL REQUIREMENTS:\n"
+            "- from manim import *\n"
+            "- class GeneratedScene(Scene):\n"
+            "- def construct(self):\n"
+            "- Use only: Text(), Circle(), Rectangle(), Axes(), Create(), Write(), FadeIn()\n"
+            "- Use colors: RED, BLUE, GREEN, WHITE, BLACK\n"
+            "- End with self.wait(2)\n"
+            "- NO complex math, NO LaTeX, NO external libraries\n\n"
+            f"Task: {user_prompt}{hint}\n\n"
+            "Generate ONLY this structure:\n"
             "from manim import *\n\n"
             "class GeneratedScene(Scene):\n"
             "    def construct(self):\n"
-            "        title = Text('Hello World', color=BLUE)\n"
-            "        self.play(Write(title))\n"
-            "        self.wait(2)\n"
-                )
+            "        # Simple working code here\n"
+            "        self.wait(2)"
+        )
     
     def _aggressive_prompt(self, user_prompt: str, previous_error: Optional[str]) -> str:
         """More aggressive prompt for second attempt"""
-        hint = f"\nPrevious error to fix: {previous_error}" if previous_error else ""
+        hint = f"\nFix: {previous_error}" if previous_error else ""
         return (
-            "URGENT: You are a Python code generator. Return ONLY Python code for Manim.\n\n"
-            "MANDATORY: Return ONLY this Python code structure:\n"
+            "URGENT: Generate ONLY working Manim code. NO explanations.\n\n"
+            "MANDATORY STRUCTURE:\n"
             "from manim import *\n\n"
             "class GeneratedScene(Scene):\n"
             "    def construct(self):\n"
-            "        # Animation code here\n"
+            "        # Simple working animation\n"
             "        self.wait(2)\n\n"
             f"Task: {user_prompt}{hint}\n"
-            "NO explanations, NO markdown, ONLY Python code."
+            "ONLY Python code, nothing else."
         )
     
     def _simple_prompt(self, user_prompt: str, previous_error: Optional[str]) -> str:
         """Simple fallback prompt for third attempt"""
-        hint = f"\nPrevious error to fix: {previous_error}" if previous_error else ""
+        hint = f"\nFix: {previous_error}" if previous_error else ""
         return (
-            f"Write Python code for Manim to {user_prompt}. Return ONLY:\n"
+            f"Generate working Manim code for: {user_prompt}\n\n"
+            "ONLY this exact structure:\n"
             "from manim import *\n\n"
             "class GeneratedScene(Scene):\n"
             "    def construct(self):\n"
-            "        # Code here\n"
+            "        # Simple working code\n"
             "        self.wait(2)"
         )
     
@@ -455,8 +553,13 @@ class OptimizedManimService:
                 if self._is_valid_python_content(raw):
                     logger.debug("✅ Content validation passed - contains Python code")
                 else:
-                    logger.warning("⚠️ Content validation failed - may contain HTML/SVG, retrying...")
-                    last_error = "AI returned HTML/SVG instead of Python code"
+                    # Check if it's a truncated response
+                    if self._is_truncated_response(response):
+                        logger.warning("⚠️ Response truncated, trying with shorter prompt...")
+                        last_error = "Response truncated due to token limit"
+                    else:
+                        logger.warning("⚠️ Content validation failed - may contain HTML/SVG, retrying...")
+                        last_error = "AI returned HTML/SVG instead of Python code"
                     continue
                 
                 code = self._ensure_code_prereqs(self._sanitize_code(raw))
@@ -481,6 +584,24 @@ class OptimizedManimService:
                     
                 last_error = result.error
                 logger.error(f"Attempt {attempt+1} failed: {result.error}")
+                
+                # Log the code that failed for debugging
+                logger.debug(f"🔍 Failed code (attempt {attempt+1}):")
+                logger.debug(f"🔍 {code[:500]}...")
+                
+                # If it's a syntax error, try to fix common issues
+                if "SyntaxError" in result.error or "IndentationError" in result.error:
+                    logger.info(f"🔄 Attempting to fix syntax errors in attempt {attempt+1}")
+                    fixed_code = self._fix_common_syntax_errors(code)
+                    if fixed_code != code:
+                        logger.info("✅ Code fixed, retrying...")
+                        fixed_result = await self._render_manim_code(fixed_code, temp_dir, attempt)
+                        if fixed_result.success:
+                            fixed_result.code_used = fixed_code
+                            return fixed_result
+                        else:
+                            logger.error(f"Fixed code still failed: {fixed_result.error}")
+                            last_error = f"Syntax fix failed: {fixed_result.error}"
                 
             except Exception as e:
                 last_error = str(e)
@@ -546,7 +667,19 @@ class OptimizedManimService:
                 return AnimationResult(success=False, error='Video file not found after successful render')
             else:
                 err = (stderr or b'').decode('utf-8', errors='ignore')
-                return AnimationResult(success=False, error=f'Manim render failed: {err[:300]}')
+                stdout_text = (stdout or b'').decode('utf-8', errors='ignore')
+                
+                # Provide more detailed error information
+                error_msg = f'Manim render failed: {err[:500]}'
+                if stdout_text:
+                    error_msg += f'\n\nStdout: {stdout_text[:200]}'
+                
+                logger.error(f"Manim render failed with return code {proc.returncode}")
+                logger.error(f"Stderr: {err}")
+                if stdout_text:
+                    logger.error(f"Stdout: {stdout_text}")
+                
+                return AnimationResult(success=False, error=error_msg)
                 
         except Exception as e:
             return AnimationResult(success=False, error=f'Rendering exception: {str(e)}')
