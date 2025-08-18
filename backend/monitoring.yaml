@@ -1,0 +1,108 @@
+# Google Cloud Monitoring Configuration for Animathic Backend
+
+# Alerting Policies
+alertPolicies:
+  - displayName: "High Error Rate"
+    conditions:
+      - displayName: "Error rate is high"
+        conditionThreshold:
+          filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend"'
+          comparison: COMPARISON_GREATER_THAN
+          thresholdValue: 0.05
+          duration: 300s
+          aggregations:
+            - alignmentPeriod: 60s
+              perSeriesAligner: ALIGN_RATE
+              crossSeriesReducer: REDUCE_MEAN
+    notificationChannels:
+      - "projects/animathic-backend/notificationChannels/email"
+
+  - displayName: "High Latency"
+    conditions:
+      - displayName: "Response time is high"
+        conditionThreshold:
+          filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend"'
+          comparison: COMPARISON_GREATER_THAN
+          thresholdValue: 5000
+          duration: 300s
+          aggregations:
+            - alignmentPeriod: 60s
+              perSeriesAligner: ALIGN_MEAN
+              crossSeriesReducer: REDUCE_MEAN
+
+  - displayName: "High Memory Usage"
+    conditions:
+      - displayName: "Memory usage is high"
+        conditionThreshold:
+          filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend"'
+          comparison: COMPARISON_GREATER_THAN
+          thresholdValue: 0.8
+          duration: 300s
+          aggregations:
+            - alignmentPeriod: 60s
+              perSeriesAligner: ALIGN_MEAN
+              crossSeriesReducer: REDUCE_MEAN
+
+# Dashboard Configuration
+dashboards:
+  - displayName: "Animathic Backend Dashboard"
+    gridLayout:
+      columns: "2"
+      widgets:
+        - title: "Request Count"
+          xyChart:
+            dataSets:
+              - timeSeriesQuery:
+                  timeSeriesFilter:
+                    filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend"'
+                    aggregations:
+                      - alignmentPeriod: 60s
+                        perSeriesAligner: ALIGN_RATE
+                        crossSeriesReducer: REDUCE_MEAN
+
+        - title: "Response Time"
+          xyChart:
+            dataSets:
+              - timeSeriesQuery:
+                  timeSeriesFilter:
+                    filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend"'
+                    aggregations:
+                      - alignmentPeriod: 60s
+                        perSeriesAligner: ALIGN_MEAN
+                        crossSeriesReducer: REDUCE_MEAN
+
+        - title: "Error Rate"
+          xyChart:
+            dataSets:
+              - timeSeriesQuery:
+                  timeSeriesFilter:
+                    filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend"'
+                    aggregations:
+                      - alignmentPeriod: 60s
+                        perSeriesAligner: ALIGN_RATE
+                        crossSeriesReducer: REDUCE_MEAN
+
+        - title: "Memory Usage"
+          xyChart:
+            dataSets:
+              - timeSeriesQuery:
+                  timeSeriesFilter:
+                    filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend"'
+                    aggregations:
+                      - alignmentPeriod: 60s
+                        perSeriesAligner: ALIGN_MEAN
+                        crossSeriesReducer: REDUCE_MEAN
+
+# Log-based Metrics
+logMetrics:
+  - name: "animathic_backend_requests"
+    description: "Count of requests to Animathic Backend"
+    filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend"'
+
+  - name: "animathic_backend_errors"
+    description: "Count of errors in Animathic Backend"
+    filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend" AND severity>=ERROR'
+
+  - name: "animathic_backend_ai_generations"
+    description: "Count of AI animation generations"
+    filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="animathic-backend" AND jsonPayload.message:"AI generation"'

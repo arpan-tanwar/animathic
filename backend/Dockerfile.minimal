@@ -1,0 +1,22 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install minimal dependencies
+COPY requirements_minimal.txt .
+RUN pip install --no-cache-dir -r requirements_minimal.txt
+
+# Copy only essential files
+COPY main.py .
+COPY services/ ./services/
+COPY models/ ./models/
+COPY config.py .
+
+# Create media directories
+RUN mkdir -p media/images media/videos media/temp media/Tex media/texts
+
+EXPOSE 8080
+ENV PORT=8080
+
+# Use gunicorn for production
+CMD exec gunicorn --bind :$PORT --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout 0 main:app

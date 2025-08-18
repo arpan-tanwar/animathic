@@ -2,15 +2,15 @@
 # This file enables automated builds and deployments
 
 steps:
-  # Build the Docker image
+  # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-f', 'Dockerfile.gcp', '-t', 'gcr.io/$PROJECT_ID/animathic-backend:$COMMIT_SHA', '.']
-    
-  # Push the Docker image to Container Registry
+    args: ['buildx', 'build', '--platform', 'linux/amd64', '-f', 'Dockerfile.production', '-t', 'gcr.io/$PROJECT_ID/animathic-backend:$COMMIT_SHA', '.']
+  
+  # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/animathic-backend:$COMMIT_SHA']
-    
-  # Deploy to Cloud Run
+  
+  # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -30,8 +30,11 @@ steps:
       - '1'
       - '--timeout'
       - '300'
-      - '--concurrency'
-      - '80'
+      - '--port'
+      - '8080'
+      - '--execution-environment'
+      - 'gen2'
+      - '--cpu-boost'
       - '--min-instances'
       - '0'
       - '--max-instances'
@@ -41,15 +44,11 @@ steps:
       - '--set-secrets'
       - 'GOOGLE_AI_API_KEY=GOOGLE_AI_API_KEY:latest,SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest'
 
-# Store images in Container Registry
 images:
   - 'gcr.io/$PROJECT_ID/animathic-backend:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/animathic-backend:latest'
 
-# Build timeout
-timeout: '1200s'
-
-# Build options
 options:
   logging: CLOUD_LOGGING_ONLY
   machineType: 'E2_HIGHCPU_8'
+
+timeout: '1200s'

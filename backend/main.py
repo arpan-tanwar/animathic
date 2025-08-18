@@ -32,13 +32,16 @@ import psutil
 # Load environment variables FIRST - before any imports that need them
 load_dotenv()
 
+# Import configuration
+from config import get_config, get_api_config, get_feature_flags, is_production, get_log_level
+
 # Configure logging first
+log_level = get_log_level()
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=getattr(logging, log_level.upper()),
+    format='%(asctime)s - %(name)s - %(message)s',
     handlers=[
-        logging.FileHandler('animathic.log'),
-        logging.StreamHandler()
+        logging.StreamHandler()  # Cloud Run handles file logging
     ]
 )
 logger = logging.getLogger(__name__)
@@ -135,10 +138,10 @@ video_storage = {}
 
 # Create FastAPI app
 app = FastAPI(
-    title="Animathic - AI Mathematical Animation Generator",
-    description="Optimized AI-powered mathematical animation generator with enhanced security and performance",
-    version="3.0.0",
-    docs_url="/docs",
+    title=config["base"]["app_name"],
+    description="AI-Powered Mathematical Animation Generator",
+    version=config["base"]["version"],
+    docs_url="/docs" if not is_production() else None,
     redoc_url="/redoc"
 )
 
@@ -174,16 +177,7 @@ async def add_security_headers(request: Request, call_next):
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000", 
-        "http://localhost:8080",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:8080",
-        "https://animathic.com",
-    ],
-    allow_origin_regex=r"https://.*\.animathic\.com",
+    allow_origins=config["api"]["cors_origins"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "user-id", "User-Id"],
@@ -763,11 +757,11 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
+    api_config = get_api_config()
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=port,
+        host=api_config["host"],
+        port=api_config["port"],
         reload=False,
         workers=1,
         access_log=True
