@@ -37,12 +37,12 @@ COPY . .
 # Create media directories
 RUN mkdir -p media/images media/videos media/temp media/Tex media/texts
 
-# Expose port
-EXPOSE 8000
+# Expose port (Cloud Run will override this with PORT env var)
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+    CMD curl -f http://localhost:8080/api/health || exit 1
 
 # Start command
 CMD ["python", "main.py"]
