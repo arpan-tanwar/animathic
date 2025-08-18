@@ -104,8 +104,8 @@ class OptimizedManimService:
     def _init_models(self):
         try:
             self.model = genai.GenerativeModel(
-            model_name='gemini-2.5-flash',
-            generation_config=genai.GenerationConfig(
+                model_name='gemini-2.5-flash',
+                generation_config=genai.GenerationConfig(
                     temperature=0.1,
                     top_p=0.8,
                     top_k=20,
@@ -135,7 +135,9 @@ class OptimizedManimService:
             self.model_secondary = None
 
     def _extract_response_text(self, response) -> str:
+        """Extract text content from Gemini API response with multiple fallback methods"""
         try:
+            # Method 1: Try candidates[0].content.parts[0].text (most common)
             if hasattr(response, 'candidates') and response.candidates:
                 for candidate in response.candidates:
                     if hasattr(candidate, 'content'):
@@ -145,45 +147,136 @@ class OptimizedManimService:
                                 if hasattr(part, 'text'):
                                     text = str(part.text).strip()
                                     if text:
+                                        logger.debug("✅ Extracted from candidates[].content.parts[].text")
                                         return text
+                        
+                        # Also try direct text access on content
+                        if hasattr(content, 'text'):
+                            text = str(content.text).strip()
+                            if text:
+                                logger.debug("✅ Extracted from candidates[].content.text")
+                                return text
+                        
+                        # Try to access text as a property
+                        try:
+                            if hasattr(content, 'text'):
+                                text = content.text.strip()
+                                if text:
+                                    logger.debug("✅ Extracted from content.text property")
+                                    return text
+                        except Exception:
+                            pass
             
+            # Method 2: Try response.parts directly
             if hasattr(response, 'parts') and response.parts:
                 for part in response.parts:
                     if hasattr(part, 'text'):
                         text = str(part.text).strip()
                         if text:
+                            logger.debug("✅ Extracted from response.parts[].text")
                             return text
             
+            # Method 3: Try response.text (simple responses)
             try:
                 if hasattr(response, 'text'):
                     text = str(response.text).strip()
                     if text:
+                        logger.debug("✅ Extracted from response.text")
                         return text
             except Exception:
                 pass
             
+            # Method 3.5: Try response.text() method call (Google Generative AI)
+            try:
+                if hasattr(response, 'text') and callable(getattr(response, 'text', None)):
+                    text = response.text().strip()
+                    if text:
+                        logger.debug("✅ Extracted from response.text() method call")
+                        return text
+            except Exception:
+                pass
+            
+            # Method 3.6: Try to access text as a property on the response object
+            try:
+                if hasattr(response, 'text'):
+                    text = response.text.strip()
+                    if text:
+                        logger.debug("✅ Extracted from response.text property")
+                        return text
+            except Exception:
+                pass
+            
+            # Method 3.7: Try to get text from the response object directly
+            try:
+                text = getattr(response, 'text', None)
+                if text:
+                    text_str = str(text).strip()
+                    if text_str and text_str != str(response):
+                        logger.debug("✅ Extracted from response.text direct access")
+                        return text_str
+            except Exception:
+                pass
+            
+            # Method 4: Convert to string and use regex patterns
             response_str = str(response)
+            logger.debug(f"🔍 Response string length: {len(response_str)}")
+            logger.debug(f"🔍 Response preview: {response_str[:200]}...")
+            
+            # Enhanced patterns for code extraction
             patterns = [
                 r"```python\s*([\s\S]*?)```",
                 r"```\s*(from\s+manim[\s\S]*?)```", 
                 r"(from\s+manim\s+import[\s\S]*?self\.wait\([^)]*\))",
-                r"```(?:python)?\s*([\s\S]*?)```"
+                r"```(?:python)?\s*([\s\S]*?)```",
+                r"(from\s+manim[\s\S]*?class\s+\w+\s*\(\s*Scene\s*\)[\s\S]*?def\s+construct[\s\S]*?self\.wait)",
+                r"(class\s+\w+\s*\(\s*Scene\s*\)[\s\S]*?def\s+construct[\s\S]*?self\.wait)"
             ]
             
-            for pattern in patterns:
+            for i, pattern in enumerate(patterns):
                 match = re.search(pattern, response_str, re.IGNORECASE | re.DOTALL)
                 if match:
                     code = match.group(1).strip()
-                    if code and 'manim' in code:
+                    if code and ('manim' in code or 'Scene' in code):
+                        logger.debug(f"✅ Extracted using pattern {i+1}")
                         return code
             
-            if 'from manim import' in response_str:
+            # Method 5: Look for any Python code structure
+            if 'from manim import' in response_str or 'class' in response_str or 'def construct' in response_str:
+                logger.debug("✅ Extracted from response string (contains key keywords)")
                 return response_str
+            
+            # Method 6: Last resort - return the full response string if it looks like code
+            if any(keyword in response_str.lower() for keyword in ['import', 'class', 'def', 'self.', 'manim']):
+                logger.debug("✅ Extracted from response string (contains Python keywords)")
+                return response_str
+            
+            # Method 7: Try to extract Python code from explanations using regex
+            python_code_patterns = [
+                r'(from manim import[\s\S]*?class[\s\S]*?def construct[\s\S]*?self\.wait)',
+                r'(class[\s\S]*?Scene[\s\S]*?def construct[\s\S]*?self\.wait)',
+                r'(from manim[\s\S]*?self\.wait)',
+                r'(class[\s\S]*?Scene[\s\S]*?self\.wait)'
+            ]
+            
+            for i, pattern in enumerate(python_code_patterns):
+                match = re.search(pattern, response_str, re.IGNORECASE | re.DOTALL)
+                if match:
+                    code = match.group(1).strip()
+                    if code and len(code) > 50:  # Ensure it's substantial code
+                        logger.debug(f"✅ Extracted Python code from explanation using pattern {i+1}")
+                        return code
+            
+            # If we get here, we couldn't extract anything useful
+            logger.error(f"❌ No extractable content found. Response type: {type(response)}")
+            logger.error(f"❌ Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
+            logger.error(f"❌ Response string preview: {response_str[:500]}...")
             
             raise ValueError("No extractable text content found in response")
             
         except Exception as e:
-            logger.error(f"Failed to extract response: {e}")
+            logger.error(f"❌ Failed to extract response: {e}")
+            logger.error(f"❌ Response type: {type(response)}")
+            logger.error(f"❌ Response string: {str(response)[:500]}...")
             raise ValueError(f"Could not extract code from AI response: {e}")
     
     def _ensure_code_prereqs(self, code: str) -> str:
@@ -240,6 +333,25 @@ class OptimizedManimService:
         code = '\n'.join(collected).strip() or raw.strip()
         return code
 
+    def _is_valid_python_content(self, content: str) -> bool:
+        """Check if content contains valid Python code structure, not HTML/SVG"""
+        content_lower = content.lower()
+        
+        # Check for unwanted content types
+        if any(unwanted in content_lower for unwanted in ['<html', '<svg', '<div', '```html', '```svg']):
+            return False
+        
+        # Check for required Python keywords
+        required_keywords = ['from manim import', 'class', 'def construct', 'self.']
+        if not all(keyword in content_lower for keyword in required_keywords):
+            return False
+        
+        # Check that it's not just an explanation
+        if content_lower.count('```') > 2:  # Too many code blocks
+            return False
+            
+        return True
+
     def _validate_syntax_thoroughly(self, code: str) -> Tuple[bool, Optional[str]]:
         try:
             ast.parse(code)
@@ -252,27 +364,57 @@ class OptimizedManimService:
     def _force_format_prompt(self, user_prompt: str, previous_error: Optional[str]) -> str:
         hint = f"\nPrevious error to fix: {previous_error}" if previous_error else ""
         return (
-            "Return ONLY valid Python code for Manim 0.19. No explanations, no markdown formatting.\n\n"
-            "REQUIREMENTS:\n"
-            "- Start exactly with: from manim import *\n"
-            "- Define: class GeneratedScene(Scene):\n"
-            "- Include: def construct(self):\n"
-            "- Use Text() instead of MathTex/Tex for safety\n"
-            "- Use Axes() for coordinate systems\n"
-            "- Use simple colors like RED, BLUE, GREEN\n"
-            "- Keep animations simple with Create(), Write(), FadeIn()\n"
-            "- End with self.wait(2)\n"
-            "- Avoid complex LaTeX, subscripts, or special formatting\n"
-            "- Use basic Python math functions (no external libraries)\n\n"
-            f"Task: {user_prompt}{hint}\n\n"
-            "Example format:\n"
+            "SYSTEM: You are a Python code generator for Manim animations. You MUST return ONLY Python code.\n\n"
+            "CRITICAL RULES:\n"
+            "1. Return ONLY Python code - no explanations, no markdown, no HTML, no SVG\n"
+            "2. Start EXACTLY with: from manim import *\n"
+            "3. Define: class GeneratedScene(Scene):\n"
+            "4. Include: def construct(self):\n"
+            "5. Use Text() instead of MathTex/Tex for safety\n"
+            "6. Use Axes() for coordinate systems\n"
+            "7. Use simple colors like RED, BLUE, GREEN\n"
+            "8. Keep animations simple with Create(), Write(), FadeIn()\n"
+            "9. End with self.wait(2)\n"
+            "10. Avoid complex LaTeX, subscripts, or special formatting\n"
+            "11. Use basic Python math functions (no external libraries)\n"
+            "12. NO explanations, NO markdown, NO HTML, NO SVG, NO comments outside the code\n\n"
+            f"TASK: {user_prompt}{hint}\n\n"
+            "RESPONSE FORMAT (Python code only):\n"
             "from manim import *\n\n"
             "class GeneratedScene(Scene):\n"
             "    def construct(self):\n"
-            "        # Your animation code here\n"
+            "        title = Text('Hello World', color=BLUE)\n"
+            "        self.play(Write(title))\n"
             "        self.wait(2)\n"
+                )
+    
+    def _aggressive_prompt(self, user_prompt: str, previous_error: Optional[str]) -> str:
+        """More aggressive prompt for second attempt"""
+        hint = f"\nPrevious error to fix: {previous_error}" if previous_error else ""
+        return (
+            "URGENT: You are a Python code generator. Return ONLY Python code for Manim.\n\n"
+            "MANDATORY: Return ONLY this Python code structure:\n"
+            "from manim import *\n\n"
+            "class GeneratedScene(Scene):\n"
+            "    def construct(self):\n"
+            "        # Animation code here\n"
+            "        self.wait(2)\n\n"
+            f"Task: {user_prompt}{hint}\n"
+            "NO explanations, NO markdown, ONLY Python code."
         )
-
+    
+    def _simple_prompt(self, user_prompt: str, previous_error: Optional[str]) -> str:
+        """Simple fallback prompt for third attempt"""
+        hint = f"\nPrevious error to fix: {previous_error}" if previous_error else ""
+        return (
+            f"Write Python code for Manim to {user_prompt}. Return ONLY:\n"
+            "from manim import *\n\n"
+            "class GeneratedScene(Scene):\n"
+            "    def construct(self):\n"
+            "        # Code here\n"
+            "        self.wait(2)"
+        )
+    
     async def generate_animation(self, prompt: str, media_dir: str = './media') -> AnimationResult:
         if not self.model and not self.model_secondary:
             return AnimationResult(success=False, error='AI model not available')
@@ -286,12 +428,40 @@ class OptimizedManimService:
             logger.info(f"Generating animation (attempt {attempt+1}/{self.max_attempts})")
             try:
                 feedback = last_error if attempt > 0 else None
-                prompt_txt = self._force_format_prompt(prompt, feedback)
+                
+                # Use different prompt strategies for different attempts
+                if attempt == 0:
+                    prompt_txt = self._force_format_prompt(prompt, feedback)
+                elif attempt == 1:
+                    # Second attempt: More aggressive prompt
+                    prompt_txt = self._aggressive_prompt(prompt, feedback)
+                else:
+                    # Third attempt: Fallback to secondary model with simple prompt
+                    prompt_txt = self._simple_prompt(prompt, feedback)
+                
                 model_to_use = self.model if attempt == 0 and self.model else (self.model_secondary or self.model)
                 
                 response = await asyncio.get_event_loop().run_in_executor(None, model_to_use.generate_content, prompt_txt)
+                
+                # Log response details for debugging
+                logger.debug(f"🔍 Response type: {type(response)}")
+                logger.debug(f"🔍 Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
+                
                 raw = self._extract_response_text(response)
+                logger.debug(f"📝 Extracted raw text length: {len(raw)}")
+                logger.debug(f"📝 Raw text preview: {raw[:200]}...")
+                
+                # Validate that we got Python code, not HTML/SVG
+                if self._is_valid_python_content(raw):
+                    logger.debug("✅ Content validation passed - contains Python code")
+                else:
+                    logger.warning("⚠️ Content validation failed - may contain HTML/SVG, retrying...")
+                    last_error = "AI returned HTML/SVG instead of Python code"
+                    continue
+                
                 code = self._ensure_code_prereqs(self._sanitize_code(raw))
+                logger.debug(f"🔧 Processed code length: {len(code)}")
+                logger.debug(f"🔧 Code preview: {code[:200]}...")
                 
                 ok, err = self._validate_syntax_thoroughly(code)
                 if not ok:

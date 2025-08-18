@@ -983,3 +983,175 @@
 2025-08-18 02:15:04,550 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
 2025-08-18 02:15:04,644 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
 2025-08-18 02:15:13,148 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:26:07,012 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:26:07,321 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:26:07,321 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:26:07,389 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:26:07,390 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:26:07,398 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:26:07,398 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:28:53,616 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: Create a 2d x,y graph for different time complexities.
+2025-08-18 02:28:53,617 - services.manim - INFO - ✅ Gemini primary model initialized (gemini-2.5-flash)
+2025-08-18 02:28:53,617 - services.manim - INFO - ✅ Gemini secondary model initialized (gemini-2.0-flash)
+2025-08-18 02:28:53,617 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 02:29:03,660 - services.manim - ERROR - Failed to extract response: No extractable text content found in response
+2025-08-18 02:29:03,661 - services.manim - ERROR - Attempt 1 failed with exception: Could not extract code from AI response: No extractable text content found in response
+2025-08-18 02:29:03,661 - services.manim - INFO - Generating animation (attempt 2/3)
+2025-08-18 02:29:07,891 - services.manim - ERROR - Attempt 2 failed: Manim render failed: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                      
+2025-08-18 02:29:07,892 - services.manim - INFO - Generating animation (attempt 3/3)
+2025-08-18 02:29:11,292 - services.manim - ERROR - Attempt 3 failed: Manim render failed: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                      
+2025-08-18 02:30:16,304 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:32:30,130 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:32:30,613 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:32:30,614 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:32:30,677 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:32:30,677 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:32:30,682 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:32:30,683 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:32:37,911 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:32:38,056 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:32:38,057 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:32:38,106 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:32:38,106 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:33:25,411 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:33:26,161 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:33:26,305 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:33:26,306 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:33:26,355 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:33:26,356 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:33:26,362 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:33:26,362 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:33:35,780 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:33:36,607 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:33:36,766 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:33:36,766 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:33:36,817 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:33:36,817 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:33:36,823 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:33:36,823 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:34:58,826 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:35:00,435 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:35:00,609 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:35:00,609 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:35:00,668 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:35:00,668 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:35:00,674 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:35:00,674 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:35:11,127 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:35:12,070 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:35:12,221 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:35:12,222 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:35:12,284 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:35:12,284 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:35:12,290 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:35:12,290 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:35:26,880 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:35:27,606 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:35:27,755 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:35:27,756 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:35:27,804 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:35:27,804 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:35:27,810 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:35:27,810 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:36:34,397 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:36:35,285 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:36:35,487 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:36:35,488 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:36:36,159 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:36:36,164 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:36:36,279 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:36:36,279 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:36:51,101 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:36:51,832 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:36:51,964 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:36:51,965 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:36:52,014 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:36:52,014 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:36:52,020 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:36:52,020 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:38:28,521 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:38:29,532 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:38:29,798 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:38:29,798 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:38:29,855 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:38:29,855 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:38:29,861 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:38:29,862 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:38:46,958 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:38:47,748 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:38:47,911 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:38:47,912 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:38:47,960 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:38:47,960 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:38:47,966 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:38:47,966 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:39:58,402 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:40:23,712 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:40:23,908 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:40:23,909 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:40:23,979 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:40:23,979 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:40:23,989 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:40:23,990 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:41:44,725 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:41:45,735 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:41:45,891 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:41:45,891 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:41:45,940 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:41:45,941 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:41:45,949 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:41:45,949 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:42:32,383 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:42:32,542 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:42:32,543 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:42:32,592 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:42:32,592 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:42:46,331 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:42:47,214 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:42:47,369 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:42:47,369 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:42:47,448 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:42:47,448 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:42:47,455 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:42:47,455 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:44:10,208 - main - INFO - ⏹️  Shutting down Animathic API
+2025-08-18 02:44:11,774 - services.manim - INFO - Google AI configured successfully
+2025-08-18 02:44:11,949 - main - INFO - ✅ Using optimized Manim service
+2025-08-18 02:44:11,949 - main - INFO - 📝 Using basic storage (enhanced database not available)
+2025-08-18 02:44:12,001 - main - INFO - ✅ Supabase storage service initialized successfully
+2025-08-18 02:44:12,001 - main - INFO - ✅ All services initialized successfully
+2025-08-18 02:44:12,007 - main - INFO - 🚀 Starting Animathic API v3.0.0
+2025-08-18 02:44:12,007 - main - INFO - 📊 Enhanced features: enabled
+2025-08-18 02:44:22,829 - main - INFO - Generating video for user user_2x3tqRZCDxWELEkvRulax5kFGmy: Create a 2d x,y graph for different time complexities.
+2025-08-18 02:44:22,830 - services.manim - INFO - ✅ Gemini primary model initialized (gemini-2.5-flash)
+2025-08-18 02:44:22,830 - services.manim - INFO - ✅ Gemini secondary model initialized (gemini-2.0-flash)
+2025-08-18 02:44:22,830 - services.manim - INFO - Generating animation (attempt 1/3)
+2025-08-18 02:44:33,752 - services.manim - ERROR - ❌ No extractable content found. Response type: <class 'google.generativeai.types.generation_types.GenerateContentResponse'>
+2025-08-18 02:44:33,753 - services.manim - ERROR - ❌ Response attributes: ['candidates', 'from_iterator', 'from_response', 'parts', 'prompt_feedback', 'resolve', 'text']
+2025-08-18 02:44:33,753 - services.manim - ERROR - ❌ Response string preview: <google.generativeai.types.generation_types.GenerateContentResponse object at 0x11124e120>...
+2025-08-18 02:44:33,753 - services.manim - ERROR - ❌ Failed to extract response: No extractable text content found in response
+2025-08-18 02:44:33,753 - services.manim - ERROR - ❌ Response type: <class 'google.generativeai.types.generation_types.GenerateContentResponse'>
+2025-08-18 02:44:33,753 - services.manim - ERROR - ❌ Response string: <google.generativeai.types.generation_types.GenerateContentResponse object at 0x11124e120>...
+2025-08-18 02:44:33,754 - services.manim - ERROR - Attempt 1 failed with exception: Could not extract code from AI response: No extractable text content found in response
+2025-08-18 02:44:33,754 - services.manim - INFO - Generating animation (attempt 2/3)
+2025-08-18 02:44:39,425 - services.manim - ERROR - Attempt 2 failed: Manim render failed: ╭─────────────────────────────── Traceback (most recent call last) ────────────────────────────────╮
+│ /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/manim/cli/render │
+│ /commands.py:125 in render                                                                      
+2025-08-18 02:44:39,426 - services.manim - INFO - Generating animation (attempt 3/3)
+2025-08-18 02:44:48,354 - main - INFO - Uploading video to Supabase: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0000b6c7_attempt_2/720p30/GeneratedScene.mp4
+2025-08-18 02:44:50,086 - main - INFO - Video uploaded successfully. ID: f7dabcf4-cebf-4f68-8d84-f278e99813d3
+2025-08-18 02:44:50,086 - main - INFO - Cleaned up local file: /Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0000b6c7_attempt_2/720p30/GeneratedScene.mp4
+2025-08-18 02:45:09,053 - main - ERROR - Error processing video 25d3740d-b92e-4a96-a1a0-f96e0af52d65: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 02:45:09,198 - main - ERROR - Error processing video 11b257e0-b602-4062-9315-b5caa464dacc: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 02:45:09,291 - main - ERROR - Error processing video 3f3f84ec-066e-479f-ad78-e8a447ee1216: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 02:45:09,380 - main - ERROR - Error processing video 221c3f36-bf97-4610-87f4-9f54c2296e86: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 02:45:09,516 - main - ERROR - Error processing video 64835e4c-20f1-45e7-81af-f82e3bbac482: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 02:45:09,582 - main - ERROR - Error processing video 88904d3f-490e-43bf-b04d-bca3b8b8f4d4: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 02:45:09,675 - main - ERROR - Error processing video 5fd0c8c1-2dc9-4209-944b-0c9c51a3fecb: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 02:45:09,747 - main - ERROR - Error processing video 1f3825d5-cc79-413b-9a68-aef5b26f4949: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 02:45:09,845 - main - ERROR - Error processing video 2bbeab25-c220-43a2-ba0d-0d00013b83fe: {'statusCode': 400, 'error': 'not_found', 'message': 'Object not found'}
+2025-08-18 02:45:22,303 - main - INFO - ⏹️  Shutting down Animathic API
