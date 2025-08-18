@@ -10,19 +10,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    software-properties-common \
     git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Manim dependencies
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    libcairo2-dev \
-    libpango1.0-dev \
-    libgdk-pixbuf2.0-dev \
-    libffi-dev \
-    shared-mime-info \
-    libgirepository1.0-dev \
     libcairo2-dev \
     libpango1.0-dev \
     libgdk-pixbuf2.0-dev \
@@ -46,9 +39,6 @@ COPY . .
 
 # Create media directories
 RUN mkdir -p media/images media/videos media/temp media/Tex media/texts
-
-# Set permissions
-RUN chmod +x start.sh
 
 # Expose port
 EXPOSE 8000
