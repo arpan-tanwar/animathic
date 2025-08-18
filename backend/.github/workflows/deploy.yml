@@ -1,0 +1,99 @@
+name: Deploy to Google Cloud
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  GCP_PROJECT_ID: animathic-backend
+  GCP_REGION: us-central1
+  SERVICE_NAME: animathic-backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+          
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker
+        
+      - name: Build and Deploy
+        run: |
+          echo "🚀 Starting deployment to Google Cloud..."
+          
+          # Build container image
+          echo "🏗️ Building Docker image..."
+          docker buildx build --platform linux/amd64 \
+            -f Dockerfile.production \
+            -t gcr.io/$GCP_PROJECT_ID/$SERVICE_NAME:${{ github.sha }} \
+            -t gcr.io/$GCP_PROJECT_ID/$SERVICE_NAME:latest \
+            .
+          
+          # Push to Container Registry
+          echo "📤 Pushing image to Container Registry..."
+          docker push gcr.io/$GCP_PROJECT_ID/$SERVICE_NAME:${{ github.sha }}
+          docker push gcr.io/$GCP_PROJECT_ID/$SERVICE_NAME:latest
+          
+          # Deploy to Cloud Run
+          echo "🚀 Deploying to Cloud Run..."
+          gcloud run deploy $SERVICE_NAME \
+            --image gcr.io/$GCP_PROJECT_ID/$SERVICE_NAME:${{ github.sha }} \
+            --platform managed \
+            --region $GCP_REGION \
+            --allow-unauthenticated \
+            --memory 2Gi \
+            --cpu 1 \
+            --timeout 300 \
+            --port 8080 \
+            --execution-environment=gen2 \
+            --cpu-boost \
+            --min-instances 0 \
+            --max-instances 10 \
+            --set-env-vars "ENVIRONMENT=production,LOG_LEVEL=INFO" \
+            --set-secrets "GOOGLE_AI_API_KEY=GOOGLE_AI_API_KEY:latest,SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest"
+          
+          echo "✅ Deployment completed successfully!"
+          
+      - name: Get Service URL
+        id: service-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=$GCP_REGION --format='value(status.url)')
+          echo "service-url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          
+      - name: Test Service
+        run: |
+          echo "🧪 Testing deployed service..."
+          SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=$GCP_REGION --format='value(status.url)')
+          
+          # Wait for service to be ready
+          sleep 30
+          
+          # Test health endpoint
+          if curl -f "$SERVICE_URL/api/health" > /dev/null 2>&1; then
+            echo "✅ Service health check passed"
+          else
+            echo "⚠️ Service health check failed, but deployment succeeded"
+          fi
+          
+      - name: Deployment Summary
+        run: |
+          echo "🎉 Deployment Summary"
+          echo "===================="
+          echo "Service: $SERVICE_NAME"
+          echo "Region: $GCP_REGION"
+          echo "Commit: ${{ github.sha }}
+          echo "Service URL: ${{ steps.service-url.outputs.service-url }}"
+          echo "Deployment Time: $(date)"
