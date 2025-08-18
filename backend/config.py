@@ -71,7 +71,7 @@ DATABASE_CONFIG = {
 # Media Configuration
 MEDIA_CONFIG = {
     "base_dir": os.getenv("MEDIA_BASE_DIR", "./media"),
-    "max_file_size": int(os.getenv("MAX_FILE_SIZE", "100 * 1024 * 1024")),  # 100MB
+    "max_file_size": int(os.getenv("MAX_FILE_SIZE", "104857600")),  # 100MB
     "allowed_extensions": [".mp4", ".gif", ".png", ".jpg", ".jpeg"],
     "cleanup_interval": int(os.getenv("CLEANUP_INTERVAL", "3600")),  # 1 hour
     "retention_hours": int(os.getenv("RETENTION_HOURS", "24")),

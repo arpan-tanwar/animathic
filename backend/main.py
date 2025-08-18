@@ -136,6 +136,9 @@ performance_monitor = PerformanceMonitor()
 # In-memory video storage for status tracking
 video_storage = {}
 
+# Initialize configuration
+config = get_config()
+
 # Create FastAPI app
 app = FastAPI(
     title=config["base"]["app_name"],
