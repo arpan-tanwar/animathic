@@ -1,17 +1,17 @@
-FROM python:3.9-slim
+FROM python:3.12-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
-    python3-dev \
-    python3-pip \
-    python3-setuptools \
-    python3-wheel \
-    python3-cffi \
+    curl \
+    git \
+    ffmpeg \
     libcairo2 \
-    libpango-1.0-0 \
+    libcairo2-dev \
+    libpango1.0-0 \
     libpangocairo-1.0-0 \
     libgdk-pixbuf2.0-0 \
+    libpango1.0-dev \
     libffi-dev \
     shared-mime-info \
     texlive-latex-base \
@@ -19,7 +19,6 @@ RUN apt-get update && apt-get install -y \
     texlive-fonts-recommended \
     texlive-fonts-extra \
     texlive-latex-recommended \
-    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -29,7 +28,9 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir "manim>=0.19.0"
 
 # Copy the rest of the application
 COPY . .
