@@ -113,21 +113,8 @@ class OptimizedManimService:
             logger.warning("Google AI not available - API key missing or library not installed")
 
     def _init_models(self):
-        try:
-            self.model = genai.GenerativeModel(
-                model_name='gemini-2.5-flash',
-                generation_config=genai.GenerationConfig(
-                    temperature=0.1,
-                    top_p=0.8,
-                    top_k=20,
-                    max_output_tokens=4096,
-                    candidate_count=1
-                )
-            )
-            logger.info("✅ Gemini fallback model initialized (gemini-2.5-flash)")
-        except Exception as e:
-            logger.warning(f"Fallback model init failed: {e}")
-            self.model = None
+        # Gemini fallback disabled for local testing; keep code path in place but do not initialize
+        self.model = None
 
     def _extract_response_text(self, response) -> str:
         """Extract text content from Gemini API response with multiple fallback methods"""
@@ -510,107 +497,13 @@ class OptimizedManimService:
         )
     
     async def generate_animation(self, prompt: str, media_dir: str = './media') -> AnimationResult:
-        # ALWAYS try structured local pipeline first (primary)
+        # Structured local pipeline ONLY (Gemini fallback temporarily disabled for testing)
         try:
             res = await self._generate_via_structured_local(prompt, media_dir)
-            if res and res.success:
-                return res
+            return res
         except Exception as e:
-            logger.warning(f"Structured local pipeline error: {e}")
-
-        # Fallback to Gemini model if available
-        if not self.model:
-            return AnimationResult(success=False, error='AI model not available')
-
-        os.makedirs(media_dir, exist_ok=True)
-        temp_dir = os.path.join(media_dir, 'temp')
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        last_error = None
-        for attempt in range(self.max_attempts):
-            logger.info(f"Generating animation via Gemini fallback (attempt {attempt+1}/{self.max_attempts})")
-            try:
-                feedback = last_error if attempt > 0 else None
-                
-                # Use different prompt strategies for different attempts
-                if attempt == 0:
-                    prompt_txt = self._force_format_prompt(prompt, feedback)
-                elif attempt == 1:
-                    # Second attempt: More aggressive prompt
-                    prompt_txt = self._aggressive_prompt(prompt, feedback)
-                else:
-                    # Third attempt: Fallback to secondary model with simple prompt
-                    prompt_txt = self._simple_prompt(prompt, feedback)
-                
-                response = await asyncio.get_event_loop().run_in_executor(None, self.model.generate_content, prompt_txt)
-                
-                # Log response details for debugging
-                logger.debug(f"🔍 Response type: {type(response)}")
-                logger.debug(f"🔍 Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
-                
-                raw = self._extract_response_text(response)
-                logger.debug(f"📝 Extracted raw text length: {len(raw)}")
-                logger.debug(f"📝 Raw text preview: {raw[:200]}...")
-                
-                # Validate that we got Python code, not HTML/SVG
-                if self._is_valid_python_content(raw):
-                    logger.debug("✅ Content validation passed - contains Python code")
-                else:
-                    # Check if it's a truncated response
-                    if self._is_truncated_response(response):
-                        logger.warning("⚠️ Response truncated, trying with shorter prompt...")
-                        last_error = "Response truncated due to token limit"
-                    else:
-                        logger.warning("⚠️ Content validation failed - may contain HTML/SVG, retrying...")
-                        last_error = "AI returned HTML/SVG instead of Python code"
-                    continue
-                
-                code = self._ensure_code_prereqs(self._sanitize_code(raw))
-                logger.debug(f"🔧 Processed code length: {len(code)}")
-                logger.debug(f"🔧 Code preview: {code[:200]}...")
-                
-                ok, err = self._validate_syntax_thoroughly(code)
-                if not ok:
-                    last_error = err
-                    logger.error(f"Attempt {attempt+1} failed: {err}")
-                    continue
-                    
-                if not self.validator.validate_code(code):
-                    last_error = 'Code failed security validation'
-                    logger.error(f"Attempt {attempt+1} failed: security validation")
-                    continue
-                    
-                result = await self._render_manim_code(code, temp_dir, attempt)
-                if result.success:
-                    result.code_used = code
-                    return result
-                    
-                last_error = result.error
-                logger.error(f"Attempt {attempt+1} failed: {result.error}")
-                
-                # Log the code that failed for debugging
-                logger.debug(f"🔍 Failed code (attempt {attempt+1}):")
-                logger.debug(f"🔍 {code[:500]}...")
-                
-                # If it's a syntax error, try to fix common issues
-                if "SyntaxError" in result.error or "IndentationError" in result.error:
-                    logger.info(f"🔄 Attempting to fix syntax errors in attempt {attempt+1}")
-                    fixed_code = self._fix_common_syntax_errors(code)
-                    if fixed_code != code:
-                        logger.info("✅ Code fixed, retrying...")
-                        fixed_result = await self._render_manim_code(fixed_code, temp_dir, attempt)
-                        if fixed_result.success:
-                            fixed_result.code_used = fixed_code
-                            return fixed_result
-                        else:
-                            logger.error(f"Fixed code still failed: {fixed_result.error}")
-                            last_error = f"Syntax fix failed: {fixed_result.error}"
-                
-            except Exception as e:
-                last_error = str(e)
-                logger.error(f"Attempt {attempt+1} failed with exception: {e}")
-                
-        return AnimationResult(success=False, error=f"Failed after {self.max_attempts} attempts: {last_error}")
+            logger.error(f"Structured local pipeline error: {e}")
+            return AnimationResult(success=False, error=str(e))
 
     async def _generate_via_structured_local(self, prompt: str, media_dir: str) -> Optional[AnimationResult]:
         try:
