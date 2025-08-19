@@ -15,7 +15,7 @@ PROJECT_ID="animathic-backend"
 REGION="us-central1"
 SERVICE_NAME="animathic-backend"
 IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
-DOCKERFILE="Dockerfile.production"
+DOCKERFILE="Dockerfile.gcp"
 
 echo -e "${BLUE}🚀 Starting Production Deployment to Google Cloud${NC}"
 echo "=================================================="

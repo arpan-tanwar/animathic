@@ -4,7 +4,7 @@
 steps:
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['buildx', 'build', '--platform', 'linux/amd64', '-f', 'Dockerfile.production', '-t', 'gcr.io/$PROJECT_ID/animathic-backend:$COMMIT_SHA', '.']
+    args: ['buildx', 'build', '--platform', 'linux/amd64', '-f', 'Dockerfile.gcp', '-t', 'gcr.io/$PROJECT_ID/animathic-backend:$COMMIT_SHA', '.']
   
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
