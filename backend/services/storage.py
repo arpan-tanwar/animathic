@@ -137,7 +137,7 @@ class StorageService:
                     raise HTTPException(status_code=500, detail="Failed to get video ID from database")
 
                 # Generate signed URL for immediate access
-                signed_url_response = self.supabase.storage.from_(self.bucket_name).create_signed_url(
+                signed_url_response = self.supabase.storage.from_(self.new_bucket_name).create_signed_url(
                     file_path,
                     3600  # URL valid for 1 hour
                 )
@@ -158,7 +158,7 @@ class StorageService:
                 print(f"Database error: {str(db_error)}")
                 # If database insert fails, try to delete the uploaded file
                 try:
-                    self.supabase.storage.from_(self.bucket_name).remove([file_path])
+                    self.supabase.storage.from_(self.new_bucket_name).remove([file_path])
                 except Exception as cleanup_error:
                     print(f"Failed to cleanup uploaded file: {str(cleanup_error)}")
                 raise HTTPException(
@@ -217,8 +217,7 @@ class StorageService:
                     print(f"Failed to generate signed URL from both buckets: {legacy_error}")
                     raise HTTPException(status_code=500, detail="Failed to generate signed URL from storage")
             
-            # Extract the signed URL from the response
-            signed_url = signed_url_response.get('signedURL', '')
+            # Check if we got a valid signed URL
             if not signed_url:
                 raise HTTPException(status_code=500, detail="Failed to generate signed URL")
             
