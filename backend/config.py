@@ -102,6 +102,8 @@ FEATURE_FLAGS = {
     "user_management": os.getenv("ENABLE_USER_MANAGEMENT", "true").lower() == "true",
     "file_upload": os.getenv("ENABLE_FILE_UPLOAD", "true").lower() == "true",
     "rate_limiting": os.getenv("ENABLE_RATE_LIMITING", "true").lower() == "true",
+    # Enable structured pipeline primary by default
+    "structured_pipeline": os.getenv("ENABLE_STRUCTURED_PIPELINE", "true").lower() == "true",
 }
 
 def get_config() -> Dict[str, Any]:

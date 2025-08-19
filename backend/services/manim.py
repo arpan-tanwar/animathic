@@ -95,8 +95,8 @@ class OptimizedManimService:
         self.validator = SecurityValidator()
         self.max_attempts = 3
         self.timeout = 120
+        # Single Gemini model used as FALLBACK only
         self.model = None
-        self.model_secondary = None
         # Lazy imports to avoid heavy deps at module import
         try:
             from config import get_feature_flags, get_structured_backend  # noqa: F401
@@ -115,35 +115,19 @@ class OptimizedManimService:
     def _init_models(self):
         try:
             self.model = genai.GenerativeModel(
-            model_name='gemini-2.5-flash',
-            generation_config=genai.GenerationConfig(
-                    temperature=0.1,
-                    top_p=0.8,
-                    top_k=20,
-                max_output_tokens=4096,
-                    candidate_count=1
-                )
-            )
-            logger.info("✅ Gemini primary model initialized (gemini-2.5-flash)")
-        except Exception as e:
-            logger.warning(f"Primary model init failed: {e}")
-            self.model = None
-            
-        try:
-            self.model_secondary = genai.GenerativeModel(
-                model_name='gemini-2.0-flash',
+                model_name='gemini-2.5-flash',
                 generation_config=genai.GenerationConfig(
-                    temperature=0.05,
+                    temperature=0.1,
                     top_p=0.8,
                     top_k=20,
                     max_output_tokens=4096,
                     candidate_count=1
                 )
             )
-            logger.info("✅ Gemini secondary model initialized (gemini-2.0-flash)")
+            logger.info("✅ Gemini fallback model initialized (gemini-2.5-flash)")
         except Exception as e:
-            logger.warning(f"Secondary model init failed: {e}")
-            self.model_secondary = None
+            logger.warning(f"Fallback model init failed: {e}")
+            self.model = None
 
     def _extract_response_text(self, response) -> str:
         """Extract text content from Gemini API response with multiple fallback methods"""
@@ -526,26 +510,25 @@ class OptimizedManimService:
         )
     
     async def generate_animation(self, prompt: str, media_dir: str = './media') -> AnimationResult:
-        # Structured local pipeline first if enabled
+        # ALWAYS try structured local pipeline first (primary)
         try:
-            from config import get_feature_flags, get_structured_backend
-            if get_feature_flags().get('structured_pipeline') and get_structured_backend() == 'local':
-                res = await self._generate_via_structured_local(prompt, media_dir)
-                if res and res.success:
-                    return res
+            res = await self._generate_via_structured_local(prompt, media_dir)
+            if res and res.success:
+                return res
         except Exception as e:
             logger.warning(f"Structured local pipeline error: {e}")
 
-        if not self.model and not self.model_secondary:
+        # Fallback to Gemini model if available
+        if not self.model:
             return AnimationResult(success=False, error='AI model not available')
-            
+
         os.makedirs(media_dir, exist_ok=True)
         temp_dir = os.path.join(media_dir, 'temp')
         os.makedirs(temp_dir, exist_ok=True)
         
         last_error = None
         for attempt in range(self.max_attempts):
-            logger.info(f"Generating animation (attempt {attempt+1}/{self.max_attempts})")
+            logger.info(f"Generating animation via Gemini fallback (attempt {attempt+1}/{self.max_attempts})")
             try:
                 feedback = last_error if attempt > 0 else None
                 
@@ -559,9 +542,7 @@ class OptimizedManimService:
                     # Third attempt: Fallback to secondary model with simple prompt
                     prompt_txt = self._simple_prompt(prompt, feedback)
                 
-                model_to_use = self.model if attempt == 0 and self.model else (self.model_secondary or self.model)
-                
-                response = await asyncio.get_event_loop().run_in_executor(None, model_to_use.generate_content, prompt_txt)
+                response = await asyncio.get_event_loop().run_in_executor(None, self.model.generate_content, prompt_txt)
                 
                 # Log response details for debugging
                 logger.debug(f"🔍 Response type: {type(response)}")
@@ -718,7 +699,15 @@ class OptimizedManimService:
                     except Exception:
                         continue
 
-            # If no venv CLI, fallback to module invocation with chosen python
+            # If still not found, try global CLI on PATH as an extra fallback
+            if manim_cli is None:
+                for bin_name in ['manim', 'manimce']:
+                    found = shutil.which(bin_name)
+                    if found:
+                        manim_cli = found
+                        break
+
+            # If no CLI, fallback to module invocation with chosen python
             if manim_cli is None:
                 cmd = [
                     python_exec, '-m', 'manim',
