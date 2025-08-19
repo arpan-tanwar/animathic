@@ -18,6 +18,9 @@ class LocalLLMService:
         env_base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self.model_name = (model_name or env_model)
         self.base_url = (base_url or env_base).rstrip("/")
+        # Optional direct inference server (FastAPI) that serves /generate
+        # If set, this takes precedence over Ollama-compatible endpoint
+        self.infer_url = os.getenv("LOCAL_INFER_URL", "").rstrip("/")
 
     async def generate_structured_scene(self, prompt: str) -> ManimScene:
         """Ask the local LLM to produce a ManimScene JSON and parse it into Pydantic model.
@@ -37,13 +40,24 @@ class LocalLLMService:
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, read=300.0, connect=10.0)) as client:
-                resp = await client.post(f"{self.base_url}/api/generate", json=payload)
-                resp.raise_for_status()
-                data = resp.json()
-
-            text: str = data.get("response", "")
-            json_str = self._extract_json(text)
-            return ManimScene.model_validate_json(json_str)
+                if self.infer_url:
+                    # Direct inference server, expects {"prompt": str, "max_new_tokens": int}
+                    resp = await client.post(f"{self.infer_url}/generate", json={"prompt": formatted, "max_new_tokens": 400})
+                    resp.raise_for_status()
+                    data = resp.json()
+                    # Expect {"json": {...}}
+                    scene_obj = data.get("json")
+                    if not scene_obj:
+                        raise ValueError("Inference server returned no 'json' field")
+                    return ManimScene.model_validate(scene_obj)
+                else:
+                    # Ollama-compatible fallback
+                    resp = await client.post(f"{self.base_url}/api/generate", json=payload)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    text: str = data.get("response", "")
+                    json_str = self._extract_json(text)
+                    return ManimScene.model_validate_json(json_str)
         except Exception:
             # Heuristic fallback: simple parser based on keywords
             return self._fallback_scene(prompt)
