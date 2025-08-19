@@ -103,7 +103,7 @@ class OptimizedManimService:
 
     def _init_models(self):
         try:
-        self.model = genai.GenerativeModel(
+            self.model = genai.GenerativeModel(
             model_name='gemini-2.5-flash',
             generation_config=genai.GenerationConfig(
                     temperature=0.1,
