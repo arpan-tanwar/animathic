@@ -592,16 +592,29 @@ class OptimizedManimService:
                     except Exception:
                         continue
 
-            # If still not found, try global CLI on PATH as an extra fallback
+            # If still not found, try common absolute paths and PATH as extra fallback
             if manim_cli is None:
-                for bin_name in ['manim', 'manimce']:
-                    found = shutil.which(bin_name)
-                    if found:
-                        manim_cli = found
+                absolute_cli_candidates = [
+                    '/usr/local/bin/manim',
+                    '/usr/bin/manim',
+                    '/bin/manim',
+                    '/usr/local/bin/manimce',
+                    '/usr/bin/manimce',
+                ]
+                for p in absolute_cli_candidates:
+                    if os.path.exists(p) and os.access(p, os.X_OK):
+                        manim_cli = p
                         break
+                if manim_cli is None:
+                    for bin_name in ['manim', 'manimce']:
+                        found = shutil.which(bin_name)
+                        if found:
+                            manim_cli = found
+                            break
 
             # If no CLI, fallback to module invocation with chosen python
             if manim_cli is None:
+                 logger.debug(f"Using module invocation: {python_exec} -m manim (sys.executable={sys.executable})")
                 cmd = [
                     python_exec, '-m', 'manim',
                     '-q', 'm',
@@ -614,6 +627,7 @@ class OptimizedManimService:
                     '--disable_caching'
                 ]
             else:
+                logger.debug(f"Using CLI invocation: {manim_cli}")
                 cmd = [
                     manim_cli,
                     '-q', 'm',

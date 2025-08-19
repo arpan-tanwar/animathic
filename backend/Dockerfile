@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     texlive-fonts-recommended \
     texlive-fonts-extra \
     texlive-latex-recommended \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
