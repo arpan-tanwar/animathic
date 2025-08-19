@@ -178,15 +178,27 @@ async def add_security_headers(request: Request, call_next):
         logger.error(f"Request failed: {e}")
         raise
 
-# CORS configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=config["api"]["cors_origins"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "user-id", "User-Id"],
-    max_age=600,
-)
+# CORS configuration (handle wildcard vs explicit origins correctly)
+_cors_origins = [o.strip() for o in config["api"]["cors_origins"] if o and o.strip()]
+if not _cors_origins or "*" in _cors_origins:
+    # When using wildcard, do NOT allow credentials. Use regex to reflect all origins.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=".*",
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "user-id", "User-Id"],
+        max_age=600,
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "user-id", "User-Id"],
+        max_age=600,
+    )
 
 # Mount static files
 app.mount("/media", StaticFiles(directory="media"), name="media")

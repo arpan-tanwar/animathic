@@ -37,7 +37,11 @@ GCP_CONFIG = {
 API_CONFIG = {
     "host": os.getenv("HOST", "0.0.0.0"),
     "port": int(os.getenv("PORT", "8080")),
-    "cors_origins": os.getenv("CORS_ORIGINS", "*").split(","),
+    # Default to allowing animathic.com, localhost dev, and wildcard
+    "cors_origins": os.getenv(
+        "CORS_ORIGINS",
+        "https://animathic.com,https://www.animathic.com,http://localhost:5173,http://127.0.0.1:5173,*",
+    ).split(","),
     "rate_limit_requests": int(os.getenv("RATE_LIMIT_REQUESTS", "10")),
     "rate_limit_window": int(os.getenv("RATE_LIMIT_WINDOW", "60")),
 }
