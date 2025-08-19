@@ -81,9 +81,23 @@ for i in range(1, 46):
     })
 
 
+from services.embedding_index import EmbeddingIndex
+
+
 class RAGService:
+    def __init__(self) -> None:
+        # Initialize optional vector index (will be disabled if deps missing)
+        try:
+            self._index = EmbeddingIndex(MANIM_SNIPPETS)
+        except Exception:
+            self._index = None
     def find_relevant_snippets(self, query: str, top_k: int = 3) -> List[Dict[str, str]]:
-        """Weighted keyword scoring favoring exact tag matches and object/action terms."""
+        """Vector search if available, otherwise weighted keyword scoring."""
+        if self._index and self._index.is_enabled():
+            results = self._index.search(query, top_k=top_k)
+            if results:
+                return results
+        # Fallback keyword scoring
         q = query.lower()
         q_tokens = q.split()
         scored = []

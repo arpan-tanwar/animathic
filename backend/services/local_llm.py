@@ -51,7 +51,9 @@ class LocalLLMService:
     def _build_structured_prompt(self, user_prompt: str) -> str:
         schema_hint = (
             "Return ONLY a JSON object with keys: scene_name, background_color, resolution, imports, objects, animations.\n"
-            "objects: [{name: string, type: one of [circle,square,rectangle,ellipse,triangle,text,line,dot,axes,number_line,graph], props: object}]\n"
+            "imports MUST be ['from manim import *']\n"
+            "objects: [{name: string, type: one of [axes,graph,circle,square,rectangle,ellipse,triangle,text,line,dot,number_line], props: object}]\n"
+            "For graph: props MUST include function (e.g. 'lambda x: sin(x)') and axes (name of Axes object).\n"
             "animations: [{type: one of [create,transform,move,rotate,scale,fade,wait,set_color,set_stroke,set_fill], target: string, duration: number, parameters: object, wait_after: number}]\n"
             "No markdown. No code fences. JSON only."
         )
@@ -81,19 +83,33 @@ class LocalLLMService:
         objects = []
         animations = []
 
-        if "circle" in p:
+        handled = False
+        if any(k in p for k in ["sin", "cos", "sine", "cosine", "graph", "axes"]):
+            # Fallback to a deterministic axes + sine/cos graph scene
+            objects = [
+                {"name": "axes", "type": "axes", "props": {"x_range": "[-5,5,1]", "y_range": "[-2,2,1]"}},
+                {"name": "sin_graph", "type": "graph", "props": {"function": "lambda x: np.sin(x)", "axes": "axes", "color": "BLUE"}},
+                {"name": "cos_graph", "type": "graph", "props": {"function": "lambda x: np.cos(x)", "axes": "axes", "color": "GREEN"}},
+            ]
+            animations = [
+                {"type": "create", "target": "axes", "duration": 1.0, "parameters": {}, "wait_after": 0.2},
+                {"type": "create", "target": "sin_graph", "duration": 1.2, "parameters": {}, "wait_after": 0.2},
+                {"type": "create", "target": "cos_graph", "duration": 1.2, "parameters": {}, "wait_after": 0.2},
+            ]
+            handled = True
+        elif "circle" in p:
             color = "BLUE" if "blue" in p else "RED" if "red" in p else "WHITE"
             objects.append({"name": "obj", "type": "circle", "props": {"radius": 1.2, "color": color}})
         elif "rectangle" in p or "rect" in p:
             objects.append({"name": "obj", "type": "rectangle", "props": {"width": 4.0, "height": 2.0, "color": "GREEN"}})
         else:
             objects.append({"name": "obj", "type": "square", "props": {"side_length": 2.0, "color": "YELLOW"}})
-
-        animations.append({"type": "create", "target": "obj", "duration": 1.0, "parameters": {}, "wait_after": 0.5})
-        if "rotate" in p:
-            animations.append({"type": "rotate", "target": "obj", "duration": 0.8, "parameters": {"angle": "PI/3"}, "wait_after": 0.5})
-        if "scale" in p:
-            animations.append({"type": "scale", "target": "obj", "duration": 0.8, "parameters": {"factor": 1.2}, "wait_after": 0.5})
+        if not handled:
+            animations.append({"type": "create", "target": "obj", "duration": 1.0, "parameters": {}, "wait_after": 0.5})
+            if "rotate" in p:
+                animations.append({"type": "rotate", "target": "obj", "duration": 0.8, "parameters": {"angle": "PI/3"}, "wait_after": 0.5})
+            if "scale" in p:
+                animations.append({"type": "scale", "target": "obj", "duration": 0.8, "parameters": {"factor": 1.2}, "wait_after": 0.5})
 
         scene = {
             "scene_name": "GeneratedScene",
