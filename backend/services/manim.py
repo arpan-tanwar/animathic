@@ -4,6 +4,8 @@ import ast
 import sys
 import asyncio
 import logging
+import shutil
+from pathlib import Path
 from typing import Optional, Tuple
 from dataclasses import dataclass
 
@@ -672,17 +674,77 @@ class OptimizedManimService:
             m = re.search(r'class\s+(\w+)\s*\(\s*Scene\s*\):', code)
             scene_name = m.group(1) if m else 'GeneratedScene'
             
-            cmd = [
-                sys.executable, '-m', 'manim',
-                '-q', 'm',
-                '-r', '1280,720',
-                '-v', 'WARNING',
-                '--renderer=cairo',
-                temp_file,
-            scene_name,
-                f'--media_dir={os.path.abspath(temp_dir)}/..',
-                '--disable_caching'
+            # Prefer using the project's virtualenv Python or its manim CLI
+            python_exec = sys.executable
+
+            # Resolve active or local venv
+            venv_path = os.environ.get('VIRTUAL_ENV')
+            backend_root = Path(__file__).resolve().parent.parent
+
+            if venv_path:
+                venv_python = Path(venv_path) / 'bin' / 'python'
+                if venv_python.exists():
+                    python_exec = str(venv_python)
+            else:
+                for candidate in [
+                    backend_root / 'venv' / 'bin' / 'python3.12',
+                    backend_root / 'venv' / 'bin' / 'python3',
+                    backend_root / 'venv' / 'bin' / 'python',
+                ]:
+                    if candidate.exists():
+                        python_exec = str(candidate)
+                        break
+
+            # Prefer venv CLI if present
+            manim_cli_candidates = [
+                Path(python_exec).parent / 'manim',
+                Path(python_exec).parent / 'manimce',
             ]
+            manim_cli = None
+            for c in manim_cli_candidates:
+                if c.exists():
+                    try:
+                        # Validate CLI script's interpreter exists to avoid broken shebang issues
+                        with open(c, 'rb') as f:
+                            first_line = f.readline().decode('utf-8', errors='ignore').strip()
+                        if first_line.startswith('#!'):
+                            interp = first_line[2:].strip()
+                            # Some env shebangs like "/usr/bin/env python" are fine; otherwise check path exists
+                            if interp.startswith('/'):  # absolute path
+                                if not Path(interp).exists():
+                                    continue
+                        manim_cli = str(c)
+                        break
+                    except Exception:
+                        continue
+
+            # If no venv CLI, fallback to module invocation with chosen python
+            if manim_cli is None:
+                cmd = [
+                    python_exec, '-m', 'manim',
+                    '-q', 'm',
+                    '-r', '1280,720',
+                    '-v', 'WARNING',
+                    '--renderer=cairo',
+                    temp_file,
+                    scene_name,
+                    f'--media_dir={os.path.abspath(temp_dir)}/..',
+                    '--disable_caching'
+                ]
+            else:
+                cmd = [
+                    manim_cli,
+                    '-q', 'm',
+                    '-r', '1280,720',
+                    '-v', 'WARNING',
+                    '--renderer=cairo',
+                    temp_file,
+                    scene_name,
+                    f'--media_dir={os.path.abspath(temp_dir)}/..',
+                    '--disable_caching'
+                ]
+
+            # As absolute last resort, try global CLI if neither venv CLI nor module works
             
             proc = await asyncio.create_subprocess_exec(
                 *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
