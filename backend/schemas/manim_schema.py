@@ -29,6 +29,8 @@ class ManimObject(BaseModel):
     type: Literal[
         "circle",
         "square",
+        "rectangle",
+        "ellipse",
         "triangle",
         "text",
         "line",

@@ -17,7 +17,9 @@ class LocalLLMService:
         self.base_url = base_url.rstrip("/")
 
     async def generate_structured_scene(self, prompt: str) -> ManimScene:
-        """Ask the local LLM to produce a ManimScene JSON and parse it into Pydantic model."""
+        """Ask the local LLM to produce a ManimScene JSON and parse it into Pydantic model.
+        Falls back to a heuristic structured scene on timeout or parse errors.
+        """
         formatted = self._build_structured_prompt(prompt)
         payload: Dict[str, Any] = {
             "model": self.model_name,
@@ -30,14 +32,18 @@ class LocalLLMService:
             },
         }
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(f"{self.base_url}/api/generate", json=payload)
-            resp.raise_for_status()
-            data = resp.json()
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, read=300.0, connect=10.0)) as client:
+                resp = await client.post(f"{self.base_url}/api/generate", json=payload)
+                resp.raise_for_status()
+                data = resp.json()
 
-        text: str = data.get("response", "")
-        json_str = self._extract_json(text)
-        return ManimScene.model_validate_json(json_str)
+            text: str = data.get("response", "")
+            json_str = self._extract_json(text)
+            return ManimScene.model_validate_json(json_str)
+        except Exception:
+            # Heuristic fallback: simple parser based on keywords
+            return self._fallback_scene(prompt)
 
     def _build_structured_prompt(self, user_prompt: str) -> str:
         schema_hint = (
@@ -67,5 +73,34 @@ class LocalLLMService:
         # Fallback: attempt loads directly
         json.loads(text)
         return text
+
+    def _fallback_scene(self, prompt: str) -> ManimScene:
+        p = prompt.lower()
+        objects = []
+        animations = []
+
+        if "circle" in p:
+            color = "BLUE" if "blue" in p else "RED" if "red" in p else "WHITE"
+            objects.append({"name": "obj", "type": "circle", "props": {"radius": 1.2, "color": color}})
+        elif "rectangle" in p or "rect" in p:
+            objects.append({"name": "obj", "type": "rectangle", "props": {"width": 4.0, "height": 2.0, "color": "GREEN"}})
+        else:
+            objects.append({"name": "obj", "type": "square", "props": {"side_length": 2.0, "color": "YELLOW"}})
+
+        animations.append({"type": "create", "target": "obj", "duration": 1.0, "parameters": {}, "wait_after": 0.5})
+        if "rotate" in p:
+            animations.append({"type": "rotate", "target": "obj", "duration": 0.8, "parameters": {"angle": "PI/3"}, "wait_after": 0.5})
+        if "scale" in p:
+            animations.append({"type": "scale", "target": "obj", "duration": 0.8, "parameters": {"factor": 1.2}, "wait_after": 0.5})
+
+        scene = {
+            "scene_name": "GeneratedScene",
+            "background_color": "#000000",
+            "resolution": [1280, 720],
+            "imports": ["from manim import *"],
+            "objects": objects,
+            "animations": animations,
+        }
+        return ManimScene.model_validate(scene)
 
 

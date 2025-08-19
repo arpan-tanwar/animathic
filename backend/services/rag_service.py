@@ -32,6 +32,27 @@ MANIM_SNIPPETS: List[Dict[str, str]] = [
         "code": "self.play(obj.animate.move_to(UP))",
         "tags": "move position up",
     },
+    {
+        "id": "scale_object",
+        "title": "Scale Object",
+        "description": "Scale object by 1.2",
+        "code": "self.play(obj.animate.scale(1.2))",
+        "tags": "scale object size",
+    },
+    {
+        "id": "rectangle_create",
+        "title": "Create Rectangle",
+        "description": "Create a rectangle with width and height",
+        "code": "rect = Rectangle(width=4.0, height=2.0, color=GREEN)\nself.play(Create(rect))",
+        "tags": "rectangle create",
+    },
+    {
+        "id": "ellipse_create",
+        "title": "Create Ellipse",
+        "description": "Create an ellipse and fade it in",
+        "code": "ell = Ellipse(width=4.0, height=2.0, color=PURPLE)\nself.play(FadeIn(ell))",
+        "tags": "ellipse create fadein",
+    },
 ]
 
 

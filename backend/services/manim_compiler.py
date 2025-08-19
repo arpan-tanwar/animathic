@@ -53,6 +53,18 @@ class ManimCompiler:
             color = p.get("color", "BLUE")
             fill_opacity = p.get("fill_opacity", 0.0)
             return [f"        {name} = Square(side_length={side}, color={color}, fill_opacity={fill_opacity})"]
+        if t == "rectangle":
+            width = p.get("width", 4.0)
+            height = p.get("height", 2.0)
+            color = p.get("color", "BLUE")
+            fill_opacity = p.get("fill_opacity", 0.0)
+            return [f"        {name} = Rectangle(width={width}, height={height}, color={color}, fill_opacity={fill_opacity})"]
+        if t == "ellipse":
+            width = p.get("width", 4.0)
+            height = p.get("height", 2.0)
+            color = p.get("color", "BLUE")
+            fill_opacity = p.get("fill_opacity", 0.0)
+            return [f"        {name} = Ellipse(width={width}, height={height}, color={color}, fill_opacity={fill_opacity})"]
         if t == "triangle":
             color = p.get("color", "BLUE")
             return [f"        {name} = Triangle(color={color})"]
