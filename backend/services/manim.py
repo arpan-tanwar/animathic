@@ -638,7 +638,7 @@ class OptimizedManimService:
             
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self.timeout)
-        except asyncio.TimeoutError:
+            except asyncio.TimeoutError:
                 proc.kill()
                 await proc.wait()
                 return AnimationResult(success=False, error='Rendering timeout')
