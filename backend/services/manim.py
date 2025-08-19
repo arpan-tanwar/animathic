@@ -613,9 +613,10 @@ class OptimizedManimService:
                             break
 
             # If no CLI, fallback to module invocation with chosen python
+            used_cli = False
             if manim_cli is None:
-                 logger.debug(f"Using module invocation: {python_exec} -m manim (sys.executable={sys.executable})")
-                 cmd = [
+                logger.info(f"Rendering with module invocation: {python_exec} -m manim")
+                cmd = [
                     python_exec, '-m', 'manim',
                     '-q', 'm',
                     '-r', '1280,720',
@@ -627,7 +628,8 @@ class OptimizedManimService:
                     '--disable_caching'
                 ]
             else:
-                logger.debug(f"Using CLI invocation: {manim_cli}")
+                logger.info(f"Rendering with CLI invocation: {manim_cli}")
+                used_cli = True
                 cmd = [
                     manim_cli,
                     '-q', 'm',
@@ -678,6 +680,56 @@ class OptimizedManimService:
             else:
                 err = (stderr or b'').decode('utf-8', errors='ignore')
                 stdout_text = (stdout or b'').decode('utf-8', errors='ignore')
+                # If manim not found in module path, auto-retry with alternative invocation
+                if 'No module named manim' in err:
+                    logger.warning("Retrying render due to missing manim module with alternate invocation strategy")
+                    try:
+                        alt_cmd = None
+                        if not used_cli:
+                            # Try CLI variants
+                            for candidate in ['/usr/local/bin/manim', '/usr/bin/manim', '/usr/local/bin/manimce', '/usr/bin/manimce']:
+                                if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+                                    alt_cmd = [candidate, '-q', 'm', '-r', '1280,720', '-v', 'WARNING', '--renderer=cairo', temp_file, scene_name, f'--media_dir={os.path.abspath(temp_dir)}/..', '--disable_caching']
+                                    logger.info(f"Retrying with CLI: {candidate}")
+                                    break
+                            if alt_cmd is None:
+                                found = shutil.which('manim') or shutil.which('manimce')
+                                if found:
+                                    alt_cmd = [found, '-q', 'm', '-r', '1280,720', '-v', 'WARNING', '--renderer=cairo', temp_file, scene_name, f'--media_dir={os.path.abspath(temp_dir)}/..', '--disable_caching']
+                                    logger.info(f"Retrying with PATH CLI: {found}")
+                        else:
+                            # Try common python executables for -m manim
+                            for py in ['/usr/bin/python3', '/usr/local/bin/python3', '/usr/local/bin/python', '/usr/bin/python']:
+                                if os.path.exists(py) and os.access(py, os.X_OK):
+                                    alt_cmd = [py, '-m', 'manim', '-q', 'm', '-r', '1280,720', '-v', 'WARNING', '--renderer=cairo', temp_file, scene_name, f'--media_dir={os.path.abspath(temp_dir)}/..', '--disable_caching']
+                                    logger.info(f"Retrying with python -m manim: {py}")
+                                    break
+                        if alt_cmd is not None:
+                            alt_proc = await asyncio.create_subprocess_exec(*alt_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                            alt_stdout, alt_stderr = await alt_proc.communicate()
+                            if alt_proc.returncode == 0:
+                                media_root = os.path.abspath(os.path.join(temp_dir, '..'))
+                                videos_root = os.path.join(media_root, 'videos')
+                                latest_mp4 = None
+                                latest_mtime = -1
+                                if os.path.isdir(videos_root):
+                                    for root, _, files in os.walk(videos_root):
+                                        for fname in files:
+                                            if fname.lower().endswith('.mp4'):
+                                                fpath = os.path.join(root, fname)
+                                                try:
+                                                    mtime = os.path.getmtime(fpath)
+                                                    if mtime > latest_mtime:
+                                                        latest_mtime = mtime
+                                                        latest_mp4 = fpath
+                                                except Exception:
+                                                    continue
+                                if latest_mp4:
+                                    return AnimationResult(success=True, video_path=latest_mp4, resolution='1280x720', duration=None)
+                            else:
+                                logger.error(f"Alternate invocation also failed: {(alt_stderr or b'').decode('utf-8', 'ignore')}")
+                    except Exception:
+                        pass
                 
                 # Provide more detailed error information
                 error_msg = f'Manim render failed: {err[:500]}'
