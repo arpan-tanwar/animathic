@@ -585,27 +585,28 @@ async def list_videos(user_id: str = Depends(verify_user)):
         if storage_service:
             try:
                 videos = await storage_service.list_user_videos(user_id)
-        # Transform videos for frontend
-        transformed_videos = []
-        for video in videos:
-            try:
-                # Generate fresh signed URL
-                signed_url_response = storage_service.supabase.storage.from_(
-                    storage_service.bucket_name
-                ).create_signed_url(video["file_path"], 3600)
+                # Transform videos for frontend
+                transformed_videos = []
+                for video in videos:
+                    try:
+                        # Generate fresh signed URL
+                        signed_url_response = storage_service.supabase.storage.from_(
+                            storage_service.bucket_name
+                        ).create_signed_url(video["file_path"], 3600)
+                        
+                        signed_url = signed_url_response.get('signedURL', '')
+                        if signed_url:
+                            transformed_videos.append({
+                                "id": video["id"],
+                                "video_url": signed_url,
+                                "prompt": video["prompt"],
+                                "created_at": video["created_at"],
+                                "status": video.get("status", "completed")
+                            })
+                    except Exception as e:
+                        logger.error(f"Error processing video {video.get('id')}: {e}")
+                        continue
                 
-                signed_url = signed_url_response.get('signedURL', '')
-                if signed_url:
-                    transformed_videos.append({
-                        "id": video["id"],
-                        "video_url": signed_url,
-                        "prompt": video["prompt"],
-                        "created_at": video["created_at"],
-                        "status": video.get("status", "completed")
-                    })
-            except Exception as e:
-                logger.error(f"Error processing video {video.get('id')}: {e}")
-                continue
                 return transformed_videos
             except Exception as e:
                 logger.error(f"Storage service error: {e}")
