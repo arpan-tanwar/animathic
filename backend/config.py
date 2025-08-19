@@ -50,6 +50,8 @@ GOOGLE_AI_CONFIG = {
     "max_output_tokens": int(os.getenv("GOOGLE_AI_MAX_TOKENS", "4096")),
     "top_p": float(os.getenv("GOOGLE_AI_TOP_P", "0.8")),
     "top_k": int(os.getenv("GOOGLE_AI_TOP_K", "40")),
+    # Toggle for structured generation backend: local|gemini
+    "structured_backend": os.getenv("STRUCTURED_BACKEND", "local"),
 }
 
 # Supabase Configuration
@@ -140,3 +142,6 @@ def is_debug_enabled() -> bool:
 def get_log_level() -> str:
     """Get log level"""
     return BASE_CONFIG["log_level"]
+
+def get_structured_backend() -> str:
+    return GOOGLE_AI_CONFIG.get("structured_backend", "local")

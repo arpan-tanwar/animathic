@@ -95,6 +95,15 @@ class OptimizedManimService:
         self.timeout = 120
         self.model = None
         self.model_secondary = None
+        # Lazy imports to avoid heavy deps at module import
+        try:
+            from config import get_feature_flags, get_structured_backend  # noqa: F401
+            from services.rag_service import RAGService  # noqa: F401
+            from services.local_llm import LocalLLMService  # noqa: F401
+            from services.manim_compiler import ManimCompiler  # noqa: F401
+            from schemas.manim_schema import ManimScene  # noqa: F401
+        except Exception:
+            pass
         
         if genai:
             self._init_models()
@@ -514,6 +523,16 @@ class OptimizedManimService:
         )
     
     async def generate_animation(self, prompt: str, media_dir: str = './media') -> AnimationResult:
+        # Structured local pipeline first if enabled
+        try:
+            from config import get_feature_flags, get_structured_backend
+            if get_feature_flags().get('structured_pipeline') and get_structured_backend() == 'local':
+                res = await self._generate_via_structured_local(prompt, media_dir)
+                if res and res.success:
+                    return res
+        except Exception as e:
+            logger.warning(f"Structured local pipeline error: {e}")
+
         if not self.model and not self.model_secondary:
             return AnimationResult(success=False, error='AI model not available')
             
@@ -608,6 +627,38 @@ class OptimizedManimService:
                 logger.error(f"Attempt {attempt+1} failed with exception: {e}")
                 
         return AnimationResult(success=False, error=f"Failed after {self.max_attempts} attempts: {last_error}")
+
+    async def _generate_via_structured_local(self, prompt: str, media_dir: str) -> Optional[AnimationResult]:
+        try:
+            from services.rag_service import RAGService
+            from services.local_llm import LocalLLMService
+            from services.manim_compiler import ManimCompiler
+            from schemas.manim_schema import ManimScene
+
+            enhanced = RAGService().enhance_prompt(prompt)
+            scene: ManimScene = await LocalLLMService().generate_structured_scene(enhanced)
+            code = ManimCompiler().compile_to_manim(scene)
+            ast.parse(code)
+
+            os.makedirs(media_dir, exist_ok=True)
+            temp_dir = os.path.join(media_dir, 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+
+            result = await self._render_manim_code(code, temp_dir, attempt=0)
+            if result.success:
+                result.code_used = code
+                return result
+
+            fixed = self._fix_common_syntax_errors(code)
+            if fixed and fixed != code:
+                retry = await self._render_manim_code(fixed, temp_dir, attempt=0)
+                if retry.success:
+                    retry.code_used = fixed
+                    return retry
+            return result
+        except Exception as e:
+            logger.error(f"Structured local generation failed: {e}")
+            return AnimationResult(success=False, error=str(e))
 
     async def _render_manim_code(self, code: str, temp_dir: str, attempt: int) -> AnimationResult:
         scene_id = f"manim_scene_{hash(code) % 100000:08x}_attempt_{attempt}"

@@ -34,6 +34,7 @@ load_dotenv()
 
 # Import configuration
 from config import get_config, get_api_config, get_feature_flags, is_production, get_log_level
+from routes.experimental import router as experimental_router
 
 # Configure logging first
 log_level = get_log_level()
@@ -190,6 +191,8 @@ app.add_middleware(
 # Mount static files
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
+# Experimental routes (no-render compile/test pipeline)
+app.include_router(experimental_router)
 # Initialize services with error handling
 try:
     if enhanced_features:
