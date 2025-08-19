@@ -31,6 +31,8 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
+# Ensure manim is present explicitly (defensive against resolver quirks)
+RUN pip install --no-cache-dir "manim>=0.19.0"
 
 # Copy application code
 COPY . .
