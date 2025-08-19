@@ -285,7 +285,7 @@ async def generate_video(
             
             generation_time = time.time() - start_time
             
-                        if result.success:
+            if result.success:
                 try:
                     # Upload video to Supabase storage
                     if storage_service and result.video_path:
