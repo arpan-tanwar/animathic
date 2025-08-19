@@ -285,7 +285,7 @@ async def generate_video(
             
             generation_time = time.time() - start_time
             
-            if result.success:
+                        if result.success:
                 try:
                     # Upload video to Supabase storage
                     if storage_service and result.video_path:
@@ -467,11 +467,11 @@ async def get_video_status(video_id: str, user_id: str = Depends(verify_user)):
         if storage_service:
             try:
                 video = await storage_service.get_video(user_id, video_id)
-                return StatusResponse(
-                    status="completed",
-                    video_url=video["video_url"],
-                    error=None
-                )
+        return StatusResponse(
+            status="completed",
+            video_url=video["video_url"],
+            error=None
+        )
             except Exception:
                 pass  # Continue to 404
         
@@ -512,12 +512,12 @@ async def get_video(video_id: str, user_id: str = Depends(verify_user)):
         if storage_service:
             try:
                 video = await storage_service.get_video(user_id, video_id)
-                return VideoResponse(
-                    id=video_id,
-                    video_url=video["video_url"],
-                    metadata=video["metadata"],
-                    status="completed"
-                )
+        return VideoResponse(
+            id=video_id,
+            video_url=video["video_url"],
+            metadata=video["metadata"],
+            status="completed"
+        )
             except Exception:
                 pass  # Continue to 404
         
@@ -585,27 +585,27 @@ async def list_videos(user_id: str = Depends(verify_user)):
         if storage_service:
             try:
                 videos = await storage_service.list_user_videos(user_id)
-                # Transform videos for frontend
-                transformed_videos = []
-                for video in videos:
-                    try:
-                        # Generate fresh signed URL
-                        signed_url_response = storage_service.supabase.storage.from_(
-                            storage_service.bucket_name
-                        ).create_signed_url(video["file_path"], 3600)
-                        
-                        signed_url = signed_url_response.get('signedURL', '')
-                        if signed_url:
-                            transformed_videos.append({
-                                "id": video["id"],
-                                "video_url": signed_url,
-                                "prompt": video["prompt"],
-                                "created_at": video["created_at"],
-                                "status": video.get("status", "completed")
-                            })
-                    except Exception as e:
-                        logger.error(f"Error processing video {video.get('id')}: {e}")
-                        continue
+        # Transform videos for frontend
+        transformed_videos = []
+        for video in videos:
+            try:
+                # Generate fresh signed URL
+                signed_url_response = storage_service.supabase.storage.from_(
+                    storage_service.bucket_name
+                ).create_signed_url(video["file_path"], 3600)
+                
+                signed_url = signed_url_response.get('signedURL', '')
+                if signed_url:
+                    transformed_videos.append({
+                        "id": video["id"],
+                        "video_url": signed_url,
+                        "prompt": video["prompt"],
+                        "created_at": video["created_at"],
+                        "status": video.get("status", "completed")
+                    })
+            except Exception as e:
+                logger.error(f"Error processing video {video.get('id')}: {e}")
+                continue
                 return transformed_videos
             except Exception as e:
                 logger.error(f"Storage service error: {e}")

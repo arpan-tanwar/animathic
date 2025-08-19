@@ -103,13 +103,13 @@ class OptimizedManimService:
 
     def _init_models(self):
         try:
-            self.model = genai.GenerativeModel(
-                model_name='gemini-2.5-flash',
-                generation_config=genai.GenerationConfig(
+        self.model = genai.GenerativeModel(
+            model_name='gemini-2.5-flash',
+            generation_config=genai.GenerationConfig(
                     temperature=0.1,
                     top_p=0.8,
                     top_k=20,
-                    max_output_tokens=4096,
+                max_output_tokens=4096,
                     candidate_count=1
                 )
             )
@@ -255,7 +255,7 @@ class OptimizedManimService:
                     code = match.group(1).strip()
                     if code and ('manim' in code or 'Scene' in code):
                         logger.debug(f"✅ Extracted using pattern {i+1}")
-                        return code
+            return code
             
             # Method 5: Look for any Python code structure
             if 'from manim import' in response_str or 'class' in response_str or 'def construct' in response_str:
@@ -427,7 +427,7 @@ class OptimizedManimService:
                 fixed_code = 'from manim import *\n\n' + fixed_code
             
             return fixed_code
-            
+        
         except Exception as e:
             logger.warning(f"Failed to fix syntax errors: {e}")
             return code
@@ -638,7 +638,7 @@ class OptimizedManimService:
             
             try:
                 stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self.timeout)
-            except asyncio.TimeoutError:
+        except asyncio.TimeoutError:
                 proc.kill()
                 await proc.wait()
                 return AnimationResult(success=False, error='Rendering timeout')

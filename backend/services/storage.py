@@ -13,7 +13,8 @@ load_dotenv()
 class StorageService:
     def __init__(self):
         supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
+        # Prefer service role key; fallback to legacy env name if present
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
         
         if not supabase_url or not supabase_key:
             raise ValueError("Missing Supabase credentials in environment variables")
@@ -22,7 +23,8 @@ class StorageService:
             supabase_url=supabase_url,
             supabase_key=supabase_key
         )
-        self.bucket_name = "manim-videos"
+        # Allow bucket to be configured via env; default to project bucket name
+        self.bucket_name = os.getenv("SUPABASE_BUCKET_NAME", "animathic-media")
 
     async def ensure_bucket_exists(self):
         """Ensure the storage bucket exists, create if it doesn't."""
