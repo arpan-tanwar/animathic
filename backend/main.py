@@ -467,11 +467,11 @@ async def get_video_status(video_id: str, user_id: str = Depends(verify_user)):
         if storage_service:
             try:
                 video = await storage_service.get_video(user_id, video_id)
-        return StatusResponse(
-            status="completed",
-            video_url=video["video_url"],
-            error=None
-        )
+                return StatusResponse(
+                    status="completed",
+                    video_url=video["video_url"],
+                    error=None
+                )
             except Exception:
                 pass  # Continue to 404
         
@@ -512,12 +512,12 @@ async def get_video(video_id: str, user_id: str = Depends(verify_user)):
         if storage_service:
             try:
                 video = await storage_service.get_video(user_id, video_id)
-        return VideoResponse(
-            id=video_id,
-            video_url=video["video_url"],
-            metadata=video["metadata"],
-            status="completed"
-        )
+                return VideoResponse(
+                    id=video_id,
+                    video_url=video["video_url"],
+                    metadata=video["metadata"],
+                    status="completed"
+                )
             except Exception:
                 pass  # Continue to 404
         
