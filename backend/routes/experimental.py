@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from services.local_llm import LocalLLMService
 from services.manim_compiler import ManimCompiler
 from services.rag_service import RAGService
+from config import is_production
 
 
 router = APIRouter(prefix="/api/exp", tags=["experimental"])
@@ -13,6 +14,8 @@ router = APIRouter(prefix="/api/exp", tags=["experimental"])
 @router.post("/compile")
 async def compile_from_prompt(payload: dict):
     """Generate structured JSON via local LLM, compile to Manim code, return code (no render)."""
+    if is_production():
+        raise HTTPException(status_code=404, detail="Not available in production")
     prompt = (payload or {}).get("prompt")
     if not prompt:
         raise HTTPException(status_code=400, detail="Missing 'prompt'")

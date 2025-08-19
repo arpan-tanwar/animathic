@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from typing import Any, Dict, Optional
+import os
 
 import httpx
 
@@ -12,9 +13,11 @@ from schemas.manim_schema import ManimScene
 class LocalLLMService:
     """Minimal Ollama client to generate structured JSON for Manim scenes."""
 
-    def __init__(self, model_name: str = "codellama:7b-instruct-q4_K_M", base_url: str = "http://localhost:11434"):
-        self.model_name = model_name
-        self.base_url = base_url.rstrip("/")
+    def __init__(self, model_name: Optional[str] = None, base_url: Optional[str] = None):
+        env_model = os.getenv("OLLAMA_MODEL", "codellama:7b-instruct-q4_K_M")
+        env_base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        self.model_name = (model_name or env_model)
+        self.base_url = (base_url or env_base).rstrip("/")
 
     async def generate_structured_scene(self, prompt: str) -> ManimScene:
         """Ask the local LLM to produce a ManimScene JSON and parse it into Pydantic model.
