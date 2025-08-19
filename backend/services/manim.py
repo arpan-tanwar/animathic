@@ -258,13 +258,14 @@ class OptimizedManimService:
                 r"(class\s+\w+\s*\(\s*Scene\s*\)[\s\S]*?def\s+construct[\s\S]*?self\.wait)"
             ]
             
+            code_candidate = None
             for i, pattern in enumerate(patterns):
                 match = re.search(pattern, response_str, re.IGNORECASE | re.DOTALL)
                 if match:
-                    code = match.group(1).strip()
-                    if code and ('manim' in code or 'Scene' in code):
+                    code_candidate = match.group(1).strip()
+                    if code_candidate and ('manim' in code_candidate or 'Scene' in code_candidate):
                         logger.debug(f"✅ Extracted using pattern {i+1}")
-            return code
+                        return code_candidate
             
             # Method 5: Look for any Python code structure
             if 'from manim import' in response_str or 'class' in response_str or 'def construct' in response_str:
