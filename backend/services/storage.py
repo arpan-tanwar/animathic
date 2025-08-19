@@ -23,28 +23,30 @@ class StorageService:
             supabase_url=supabase_url,
             supabase_key=supabase_key
         )
-        # Allow bucket to be configured via env; default to project bucket name
-        self.bucket_name = os.getenv("SUPABASE_BUCKET_NAME", "animathic-media")
+        # Configure buckets - new videos go to animathic-media, old videos are read from manim-videos
+        self.new_bucket_name = os.getenv("SUPABASE_BUCKET_NAME", "animathic-media")
+        self.legacy_bucket_name = "manim-videos"  # Old bucket for backward compatibility
 
     async def ensure_bucket_exists(self):
-        """Ensure the storage bucket exists, create if it doesn't."""
-        try:
-            # Try to get bucket info
-            self.supabase.storage.get_bucket(self.bucket_name)
-        except Exception as e:
-            print(f"Bucket not found, creating new bucket: {self.bucket_name}")
+        """Ensure both storage buckets exist, create if they don't."""
+        for bucket_name in [self.new_bucket_name, self.legacy_bucket_name]:
             try:
-                # Create bucket with proper options
-                self.supabase.storage.create_bucket(
-                    id=self.bucket_name,
-                    options={"public": False}
-                )
-            except Exception as create_error:
-                print(f"Error creating bucket: {str(create_error)}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to create storage bucket: {str(create_error)}"
-                )
+                # Try to get bucket info
+                self.supabase.storage.get_bucket(bucket_name)
+            except Exception as e:
+                print(f"Bucket not found, creating new bucket: {bucket_name}")
+                try:
+                    # Create bucket with proper options
+                    self.supabase.storage.create_bucket(
+                        id=bucket_name,
+                        options={"public": False}
+                    )
+                except Exception as create_error:
+                    print(f"Error creating bucket: {str(create_error)}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to create storage bucket: {str(create_error)}"
+                    )
 
     def _generate_file_path(self, user_id: str, prompt: str) -> str:
         """Generate a unique file path for the video."""
@@ -79,11 +81,11 @@ class StorageService:
             # Generate file path
             file_path = self._generate_file_path(user_id, prompt)
 
-            # Upload file
+            # Upload file to new bucket
             with open(video_path, "rb") as f:
                 file_data = f.read()
                 file_size = len(file_data)
-                self.supabase.storage.from_(self.bucket_name).upload(
+                self.supabase.storage.from_(self.new_bucket_name).upload(
                     path=file_path,
                     file=file_data,
                     file_options={"content-type": "video/mp4"}
@@ -195,11 +197,25 @@ class StorageService:
             if video["user_id"] != user_id:
                 raise HTTPException(status_code=403, detail="Not authorized to access this video")
             
-            # Generate signed URL
-            signed_url_response = self.supabase.storage.from_(self.bucket_name).create_signed_url(
-                video["file_path"],
-                3600  # URL valid for 1 hour
-            )
+            # Try to generate signed URL from new bucket first, then legacy bucket
+            signed_url = None
+            try:
+                signed_url_response = self.supabase.storage.from_(self.new_bucket_name).create_signed_url(
+                    video["file_path"],
+                    3600  # URL valid for 1 hour
+                )
+                signed_url = signed_url_response.get('signedURL', '')
+            except Exception:
+                # If new bucket fails, try legacy bucket
+                try:
+                    signed_url_response = self.supabase.storage.from_(self.legacy_bucket_name).create_signed_url(
+                        video["file_path"],
+                        3600  # URL valid for 1 hour
+                    )
+                    signed_url = signed_url_response.get('signedURL', '')
+                except Exception as legacy_error:
+                    print(f"Failed to generate signed URL from both buckets: {legacy_error}")
+                    raise HTTPException(status_code=500, detail="Failed to generate signed URL from storage")
             
             # Extract the signed URL from the response
             signed_url = signed_url_response.get('signedURL', '')
@@ -260,8 +276,16 @@ class StorageService:
             if video["user_id"] != user_id:
                 raise HTTPException(status_code=403, detail="Not authorized to delete this video")
             
-            # Delete from storage
-            self.supabase.storage.from_(self.bucket_name).remove([video["file_path"]])
+            # Try to delete from both buckets (in case file exists in either)
+            try:
+                self.supabase.storage.from_(self.new_bucket_name).remove([video["file_path"]])
+            except Exception:
+                pass  # Ignore if file doesn't exist in new bucket
+                
+            try:
+                self.supabase.storage.from_(self.legacy_bucket_name).remove([video["file_path"]])
+            except Exception:
+                pass  # Ignore if file doesn't exist in legacy bucket
             
             # Delete metadata
             self.supabase.table("videos").delete().eq("id", video_id).execute()
@@ -272,4 +296,52 @@ class StorageService:
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to delete video: {str(e)}"
+            )
+
+    async def migrate_legacy_videos(self, user_id: str) -> Dict[str, Any]:
+        """
+        Migrate videos from legacy bucket to new bucket for a user.
+        This is optional and can be called to consolidate storage.
+        
+        Args:
+            user_id: The Clerk user ID
+            
+        Returns:
+            Dict containing migration results
+        """
+        try:
+            # Get all videos for the user
+            videos = await self.list_user_videos(user_id)
+            migrated_count = 0
+            failed_count = 0
+            
+            for video in videos:
+                try:
+                    # Try to get file from legacy bucket
+                    legacy_file = self.supabase.storage.from_(self.legacy_bucket_name).download(video["file_path"])
+                    
+                    # Upload to new bucket
+                    self.supabase.storage.from_(self.new_bucket_name).upload(
+                        path=video["file_path"],
+                        file=legacy_file,
+                        file_options={"content-type": "video/mp4"}
+                    )
+                    
+                    migrated_count += 1
+                    print(f"Migrated video {video['id']} to new bucket")
+                    
+                except Exception as e:
+                    print(f"Failed to migrate video {video['id']}: {str(e)}")
+                    failed_count += 1
+            
+            return {
+                "migrated_count": migrated_count,
+                "failed_count": failed_count,
+                "total_count": len(videos)
+            }
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to migrate legacy videos: {str(e)}"
             ) 

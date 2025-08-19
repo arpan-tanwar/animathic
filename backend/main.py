@@ -589,16 +589,13 @@ async def list_videos(user_id: str = Depends(verify_user)):
                 transformed_videos = []
                 for video in videos:
                     try:
-                        # Generate fresh signed URL
-                        signed_url_response = storage_service.supabase.storage.from_(
-                            storage_service.bucket_name
-                        ).create_signed_url(video["file_path"], 3600)
-                        
-                        signed_url = signed_url_response.get('signedURL', '')
-                        if signed_url:
+                        # Generate fresh signed URL using the storage service method
+                        # This will automatically try both buckets
+                        video_data = await storage_service.get_video(user_id, video["id"])
+                        if video_data and video_data.get("video_url"):
                             transformed_videos.append({
                                 "id": video["id"],
-                                "video_url": signed_url,
+                                "video_url": video_data["video_url"],
                                 "prompt": video["prompt"],
                                 "created_at": video["created_at"],
                                 "status": video.get("status", "completed")
@@ -631,6 +628,24 @@ async def delete_video(video_id: str, user_id: str = Depends(verify_user)):
     except Exception as e:
         logger.error(f"Failed to delete video: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete video")
+
+@app.post("/api/videos/migrate-legacy")
+async def migrate_legacy_videos(user_id: str = Depends(verify_user)):
+    """Migrate videos from legacy bucket to new bucket"""
+    try:
+        if not storage_service:
+            raise HTTPException(status_code=500, detail="Storage service not available")
+        
+        result = await storage_service.migrate_legacy_videos(user_id)
+        return {
+            "status": "success",
+            "message": f"Migration completed: {result['migrated_count']} videos migrated, {result['failed_count']} failed",
+            "details": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to migrate legacy videos: {e}")
+        raise HTTPException(status_code=500, detail="Failed to migrate legacy videos")
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
