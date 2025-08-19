@@ -55,6 +55,16 @@ MANIM_SNIPPETS: List[Dict[str, str]] = [
     },
 ]
 
+# Add many small variations to reach ~50 entries for simple retrieval
+for i in range(1, 46):
+    MANIM_SNIPPETS.append({
+        "id": f"variant_{i}",
+        "title": f"Variant Snippet {i}",
+        "description": "Basic create-play pattern for demonstration",
+        "code": "obj = Circle(radius=1)\nself.play(Create(obj))",
+        "tags": "variant circle create basic",
+    })
+
 
 class RAGService:
     def find_relevant_snippets(self, query: str, top_k: int = 3) -> List[Dict[str, str]]:

@@ -80,6 +80,19 @@ class ManimCompiler:
         if t == "dot":
             color = p.get("color", "WHITE")
             return [f"        {name} = Dot(color={color})"]
+        if t == "axes":
+            x_range = p.get("x_range", "[-3,3,1]")
+            y_range = p.get("y_range", "[-2,2,1]")
+            return [f"        {name} = Axes(x_range={x_range}, y_range={y_range})"]
+        if t == "number_line":
+            x_range = p.get("x_range", "[-5,5,1]")
+            return [f"        {name} = NumberLine(x_range={x_range})"]
+        if t == "graph":
+            # Requires an axes object reference 'axes'
+            func = p.get("function", "lambda x: x**2")
+            axes_ref = p.get("axes", "axes")
+            color = p.get("color", "YELLOW")
+            return [f"        {name} = {axes_ref}.plot({func}, color={color})"]
 
         # Fallback unknown objects to a Dot
         return [f"        {name} = Dot()"]
@@ -113,6 +126,17 @@ class ManimCompiler:
                 lines.append(f"        self.play(FadeOut({target}), run_time={dur})")
         elif t == AnimationType.WAIT:
             lines.append(f"        self.wait({dur})")
+        elif t == AnimationType.SET_COLOR:
+            color = params.get("color", "WHITE")
+            lines.append(f"        {target}.set_color({color})")
+        elif t == AnimationType.SET_STROKE:
+            color = params.get("color", "WHITE")
+            width = params.get("width", 2)
+            lines.append(f"        {target}.set_stroke({color}, width={width})")
+        elif t == AnimationType.SET_FILL:
+            color = params.get("color", "WHITE")
+            opacity = params.get("opacity", 0.5)
+            lines.append(f"        {target}.set_fill({color}, opacity={opacity})")
 
         if step.wait_after and step.wait_after > 0:
             lines.append(f"        self.wait({step.wait_after})")

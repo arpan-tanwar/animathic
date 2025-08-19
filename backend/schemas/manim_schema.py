@@ -14,6 +14,9 @@ class AnimationType(str, Enum):
     SCALE = "scale"
     FADE = "fade"
     WAIT = "wait"
+    SET_COLOR = "set_color"
+    SET_STROKE = "set_stroke"
+    SET_FILL = "set_fill"
 
 
 class AnimationStep(BaseModel):
@@ -35,6 +38,9 @@ class ManimObject(BaseModel):
         "text",
         "line",
         "dot",
+        "axes",
+        "number_line",
+        "graph",
     ]
     # Generic properties; compiler will interpret according to type
     props: Dict[str, object] = Field(default_factory=dict)
