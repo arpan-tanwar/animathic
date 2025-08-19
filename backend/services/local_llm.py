@@ -50,11 +50,10 @@ class LocalLLMService:
 
     def _build_structured_prompt(self, user_prompt: str) -> str:
         schema_hint = (
-            "Return ONLY a JSON object for a Manim scene with keys: scene_name (CamelCase string), "
-            "background_color (hex string), resolution ([int,int]), imports (list of strings), "
-            "objects (list of {name,type,props}), animations (list of {type,target,duration,parameters,wait_after}). "
-            "Object types: circle, square, triangle, text, line, dot. Animation types: create, transform, move, rotate, scale, fade, wait. "
-            "Do not include markdown or code fences. No explanations."
+            "Return ONLY a JSON object with keys: scene_name, background_color, resolution, imports, objects, animations.\n"
+            "objects: [{name: string, type: one of [circle,square,rectangle,ellipse,triangle,text,line,dot,axes,number_line,graph], props: object}]\n"
+            "animations: [{type: one of [create,transform,move,rotate,scale,fade,wait,set_color,set_stroke,set_fill], target: string, duration: number, parameters: object, wait_after: number}]\n"
+            "No markdown. No code fences. JSON only."
         )
         return f"Task: Create a structured Manim animation for: {user_prompt}\n{schema_hint}\nJSON:"
 
