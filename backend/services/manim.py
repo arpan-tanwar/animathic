@@ -615,7 +615,7 @@ class OptimizedManimService:
             # If no CLI, fallback to module invocation with chosen python
             if manim_cli is None:
                  logger.debug(f"Using module invocation: {python_exec} -m manim (sys.executable={sys.executable})")
-                cmd = [
+                 cmd = [
                     python_exec, '-m', 'manim',
                     '-q', 'm',
                     '-r', '1280,720',
