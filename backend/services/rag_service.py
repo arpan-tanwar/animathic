@@ -1,9 +1,24 @@
 from __future__ import annotations
 
 from typing import List, Dict
+from pathlib import Path
+import yaml
 
 
-MANIM_SNIPPETS: List[Dict[str, str]] = [
+# Load curated snippets from YAML if present; otherwise use built-ins
+def _load_yaml_snippets() -> List[Dict[str, str]]:
+    try:
+        data_path = Path(__file__).resolve().parent.parent / "data" / "manim_snippets.yaml"
+        if data_path.exists():
+            with open(data_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or []
+                if isinstance(data, list):
+                    return [s for s in data if isinstance(s, dict)]
+    except Exception:
+        pass
+    return []
+
+MANIM_SNIPPETS: List[Dict[str, str]] = _load_yaml_snippets() or [
     {
         "id": "circle_create",
         "title": "Create Circle",
