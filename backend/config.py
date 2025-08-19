@@ -27,10 +27,10 @@ GCP_CONFIG = {
     "image_name": f"gcr.io/{os.getenv('GCP_PROJECT_ID', 'animathic-backend')}/animathic-backend",
     "memory": os.getenv("GCP_MEMORY", "2Gi"),
     "cpu": int(os.getenv("GCP_CPU", "1")),
-    "timeout": int(os.getenv("GCP_TIMEOUT", "300")),
+    "timeout": int(os.getenv("GCP_TIMEOUT", "600")),
     "max_instances": int(os.getenv("GCP_MAX_INSTANCES", "10")),
-    "min_instances": int(os.getenv("GCP_MIN_INSTANCES", "0")),
-    "concurrency": int(os.getenv("GCP_CONCURRENCY", "80")),
+    "min_instances": int(os.getenv("GCP_MIN_INSTANCES", "1")),
+    "concurrency": int(os.getenv("GCP_CONCURRENCY", "40")),
 }
 
 # API Configuration

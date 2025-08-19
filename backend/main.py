@@ -697,6 +697,10 @@ async def healthz():
     """Lightweight health endpoint for container health checks."""
     return {"status": "ok"}
 
+@app.head("/api/healthz")
+async def healthz_head():
+    return {}
+
 @app.get("/api/metrics")
 async def get_metrics():
     """Get detailed performance metrics"""
