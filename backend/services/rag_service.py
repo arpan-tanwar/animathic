@@ -83,14 +83,24 @@ for i in range(1, 46):
 
 class RAGService:
     def find_relevant_snippets(self, query: str, top_k: int = 3) -> List[Dict[str, str]]:
-        """Simple keyword-based retrieval over snippets."""
+        """Weighted keyword scoring favoring exact tag matches and object/action terms."""
         q = query.lower()
+        q_tokens = q.split()
         scored = []
         for s in MANIM_SNIPPETS:
+            desc = s.get("description", "").lower()
+            tags = s.get("tags", "")
+            tag_list = tags if isinstance(tags, list) else str(tags).split()
+            tag_set = {t.lower().strip(',') for t in tag_list}
             score = 0
-            for token in q.split():
-                if token in s["description"].lower() or token in s["tags"].lower():
+            for tok in q_tokens:
+                if tok in tag_set:
+                    score += 3
+                elif tok in desc:
                     score += 1
+            # small bonus for axes/graph/number_line specific content
+            if any(k in tag_set for k in ["axes", "graph", "number_line"]):
+                score += 0.5
             scored.append((score, s))
         scored.sort(key=lambda x: x[0], reverse=True)
         return [s for _, s in scored[:top_k]]
