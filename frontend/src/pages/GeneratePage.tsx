@@ -270,14 +270,29 @@ const GeneratePage = () => {
       {/* Header */}
       <div className="border-b border-subtle bg-surface-primary/50">
         <div className="container-narrow py-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/dashboard")}
-            className="mb-4 interactive focus-ring"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/dashboard")}
+              className="mb-4 interactive focus-ring"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+            {showPromptInput && (
+              <Button
+                onClick={() => {
+                  const el = document.querySelector<HTMLButtonElement>(
+                    'form button[type="submit"]'
+                  );
+                  el?.click();
+                }}
+                className="btn-primary interactive"
+              >
+                <Sparkles className="h-4 w-4 mr-2" /> Generate
+              </Button>
+            )}
+          </div>
 
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-primary">
