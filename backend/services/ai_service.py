@@ -466,6 +466,103 @@ class GeneratedScene(MovingCameraScene):
             except Exception:
                 pass
 
+        def smart_screen_management(new_graph_type):
+            """Intelligent screen management when adding new graphs"""
+            try:
+                # Count existing graphs
+                existing_graphs = [oid for oid in active_ids if id_to_meta.get(oid, {{}}).get('type') in ['plot', 'axes', 'function', 'graph']]
+                
+                if len(existing_graphs) == 0:
+                    # First graph - use default positioning
+                    return
+                
+                elif len(existing_graphs) == 1:
+                    # Second graph - check if we can fit both
+                    existing_graph = id_to_mobject.get(existing_graphs[0])
+                    if existing_graph:
+                        bbox = _mobj_bbox(existing_graph)
+                        if bbox:
+                            (x0, y0), (x1, y1), w, h = bbox
+                            
+                            # If existing graph is small, we can fit both side by side
+                            if w < 6 and h < 4:
+                                # Keep existing graph, position new one to the right
+                                return 'side_by_side'
+                            else:
+                                # Existing graph is large, fade it out
+                                return 'fade_existing'
+                
+                else:
+                    # Multiple graphs - need to manage screen space
+                    total_width = 0
+                    for oid in existing_graphs:
+                        mobj = id_to_mobject.get(oid)
+                        if mobj:
+                            bbox = _mobj_bbox(mobj)
+                            if bbox:
+                                _, _, w, _ = bbox
+                                total_width += w
+                    
+                    # If total width exceeds screen capacity, fade out oldest
+                    if total_width > 10:
+                        return 'fade_oldest'
+                    else:
+                        return 'reorganize'
+                        
+            except Exception:
+                return 'default'
+
+        def execute_screen_strategy(strategy, new_graph_obj=None):
+            """Execute the chosen screen management strategy"""
+            try:
+                if strategy == 'side_by_side':
+                    # Position new graph to the right of existing one
+                    existing_graphs = [oid for oid in active_ids if id_to_meta.get(oid, {{}}).get('type') in ['plot', 'axes', 'function', 'graph']]
+                    if existing_graphs and new_graph_obj:
+                        existing_graph = id_to_mobject.get(existing_graphs[0])
+                        if existing_graph:
+                            existing_center = existing_graph.get_center()
+                            new_graph_obj.move_to([existing_center[0] + 6, existing_center[1], 0])
+                            
+                            # Zoom out camera to show both graphs
+                            safe_play(self.camera.frame.animate.set_width(16), run_time=0.8)
+                
+                elif strategy == 'fade_existing':
+                    # Fade out existing graph and focus on new one
+                    existing_graphs = [oid for oid in active_ids if id_to_meta.get(oid, {{}}).get('type') in ['plot', 'axes', 'function', 'graph']]
+                    for oid in existing_graphs:
+                        mobj = id_to_mobject.get(oid)
+                        if mobj:
+                            safe_play(FadeOut(mobj), run_time=0.6)
+                            if oid in active_ids:
+                                active_ids.remove(oid)
+                    
+                    # Center camera on new graph
+                    if new_graph_obj:
+                        new_center = new_graph_obj.get_center()
+                        safe_play(self.camera.frame.animate.move_to(new_center).set_width(8), run_time=0.8)
+                
+                elif strategy == 'fade_oldest':
+                    # Fade out oldest graph to make room
+                    existing_graphs = [oid for oid in active_ids if id_to_meta.get(oid, {{}}).get('type') in ['plot', 'axes', 'function', 'graph']]
+                    if existing_graphs:
+                        oldest_graph = existing_graphs[0]  # First in list is oldest
+                        mobj = id_to_mobject.get(oldest_graph)
+                        if mobj:
+                            safe_play(FadeOut(mobj), run_time=0.6)
+                            active_ids.remove(oldest_graph)
+                            
+                            # Adjust camera to show remaining graphs
+                            dynamic_camera_adjust(active_ids, target_margin=0.3)
+                
+                elif strategy == 'reorganize':
+                    # Reorganize all graphs to fit better
+                    resolve_graph_overlaps()
+                    dynamic_camera_adjust(active_ids, target_margin=0.4)
+                    
+            except Exception:
+                pass
+
         def camera_zoom(factor=1.0, anchor=None):
             try:
                 factor = float(factor) if isinstance(factor, (int, float)) else 1.0
@@ -662,6 +759,140 @@ class GeneratedScene(MovingCameraScene):
                             obj1.move_to(center1 - direction * separation * 0.5)
                             obj2.move_to(center2 + direction * separation * 0.5)
                             
+            except Exception:
+                pass
+
+        def resolve_graph_overlaps():
+            """Specialized overlap resolution for graphs and mathematical objects"""
+            try:
+                # Get all graph-like objects (plots, axes, functions)
+                graph_objects = []
+                for oid, mobj in id_to_mobject.items():
+                    obj_type = id_to_meta.get(oid, {{}}).get('type', '')
+                    if obj_type in ['plot', 'axes', 'function', 'graph']:
+                        graph_objects.append((oid, mobj))
+                
+                if len(graph_objects) < 2:
+                    return
+                
+                # Check for overlaps between graphs
+                for i in range(len(graph_objects)):
+                    for j in range(i+1, len(graph_objects)):
+                        oid1, obj1 = graph_objects[i]
+                        oid2, obj2 = graph_objects[j]
+                        
+                        bbox1 = _mobj_bbox(obj1)
+                        bbox2 = _mobj_bbox(obj2)
+                        
+                        if not bbox1 or not bbox2:
+                            continue
+                        
+                        (x1_0, y1_0), (x1_1, y1_1), w1, h1 = bbox1
+                        (x2_0, y2_0), (x2_1, y2_1), w2, h2 = bbox2
+                        
+                        # Check for significant overlap
+                        overlap_x = not (x1_1 < x2_0 or x2_1 < x1_0)
+                        overlap_y = not (y1_1 < y2_0 or y2_1 < y1_0)
+                        
+                        if overlap_x and overlap_y:
+                            # Calculate overlap area
+                            overlap_area = min(w1, w2) * min(h1, h2)
+                            total_area = w1 * h1 + w2 * h2
+                            overlap_ratio = overlap_area / total_area if total_area > 0 else 0
+                            
+                            if overlap_ratio > 0.3:  # Significant overlap
+                                # Strategy 1: Try to separate graphs horizontally
+                                if w1 + w2 < 12:  # If both graphs can fit side by side
+                                    # Move first graph to left, second to right
+                                    left_pos = [-6 + w1/2, 0, 0]
+                                    right_pos = [6 - w2/2, 0, 0]
+                                    
+                                    safe_play(obj1.animate.move_to(left_pos), run_time=0.8)
+                                    safe_play(obj2.animate.move_to(right_pos), run_time=0.8)
+                                    
+                                    # Adjust camera to show both graphs
+                                    dynamic_camera_adjust(active_ids, target_margin=0.4)
+                                    
+                                else:
+                                    # Strategy 2: Fade out older graph and zoom camera for new one
+                                    older_graph = obj1 if oid1 < oid2 else obj2
+                                    newer_graph = obj2 if oid1 < oid2 else obj1
+                                    
+                                    # Fade out older graph
+                                    safe_play(FadeOut(older_graph), run_time=0.6)
+                                    
+                                    # Center camera on newer graph with zoom
+                                    newer_center = newer_graph.get_center()
+                                    safe_play(self.camera.frame.animate.move_to(newer_center).set_width(8), run_time=0.8)
+                                    
+                                    # Remove older graph from active list
+                                    if oid1 < oid2 and oid1 in active_ids:
+                                        active_ids.remove(oid1)
+                                    elif oid2 < oid1 and oid2 in active_ids:
+                                        active_ids.remove(oid2)
+                                    
+            except Exception:
+                pass
+
+        def smart_graph_positioning(graph_data):
+            """Intelligent positioning for graphs to avoid overlaps"""
+            try:
+                if not graph_data:
+                    return
+                
+                # Sort graphs by priority (axes first, then plots, then functions)
+                priority_order = {{'axes': 0, 'plot': 1, 'function': 2, 'graph': 3}}
+                sorted_graphs = sorted(graph_data, key=lambda x: priority_order.get(x.get('type', 'plot'), 1))
+                
+                # Define screen regions for different graph types
+                screen_regions = {{
+                    'axes': {{'x_range': [-8, 8], 'y_range': [-6, 6]}},
+                    'plot': {{'x_range': [-6, 6], 'y_range': [-4, 4]}},
+                    'function': {{'x_range': [-5, 5], 'y_range': [-3, 3]}}
+                }}
+                
+                used_regions = []
+                
+                for graph in sorted_graphs:
+                    graph_type = graph.get('type', 'plot')
+                    props = graph.get('properties', {{}})
+                    
+                    # Find available region
+                    best_region = None
+                    min_overlap = float('inf')
+                    
+                    for region in screen_regions.get(graph_type, screen_regions['plot']):
+                        x_range = region['x_range']
+                        y_range = region['y_range']
+                        
+                        # Check overlap with existing regions
+                        overlap_count = 0
+                        for used in used_regions:
+                            if (x_range[0] < used['x_range'][1] and x_range[1] > used['x_range'][0] and
+                                y_range[0] < used['y_range'][1] and y_range[1] > used['y_range'][0]):
+                                overlap_count += 1
+                        
+                        if overlap_count < min_overlap:
+                            min_overlap = overlap_count
+                            best_region = region
+                        
+                        if overlap_count == 0:
+                            break
+                    
+                    if best_region:
+                        # Update graph position to use this region
+                        center_x = (best_region['x_range'][0] + best_region['x_range'][1]) / 2
+                        center_y = (best_region['y_range'][0] + best_region['y_range'][1]) / 2
+                        props['position'] = [center_x, center_y, 0]
+                        
+                        # Update graph bounds if they exist
+                        if 'x_range' not in props:
+                            props['x_range'] = best_region['x_range']
+                        if 'y_range' not in props:
+                            props['y_range'] = best_region['y_range']
+                        
+                        used_regions.append(best_region)
+                        
             except Exception:
                 pass
 
@@ -1019,7 +1250,16 @@ class GeneratedScene(MovingCameraScene):
             try:
                 reg("{obj_id}", axes_obj, {int(props.get('z_index', 80))})
                 activate("{obj_id}")
-                camera_fit(active_ids, margin=0.1)
+                
+                # Smart screen management for axes
+                strategy = smart_screen_management("axes")
+                execute_screen_strategy(strategy, axes_obj)
+                
+                # Resolve any remaining overlaps
+                resolve_graph_overlaps()
+                
+                # Use dynamic camera adjustment for optimal viewing
+                dynamic_camera_adjust(active_ids, target_margin=0.25)
             except Exception:
                 pass
         except Exception:
@@ -1070,7 +1310,16 @@ class GeneratedScene(MovingCameraScene):
             try:
                 reg("{obj_id}", graph_obj, {int(props.get('z_index', 120))})
                 activate("{obj_id}")
-                camera_fit(active_ids, margin=0.1)
+                
+                # Smart screen management for graphs
+                strategy = smart_screen_management("plot")
+                execute_screen_strategy(strategy, graph_obj)
+                
+                # Resolve any remaining overlaps
+                resolve_graph_overlaps()
+                
+                # Use dynamic camera adjustment for optimal viewing
+                dynamic_camera_adjust(active_ids, target_margin=0.25)
             except Exception:
                 pass
         except Exception:
@@ -1130,12 +1379,18 @@ class GeneratedScene(MovingCameraScene):
             manim_code += '''
         # Final overlap resolution and camera optimization
         try:
-            # Resolve any remaining overlaps
+            # Resolve graph-specific overlaps first
+            resolve_graph_overlaps()
+            # Resolve any remaining object overlaps
             resolve_object_overlaps()
             # Final camera adjustment for optimal viewing
             dynamic_camera_adjust(active_ids, target_margin=0.3)
             # Resolve label overlaps specifically
             resolve_label_overlaps(active_ids)
+            # Final screen space optimization
+            if len([oid for oid in active_ids if id_to_meta.get(oid, {{}}).get('type') in ['plot', 'axes', 'function', 'graph']]) > 1:
+                # Multiple graphs - ensure optimal spacing
+                dynamic_camera_adjust(active_ids, target_margin=0.4)
         except Exception:
             pass
         
