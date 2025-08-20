@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   SignedIn,
   SignedOut,
   SignInButton,
   UserButton,
+  useUser,
 } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -542,6 +543,8 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [typing, setTyping] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isSignedIn } = useUser();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -621,6 +624,16 @@ export default function ChatPage() {
         setTimeout(() => setTyping(false), 200);
       }
     }, 280);
+  }
+
+  function generateFromInput() {
+    if (!input.trim()) return;
+    if (!isSignedIn) {
+      // If not signed in, route to landing or show sign-in
+      navigate("/generate", { state: { prompt: input.trim() } });
+      return;
+    }
+    navigate("/generate", { state: { prompt: input.trim() } });
   }
 
   return (
@@ -919,6 +932,16 @@ export default function ChatPage() {
                     <TooltipContent>Voice</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+                {/* Generate button for workflow */}
+                <Button
+                  onClick={generateFromInput}
+                  disabled={!input.trim()}
+                  className="h-10"
+                  style={{ backgroundColor: "#7C3AED", color: "#fff" }}
+                  aria-label="Generate animation from prompt"
+                >
+                  <Sparkles className="mr-1 h-4 w-4" /> Generate
+                </Button>
                 <Button
                   onClick={sendMessage}
                   disabled={!input.trim()}
