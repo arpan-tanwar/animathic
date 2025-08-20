@@ -89,6 +89,15 @@ const DashboardPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Floating action button (always visible) */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <Button asChild className="btn-primary rounded-full h-12 w-12 p-0 shadow-lg interactive focus-ring">
+          <Link to="/generate" aria-label="Create new animation">
+            <Plus className="h-6 w-6" />
+          </Link>
+        </Button>
+      </div>
     </div>
   );
 };
