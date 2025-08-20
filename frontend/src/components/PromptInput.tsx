@@ -14,11 +14,11 @@ interface PromptInputProps {
   className?: string;
 }
 
-export function PromptInput({ 
-  initialValue = "", 
-  onSubmit, 
+export function PromptInput({
+  initialValue = "",
+  onSubmit,
   placeholder = "e.g., Create an animation showing how the derivative of x² becomes 2x using the limit definition",
-  className = ""
+  className = "",
 }: PromptInputProps) {
   const [prompt, setPrompt] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,6 +28,7 @@ export function PromptInput({
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isSubmitting) return;
     if (!prompt.trim()) {
       toast.error("Please enter a prompt to get started");
       return;
@@ -51,22 +52,24 @@ export function PromptInput({
 
   const suggestions = [
     "Visualize the unit circle and sine wave",
-    "Animate matrix transformation of a square", 
+    "Animate matrix transformation of a square",
     "Show the Pythagorean theorem proof",
-    "Graph the quadratic formula step by step"
+    "Graph the quadratic formula step by step",
   ];
 
   return (
     <div className={`w-full max-w-3xl mx-auto ${className}`}>
       <form onSubmit={handleSubmit} className="relative group">
-        <div className={`relative surface-primary rounded-2xl border-2 transition-all duration-300 ${
-          isFocused 
-            ? "border-accent-primary shadow-lg glow-subtle" 
-            : "border-subtle hover:border-emphasis"
-        }`}>
+        <div
+          className={`relative surface-primary rounded-2xl border-2 transition-all duration-300 ${
+            isFocused
+              ? "border-accent-primary shadow-lg glow-subtle"
+              : "border-subtle hover:border-emphasis"
+          }`}
+        >
           <Textarea
             className={`
-              min-h-[120px] w-full resize-none border-0 bg-transparent 
+              min-h[120px] w-full resize-none border-0 bg-transparent 
               p-6 text-base placeholder:text-muted focus:ring-0 focus:outline-none
               transition-all duration-300
             `}
@@ -81,11 +84,9 @@ export function PromptInput({
           <div className="absolute bottom-4 right-4 hidden sm:block">
             <Button
               type="submit"
-              disabled={isSubmitting || !prompt.trim()}
               className="
                 h-12 px-6 rounded-xl font-medium
                 bg-accent-primary hover:bg-accent-secondary
-                disabled:opacity-50 disabled:cursor-not-allowed
                 transition-all duration-300 interactive
                 focus-ring
               "
@@ -110,8 +111,7 @@ export function PromptInput({
           <Button
             type="button"
             onClick={() => handleSubmit()}
-            disabled={isSubmitting || !prompt.trim()}
-            className="w-full h-12 rounded-xl font-medium bg-accent-primary hover:bg-accent-secondary disabled:opacity-50 disabled:cursor-not-allowed interactive focus-ring"
+            className="w-full h-12 rounded-xl font-medium bg-accent-primary hover:bg-accent-secondary interactive focus-ring"
           >
             {isSubmitting ? (
               <div className="flex items-center justify-center gap-3">
@@ -158,9 +158,11 @@ export function PromptInput({
       {/* Character count */}
       {prompt.length > 0 && (
         <div className="mt-2 text-right">
-          <span className={`text-xs ${
-            prompt.length > 500 ? "text-red-400" : "text-muted"
-          }`}>
+          <span
+            className={`text-xs ${
+              prompt.length > 500 ? "text-red-400" : "text-muted"
+            }`}
+          >
             {prompt.length}/500
           </span>
         </div>
@@ -169,8 +171,9 @@ export function PromptInput({
       {/* Tips */}
       <div className="mt-6 space-y-2">
         <p className="text-xs text-muted text-center">
-          💡 <strong>Tip:</strong> Be specific about what you want to visualize. 
-          Include mathematical concepts, visual elements, and any step-by-step requirements.
+          💡 <strong>Tip:</strong> Be specific about what you want to visualize.
+          Include mathematical concepts, visual elements, and any step-by-step
+          requirements.
         </p>
       </div>
     </div>
