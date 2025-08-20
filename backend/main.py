@@ -1,13 +1,12 @@
 """
-Animathic - Consolidated AI Manim Generator API
+Animathic - Production-Ready AI Manim Generator API
 
-This is the unified, optimized backend combining all best features:
-- Enhanced security with input validation and rate limiting
-- Performance monitoring and resource management  
-- Memory leak prevention and automated cleanup
-- Comprehensive error handling and logging
-- Database integration with user tracking
-- Health monitoring and metrics endpoints
+Complete workflow:
+1. User provides prompt
+2. Gemini generates structured JSON (local model as fallback)
+3. JSON converts to Manim code
+4. Code is compiled and provided to user
+5. User feedback collected for fine-tuning and training
 """
 
 import os
@@ -21,8 +20,8 @@ from collections import defaultdict, deque
 from pathlib import Path
 import uuid
 
-from fastapi import FastAPI, HTTPException, Header, Request, Depends
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Header, Request, Depends, BackgroundTasks
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, validator
@@ -33,14 +32,13 @@ import psutil
 load_dotenv()
 
 # Import configuration
-from config import get_config, get_api_config, get_feature_flags, is_production, get_log_level
-from routes.experimental import router as experimental_router
+from config import get_config, get_api_config, get_feature_flags, is_production, get_log_level, get_cors_origins, get_rate_limit_config
 
 # Configure logging first
 log_level = get_log_level()
 logging.basicConfig(
     level=getattr(logging, log_level.upper()),
-    format='%(asctime)s - %(name)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler()  # Cloud Run handles file logging
     ]
@@ -49,10 +47,13 @@ logger = logging.getLogger(__name__)
 
 # Import services
 try:
-    from services.manim import get_manim_service, generate_video_from_prompt
-    from services.storage import StorageService
+    from services.hybrid_orchestrator import HybridOrchestrator
+    from services.feedback_collector import FeedbackCollector
+    from services.manim_compiler import ManimCompiler
+    from services.enhanced_gemini import EnhancedGeminiService
+    from services.local_llm import LocalLLMService
     enhanced_features = True
-    logger.info("✅ Using optimized Manim service")
+    logger.info("✅ All services imported successfully")
 except ImportError as e:
     logger.error(f"❌ Failed to import services: {e}")
     enhanced_features = False
@@ -67,7 +68,20 @@ except ImportError:
 except Exception as e:
     logger.warning(f"📝 Database initialization skipped: {e}")
 
+# Initialize services
+hybrid_orchestrator = None
+feedback_collector = None
+manim_compiler = None
 
+if enhanced_features:
+    try:
+        hybrid_orchestrator = HybridOrchestrator()
+        feedback_collector = FeedbackCollector()
+        manim_compiler = ManimCompiler()
+        logger.info("✅ All services initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Service initialization failed: {e}")
+        enhanced_features = False
 
 # Environment variables already loaded above
 
@@ -100,703 +114,388 @@ class PerformanceMonitor:
     """Monitor application performance and resource usage"""
     
     def __init__(self):
-        self.request_times = deque(maxlen=1000)
+        self.start_time = time.time()
+        self.request_count = 0
         self.error_count = 0
-        self.total_requests = 0
+        self.response_times = deque(maxlen=1000)
     
-    def log_request(self, duration: float, success: bool = True):
-        """Log request performance"""
-        self.request_times.append(duration)
-        self.total_requests += 1
+    def record_request(self, response_time: float, success: bool = True):
+        """Record request metrics"""
+        self.request_count += 1
         if not success:
             self.error_count += 1
+        self.response_times.append(response_time)
     
     def get_metrics(self) -> Dict[str, Any]:
-        """Get performance metrics"""
-        if not self.request_times:
-            return {"status": "no_data"}
-        
-        avg_time = sum(self.request_times) / len(self.request_times)
-        memory_usage = psutil.Process().memory_info().rss / 1024 / 1024  # MB
-        cpu_percent = psutil.cpu_percent()
+        """Get current metrics"""
+        uptime = time.time() - self.start_time
+        avg_response_time = sum(self.response_times) / len(self.response_times) if self.response_times else 0
         
         return {
-            "avg_response_time": round(avg_time, 3),
-            "total_requests": self.total_requests,
-            "error_rate": round(self.error_count / self.total_requests * 100, 2) if self.total_requests > 0 else 0,
-            "memory_usage_mb": round(memory_usage, 2),
-            "cpu_percent": cpu_percent,
-            "active_requests": len(self.request_times),
-            "enhanced_features": enhanced_features
+            "uptime_seconds": uptime,
+            "total_requests": self.request_count,
+            "error_rate": self.error_count / max(self.request_count, 1),
+            "avg_response_time": avg_response_time,
+            "memory_usage_mb": psutil.Process().memory_info().rss / 1024 / 1024,
+            "cpu_percent": psutil.Process().cpu_percent()
         }
 
-# Initialize services
-rate_limiter = RateLimiter(max_requests=5, window_minutes=1)
+# Initialize monitoring
 performance_monitor = PerformanceMonitor()
 
-# In-memory video storage for status tracking
-video_storage = {}
-
-# Initialize configuration
-config = get_config()
-
-# Create FastAPI app
-app = FastAPI(
-    title=config["base"]["app_name"],
-    description="AI-Powered Mathematical Animation Generator",
-    version=config["base"]["version"],
-    docs_url="/docs" if not is_production() else None,
-    redoc_url="/redoc"
+# Initialize rate limiter
+rate_limit_config = get_rate_limit_config()
+rate_limiter = RateLimiter(
+    max_requests=rate_limit_config["max_requests"],
+    window_minutes=rate_limit_config["window_minutes"]
 )
 
-# Security headers middleware
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    """Add security headers and performance monitoring"""
-    start_time = time.time()
-    
-    try:
-        response = await call_next(request)
-        
-        # Add security headers
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        
-        # Log performance
-        duration = time.time() - start_time
-        performance_monitor.log_request(duration, response.status_code < 400)
-        
-        return response
-        
-    except Exception as e:
-        duration = time.time() - start_time
-        performance_monitor.log_request(duration, False)
-        logger.error(f"Request failed: {e}")
-        raise
+# Create FastAPI app
+app = FastAPI(**get_api_config())
 
-# CORS configuration (handle wildcard vs explicit origins correctly)
-_cors_origins = [o.strip() for o in config["api"]["cors_origins"] if o and o.strip()]
-if not _cors_origins or "*" in _cors_origins:
-    # When using wildcard, do NOT allow credentials. Use regex to reflect all origins.
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=".*",
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "user-id", "User-Id"],
-        max_age=600,
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_cors_origins,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "user-id", "User-Id"],
-        max_age=600,
-    )
+# Add CORS middleware
+cors_origins = get_cors_origins()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Mount static files
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
-# Experimental routes (no-render compile/test pipeline)
-app.include_router(experimental_router)
-# Initialize services with error handling
-try:
-    if enhanced_features:
-        storage_service = StorageService()
-        logger.info("✅ Supabase storage service initialized successfully")
-    else:
-        storage_service = None
-        logger.info("📝 Enhanced features disabled, using basic storage")
-except Exception as e:
-    logger.warning(f"⚠️ Supabase storage service failed to initialize: {e}")
-    logger.info("📝 Falling back to local storage only")
-    storage_service = None
-
-logger.info("✅ All services initialized successfully")
-
-# Pydantic models with validation
-class GenerateRequest(BaseModel):
+# Pydantic models for API
+class AnimationRequest(BaseModel):
+    """Request model for animation generation"""
     prompt: str
     user_id: Optional[str] = None
     
     @validator('prompt')
     def validate_prompt(cls, v):
-        if not v or len(v.strip()) < 5:
-            raise ValueError('Prompt must be at least 5 characters long')
-        if len(v) > 500:
-            raise ValueError('Prompt must be less than 500 characters')
-        
-        # Basic sanitization
-        dangerous_chars = ['<', '>', '"', "'", '&', 'script', 'exec', 'eval']
-        v_lower = v.lower()
-        for char in dangerous_chars:
-            if char in v_lower:
-                raise ValueError(f'Prompt contains potentially dangerous content: {char}')
-        
+        if not v or len(v.strip()) < 3:
+            raise ValueError('Prompt must be at least 3 characters long')
+        if len(v) > 1000:
+            raise ValueError('Prompt must be less than 1000 characters')
         return v.strip()
 
-class VideoResponse(BaseModel):
-    id: str
-    video_url: str
-    metadata: Dict[str, Any]
-    status: str = "completed"
-    generation_time: Optional[float] = None
-
-class StatusResponse(BaseModel):
-    status: str
-    video_url: Optional[str] = None
-    error: Optional[str] = None
+class FeedbackRequest(BaseModel):
+    """Request model for user feedback"""
+    generation_id: str
+    rating: int
+    quality: str
+    comments: Optional[str] = None
+    animation_worked: bool
+    matched_intent: bool
+    
+    @validator('rating')
+    def validate_rating(cls, v):
+        if not 1 <= v <= 5:
+            raise ValueError('Rating must be between 1 and 5')
+        return v
 
 class HealthResponse(BaseModel):
+    """Health check response"""
     status: str
     timestamp: str
-    version: str
+    uptime: float
+    services: Dict[str, str]
     performance: Dict[str, Any]
 
-# Rate limiting dependency
+# Dependency for rate limiting
 async def check_rate_limit(request: Request):
     """Check rate limit for request"""
-    client_ip = request.client.host
-    user_agent = request.headers.get("user-agent", "unknown")
-    client_id = f"{client_ip}:{user_agent}"
+    if not rate_limit_config["enabled"]:
+        return
     
+    client_id = request.client.host if request.client else "unknown"
     if not rate_limiter.is_allowed(client_id):
         raise HTTPException(
             status_code=429,
-            detail="Rate limit exceeded. Please wait before making more requests."
+            detail="Rate limit exceeded. Please try again later."
         )
 
-# Authentication dependency
-async def verify_user(user_id: Optional[str] = Header(None)):
-    """Verify user authentication"""
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Missing user_id header")
-    return user_id
-
-# API Routes
-@app.post("/api/generate", response_model=VideoResponse, dependencies=[Depends(check_rate_limit)])
-async def generate_video(
-    request: GenerateRequest,
-    user_id: str = Depends(verify_user)
-):
-    """Generate a video with enhanced security and performance monitoring"""
-    start_time = time.time()
-    
+# Background task for training
+async def trigger_training(generation_id: str):
+    """Trigger training pipeline in background"""
     try:
-        logger.info(f"Generating video for user {user_id}: {request.prompt}")
-        
-        # Generate video using new optimized service
-        if enhanced_features:
-            result = await generate_video_from_prompt(
-                prompt=request.prompt,
-                media_dir="./media"
-            )
-            
-            generation_time = time.time() - start_time
-            
-            if result.success:
-                try:
-                    # Upload video to Supabase storage
-                    if storage_service and result.video_path:
-                        logger.info(f"Uploading video to Supabase: {result.video_path}")
-                        
-                        # Prepare metadata for Supabase
-                        upload_metadata = {
-                            "duration": result.duration,
-                            "resolution": result.resolution,
-                            "generation_time": round(generation_time, 2),
-                            "code_used": result.code_used[:500] if result.code_used else None
-                        }
-                        
-                        # Upload to Supabase
-                        upload_result = await storage_service.upload_video(
-                            user_id=user_id,
-                            prompt=request.prompt,
-                            video_path=result.video_path,
-                            metadata=upload_metadata
-                        )
-                        
-                        video_id = upload_result["metadata"]["id"]
-                        video_url = upload_result["video_url"]
-                        
-                        logger.info(f"Video uploaded successfully. ID: {video_id}")
-                        
-                        # Clean up local file after successful upload
-                        try:
-                            if os.path.exists(result.video_path):
-                                os.remove(result.video_path)
-                                logger.info(f"Cleaned up local file: {result.video_path}")
-                        except Exception as cleanup_error:
-                            logger.warning(f"Failed to cleanup local file: {cleanup_error}")
-                        
-                        return VideoResponse(
-                            id=video_id,
-                            video_url=video_url,
-                            metadata={
-                                "duration": result.duration,
-                                "resolution": result.resolution,
-                                "prompt": request.prompt,
-                                "generation_time": round(generation_time, 2),
-                                "code_used": result.code_used[:500] if result.code_used else None
-                            },
-                            status="completed",
-                            generation_time=round(generation_time, 2)
-                        )
-                    else:
-                        # Fallback to local storage if Supabase unavailable
-                        logger.warning("Supabase storage not available, using local storage")
-                        
-                        video_url = None
-                        if result.video_path:
-                            relative_path = os.path.relpath(result.video_path, "./media")
-                            video_url = f"/media/{relative_path}"
-                        
-                        # Generate video ID and store metadata in memory
-                        video_id = str(uuid.uuid4())
-                        video_metadata = {
-                            "id": video_id,
-                            "user_id": user_id,
-                            "video_url": video_url,
-                            "video_path": result.video_path,
-                            "status": "completed",
-                            "prompt": request.prompt,
-                            "duration": result.duration,
-                            "resolution": result.resolution,
-                            "generation_time": round(generation_time, 2),
-                            "code_used": result.code_used[:500] if result.code_used else None,
-                            "created_at": datetime.now().isoformat()
-                        }
-                        
-                        # Store in memory for status checking
-                        video_storage[video_id] = video_metadata
-                        
-                        return VideoResponse(
-                            id=video_id,
-                            video_url=video_url,
-                            metadata={
-                                "duration": result.duration,
-                                "resolution": result.resolution,
-                                "prompt": request.prompt,
-                                "generation_time": round(generation_time, 2),
-                                "code_used": result.code_used[:500] if result.code_used else None
-                            },
-                            status="completed",
-                            generation_time=round(generation_time, 2)
-                        )
-                        
-                except Exception as upload_error:
-                    logger.error(f"Failed to upload video to Supabase: {upload_error}")
-                    # Fallback to local storage
-                    video_url = None
-                    if result.video_path:
-                        relative_path = os.path.relpath(result.video_path, "./media")
-                        video_url = f"/media/{relative_path}"
-                    
-                    # Generate video ID and store metadata in memory
-                    video_id = str(uuid.uuid4())
-                    video_metadata = {
-                        "id": video_id,
-                        "user_id": user_id,
-                        "video_url": video_url,
-                        "video_path": result.video_path,
-                        "status": "completed",
-                        "prompt": request.prompt,
-                        "duration": result.duration,
-                        "resolution": result.resolution,
-                        "generation_time": round(generation_time, 2),
-                        "code_used": result.code_used[:500] if result.code_used else None,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    
-                    # Store in memory for status checking
-                    video_storage[video_id] = video_metadata
-                    
-                    return VideoResponse(
-                        id=video_id,
-                        video_url=video_url,
-                        metadata={
-                            "duration": result.duration,
-                            "resolution": result.resolution,
-                            "prompt": request.prompt,
-                            "generation_time": round(generation_time, 2),
-                            "code_used": result.code_used[:500] if result.code_used else None,
-                            "upload_error": "Failed to upload to cloud storage, using local storage"
-                        },
-                        status="completed",
-                        generation_time=round(generation_time, 2)
-                    )
-            else:
-                # Handle different error types with appropriate status codes
-                if "API key not found" in result.error or "GOOGLE_AI_API_KEY" in result.error:
-                    raise HTTPException(
-                        status_code=503, 
-                        detail="Video generation service unavailable: Google AI API key not configured"
-                    )
-                elif "initialization failed" in result.error or "network connection" in result.error:
-                    raise HTTPException(
-                        status_code=503,
-                        detail="Video generation service temporarily unavailable"
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=422, 
-                        detail=f"Video generation failed: {result.error}"
-                    )
-        else:
-            raise HTTPException(status_code=503, detail="Video generation service not available")
-        
-    except HTTPException:
-        raise
+        if feedback_collector:
+            # Collect training data
+            training_data = await feedback_collector.get_training_data_for_generation(generation_id)
+            if training_data:
+                logger.info(f"🎯 Training data collected for generation {generation_id}")
+                # Here you would trigger the actual training pipeline
+                # For now, just log it
+                logger.info(f"📚 Training pipeline would be triggered with {len(training_data)} examples")
     except Exception as e:
-        logger.error(f"Video generation failed: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Video generation failed: {str(e)}")
+        logger.error(f"❌ Training trigger failed: {e}")
 
-@app.get("/api/status/{video_id}", response_model=StatusResponse)
-async def get_video_status(video_id: str, user_id: str = Depends(verify_user)):
-    """Get video generation status"""
-    try:
-        if not video_id or video_id == "undefined":
-            raise HTTPException(status_code=400, detail="Invalid video ID")
-        
-        # Check in-memory storage first
-        if video_id in video_storage:
-            video = video_storage[video_id]
-            # Verify user owns this video
-            if video["user_id"] != user_id:
-                raise HTTPException(status_code=403, detail="Access denied")
-            
-            return StatusResponse(
-                status=video["status"],
-                video_url=video["video_url"],
-                error=None
-            )
-        
-        # Fallback to storage service if available
-        if storage_service:
-            try:
-                video = await storage_service.get_video(user_id, video_id)
-                return StatusResponse(
-                    status="completed",
-                    video_url=video["video_url"],
-                    error=None
-                )
-            except Exception:
-                pass  # Continue to 404
-        
-        raise HTTPException(status_code=404, detail="Video not found")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get video status: {e}")
-        raise HTTPException(status_code=404, detail="Video not found")
+# API Endpoints
 
-@app.get("/api/videos/{video_id}", response_model=VideoResponse)
-async def get_video(video_id: str, user_id: str = Depends(verify_user)):
-    """Get specific video by ID"""
-    try:
-        # Check in-memory storage first
-        if video_id in video_storage:
-            video = video_storage[video_id]
-            # Verify user owns this video
-            if video["user_id"] != user_id:
-                raise HTTPException(status_code=403, detail="Access denied")
-            
-            return VideoResponse(
-                id=video_id,
-                video_url=video["video_url"],
-                metadata={
-                    "duration": video["duration"],
-                    "resolution": video["resolution"],
-                    "prompt": video["prompt"],
-                    "generation_time": video["generation_time"],
-                    "code_used": video["code_used"]
-                },
-                status=video["status"],
-                generation_time=video["generation_time"]
-            )
-        
-        # Fallback to storage service if available
-        if storage_service:
-            try:
-                video = await storage_service.get_video(user_id, video_id)
-                return VideoResponse(
-                    id=video_id,
-                    video_url=video["video_url"],
-                    metadata=video["metadata"],
-                    status="completed"
-                )
-            except Exception:
-                pass  # Continue to 404
-        
-        raise HTTPException(status_code=404, detail="Video not found")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get video: {e}")
-        raise HTTPException(status_code=404, detail="Video not found")
-
-@app.get("/api/service-status")
-async def service_status():
-    """Check service status and configuration"""
-    try:
-        # Check if AI service is available
-        from services.manim import get_manim_service
-        service = get_manim_service()
-        
-        ai_available = service.model is not None
-        api_key_configured = bool(os.getenv('GOOGLE_AI_API_KEY'))
-        
-        return {
-            "status": "healthy" if ai_available else "degraded",
-            "ai_service": {
-                "available": ai_available,
-                "api_key_configured": api_key_configured,
-                "message": "AI video generation ready" if ai_available else "API key required for AI features"
-            },
-            "storage_service": {
-                "available": storage_service is not None,
-                "message": "Storage service ready" if storage_service else "Storage service unavailable"
-            }
-        }
-    except Exception as e:
-        logger.error(f"Service status check failed: {e}")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
-@app.get("/api/videos")
-async def list_videos(user_id: str = Depends(verify_user)):
-    """List all videos for authenticated user"""
-    try:
-        # First check in-memory storage
-        user_videos = []
-        for video_id, video_data in video_storage.items():
-            if video_data["user_id"] == user_id:
-                user_videos.append({
-                    "id": video_id,
-                    "video_url": video_data["video_url"],
-                    "prompt": video_data["prompt"],
-                    "created_at": video_data["created_at"],
-                    "status": video_data["status"],
-                    "duration": video_data.get("duration"),
-                    "resolution": video_data.get("resolution")
-                })
-        
-        # If we have in-memory videos, return them
-        if user_videos:
-            return user_videos
-        
-        # Fallback to storage service if available and no videos in memory
-        if storage_service:
-            try:
-                videos = await storage_service.list_user_videos(user_id)
-                # Transform videos for frontend
-                transformed_videos = []
-                for video in videos:
-                    try:
-                        # Generate fresh signed URL using the storage service method
-                        # This will automatically try both buckets
-                        video_data = await storage_service.get_video(user_id, video["id"])
-                        if video_data and video_data.get("video_url"):
-                            transformed_videos.append({
-                                "id": video["id"],
-                                "video_url": video_data["video_url"],
-                                "prompt": video["prompt"],
-                                "created_at": video["created_at"],
-                                "status": video.get("status", "completed")
-                            })
-                    except Exception as e:
-                        logger.error(f"Error processing video {video.get('id')}: {e}")
-                        continue
-                
-                return transformed_videos
-            except Exception as e:
-                logger.error(f"Storage service error: {e}")
-        
-        # Return empty list if no videos found
-        return []
-        
-    except Exception as e:
-        logger.error(f"Failed to list videos: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve videos")
-
-@app.delete("/api/videos/{video_id}")
-async def delete_video(video_id: str, user_id: str = Depends(verify_user)):
-    """Delete video with proper authorization"""
-    try:
-        success = await storage_service.delete_video(user_id, video_id)
-        if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete video")
-        
-        return {"status": "success", "message": "Video deleted successfully"}
-        
-    except Exception as e:
-        logger.error(f"Failed to delete video: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete video")
-
-@app.post("/api/videos/migrate-legacy")
-async def migrate_legacy_videos(user_id: str = Depends(verify_user)):
-    """Migrate videos from legacy bucket to new bucket"""
-    try:
-        if not storage_service:
-            raise HTTPException(status_code=500, detail="Storage service not available")
-        
-        result = await storage_service.migrate_legacy_videos(user_id)
-        return {
-            "status": "success",
-            "message": f"Migration completed: {result['migrated_count']} videos migrated, {result['failed_count']} failed",
-            "details": result
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to migrate legacy videos: {e}")
-        raise HTTPException(status_code=500, detail="Failed to migrate legacy videos")
-
-@app.get("/api/health", response_model=HealthResponse)
-async def health_check():
-    """Comprehensive health check with performance metrics.
-    Avoids external dependencies to remain stable under all configurations.
-    """
-    try:
-        # Only check storage if it's configured and available
-        if 'storage_service' in globals() and storage_service is not None:
-            try:
-                # Use a very lightweight call and swallow errors
-                await storage_service.list_user_videos("health_check")
-            except Exception:
-                pass
-        
-        return HealthResponse(
-            status="healthy",
-            timestamp=datetime.utcnow().isoformat(),
-            version="3.0.0",
-            performance=performance_monitor.get_metrics()
-        )
-        
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return HealthResponse(
-            status="unhealthy",
-            timestamp=datetime.utcnow().isoformat(),
-            version="3.0.0",
-            performance=performance_monitor.get_metrics()
-        )
-
-@app.get("/api/healthz")
-async def healthz():
-    """Lightweight health endpoint for container health checks."""
-    return {"status": "ok"}
-
-@app.head("/api/healthz")
-async def healthz_head():
-    return {}
-
-@app.get("/api/metrics")
-async def get_metrics():
-    """Get detailed performance metrics"""
-    return {
-        "performance": performance_monitor.get_metrics(),
-        "system": {
-            "memory_usage": psutil.virtual_memory()._asdict(),
-            "cpu_usage": psutil.cpu_percent(interval=1),
-            "disk_usage": psutil.disk_usage('/')._asdict()
-        },
-        "features": {
-            "enhanced_database": enhanced_features,
-            "rate_limiting": True,
-            "performance_monitoring": True,
-            "security_headers": True,
-            "automated_cleanup": True
-        },
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-@app.get("/")
+@app.get("/", response_class=JSONResponse)
 async def root():
     """Root endpoint with API information"""
     return {
-        "message": "Animathic - AI Mathematical Animation Generator",
-        "version": "3.0.0",
+        "message": "Animathic API - AI-Powered Mathematical Animation Generation",
+        "version": "1.0.0",
         "status": "operational",
-        "features": {
-            "enhanced_database": enhanced_features,
-            "security": "enterprise-grade",
-            "performance": "optimized"
+        "workflow": [
+            "1. User provides prompt",
+            "2. Gemini generates structured JSON (local model as fallback)",
+            "3. JSON converts to Manim code",
+            "4. Code is compiled and provided to user",
+            "5. User feedback collected for fine-tuning and training"
+        ]
+    }
+
+@app.post("/api/generate-animation", response_class=JSONResponse)
+async def generate_animation(
+    request: AnimationRequest,
+    background_tasks: BackgroundTasks,
+    rate_limit_check: None = Depends(check_rate_limit)
+):
+    """
+    Main endpoint for animation generation
+    
+    Complete workflow:
+    1. User provides prompt
+    2. Gemini generates structured JSON (local model as fallback)
+    3. JSON converts to Manim code
+    4. Code is compiled and provided to user
+    """
+    
+    start_time = time.time()
+    
+    try:
+        if not enhanced_features or not hybrid_orchestrator:
+            raise HTTPException(
+                status_code=503,
+                detail="Animation service is currently unavailable"
+            )
+        
+        logger.info(f"🎯 Generating animation for prompt: {request.prompt[:100]}...")
+        
+        # Step 1: Generate animation using hybrid orchestrator
+        manim_scene, generation_record = await hybrid_orchestrator.generate_animation(
+            request.prompt, 
+            request.user_id or "anonymous"
+        )
+        
+        # Step 2: Compile to Manim code
+        compilation_start = time.time()
+        compiled_manim = manim_compiler.compile_to_manim(manim_scene)
+        compilation_time = time.time() - compilation_start
+        
+        # Update generation record with compilation info
+        if feedback_collector:
+            await feedback_collector.update_generation(generation_record.id, {
+                "compiled_manim": compiled_manim,
+                "compilation_time": compilation_time
+            })
+        
+        # Step 3: Generate video (optional - can be done asynchronously)
+        video_path = None
+        try:
+            # Here you would render the Manim code to video
+            # For now, we'll just return the code
+            logger.info("✅ Animation generation completed successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ Video generation failed: {e}")
+            # Continue without video - user can still see the code
+        
+        total_time = time.time() - start_time
+        
+        # Record performance metrics
+        performance_monitor.record_request(total_time, True)
+        
+        # Prepare response
+        response = {
+            "success": True,
+            "generation_id": generation_record.id,
+            "prompt": request.prompt,
+            "manim_code": compiled_manim,
+            "video_path": video_path,
+            "generation_time": generation_record.generation_time,
+            "compilation_time": compilation_time,
+            "total_time": total_time,
+            "model_used": generation_record.primary_model.value,
+            "fallback_used": generation_record.fallback_used
+        }
+        
+        # Trigger training in background
+        background_tasks.add_task(trigger_training, generation_record.id)
+        
+        return response
+        
+    except Exception as e:
+        total_time = time.time() - start_time
+        performance_monitor.record_request(total_time, False)
+        
+        logger.error(f"❌ Animation generation failed: {e}")
+        logger.error(traceback.format_exc())
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Animation generation failed: {str(e)}"
+        )
+
+@app.post("/api/feedback", response_class=JSONResponse)
+async def submit_feedback(
+    feedback: FeedbackRequest,
+    rate_limit_check: None = Depends(check_rate_limit)
+):
+    """Submit user feedback for animation generation"""
+    
+    try:
+        if not feedback_collector:
+            raise HTTPException(
+                status_code=503,
+                detail="Feedback service is currently unavailable"
+            )
+        
+        # Create user feedback record
+        user_feedback = await feedback_collector.create_user_feedback(
+            generation_id=feedback.generation_id,
+            rating=feedback.rating,
+            quality=feedback.quality,
+            comments=feedback.comments,
+            animation_worked=feedback.animation_worked,
+            matched_intent=feedback.matched_intent
+        )
+        
+        logger.info(f"✅ Feedback submitted for generation {feedback.generation_id}")
+        
+        return {
+            "success": True,
+            "feedback_id": user_feedback.generation_id,
+            "message": "Feedback submitted successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Feedback submission failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Feedback submission failed: {str(e)}"
+        )
+
+@app.get("/api/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint"""
+    
+    # Check service status
+    services = {}
+    
+    if hybrid_orchestrator:
+        try:
+            service_status = await hybrid_orchestrator.test_services()
+            services["hybrid_orchestrator"] = "healthy" if service_status else "unhealthy"
+        except:
+            services["hybrid_orchestrator"] = "unhealthy"
+    else:
+        services["hybrid_orchestrator"] = "not_available"
+    
+    if feedback_collector:
+        services["feedback_collector"] = "healthy"
+    else:
+        services["feedback_collector"] = "not_available"
+    
+    if manim_compiler:
+        services["manim_compiler"] = "healthy"
+    else:
+        services["manim_compiler"] = "not_available"
+    
+    # Get performance metrics
+    performance = performance_monitor.get_metrics()
+    
+    return HealthResponse(
+        status="healthy" if all(s == "healthy" for s in services.values() if s != "not_available") else "degraded",
+        timestamp=datetime.utcnow().isoformat(),
+        uptime=performance["uptime_seconds"],
+        services=services,
+        performance=performance
+    )
+
+@app.get("/api/metrics")
+async def get_metrics():
+    """Get performance metrics"""
+    return performance_monitor.get_metrics()
+
+@app.get("/api/status")
+async def get_status():
+    """Get detailed system status"""
+    
+    config = get_config()
+    
+    return {
+        "environment": config.environment,
+        "features_enabled": {
+            "hybrid_ai": config.features.hybrid_ai,
+            "feedback_collection": config.features.feedback_collection,
+            "enhanced_database": config.features.enhanced_database,
+            "ai_animations": config.features.ai_animations
         },
-        "endpoints": {
-            "docs": "/docs",
-            "health": "/api/health",
-            "metrics": "/api/metrics"
+        "services": {
+            "hybrid_orchestrator": enhanced_features and hybrid_orchestrator is not None,
+            "feedback_collector": enhanced_features and feedback_collector is not None,
+            "manim_compiler": enhanced_features and manim_compiler is not None
+        },
+        "configuration": {
+            "google_ai_configured": bool(config.google_ai.api_key),
+            "local_llm_enabled": config.local_llm.enabled,
+            "rate_limiting_enabled": config.rate_limit.enabled
         }
     }
 
-# Cleanup background task
-async def cleanup_task():
-    """Background task to clean up old files"""
-    while True:
-        try:
-            # Clean up old media files (simple cleanup)
-            media_dir = Path("./media")
-            if media_dir.exists():
-                # Remove files older than 24 hours
-                cutoff_time = time.time() - (24 * 3600)
-                for file_path in media_dir.glob("**/*"):
-                    if file_path.is_file() and file_path.stat().st_mtime < cutoff_time:
-                        try:
-                            file_path.unlink()
-                            logger.debug(f"Cleaned up old file: {file_path}")
-                        except Exception as e:
-                            logger.warning(f"Failed to remove old file {file_path}: {e}")
-            
-            await asyncio.sleep(3600)  # Run every hour
-        except Exception as e:
-            logger.error(f"Cleanup task failed: {e}")
-            await asyncio.sleep(3600)
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize background tasks"""
-    logger.info("🚀 Starting Animathic API v3.0.0")
-    logger.info(f"📊 Enhanced features: {'enabled' if enhanced_features else 'disabled'}")
-    # Start cleanup task in a safeguarded manner; if event loop is shutting down, avoid raising
+@app.get("/api/manim-code/{generation_id}")
+async def get_manim_code(generation_id: str):
+    """Get Manim code for a specific generation"""
+    
     try:
-        asyncio.create_task(cleanup_task())
-    except RuntimeError:
-        logger.warning("Cleanup task not started due to event loop shutdown")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("⏹️  Shutting down Animathic API")
+        if not feedback_collector:
+            raise HTTPException(
+                status_code=503,
+                detail="Service unavailable"
+            )
+        
+        generation = await feedback_collector.get_generation(generation_id)
+        if not generation:
+            raise HTTPException(
+                status_code=404,
+                detail="Generation not found"
+            )
+        
+        return {
+            "generation_id": generation_id,
+            "manim_code": generation.get("compiled_manim", ""),
+            "prompt": generation.get("prompt", ""),
+            "timestamp": generation.get("timestamp", "")
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to retrieve Manim code: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve Manim code: {str(e)}"
+        )
 
 # Error handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Custom HTTP exception handler"""
+    """Handle HTTP exceptions"""
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "error": exc.detail,
             "status_code": exc.status_code,
-            "timestamp": datetime.utcnow().isoformat(),
-            "path": str(request.url)
+            "timestamp": datetime.utcnow().isoformat()
         }
     )
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """General exception handler"""
-    logger.error(f"Unhandled exception: {exc}")
+    """Handle general exceptions"""
+    logger.error(f"❌ Unhandled exception: {exc}")
     logger.error(traceback.format_exc())
     
     return JSONResponse(
@@ -804,19 +503,45 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={
             "error": "Internal server error",
             "status_code": 500,
-            "timestamp": datetime.utcnow().isoformat(),
-            "path": str(request.url)
+            "timestamp": datetime.utcnow().isoformat()
         }
     )
 
+# Startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """Application startup event"""
+    logger.info("🚀 Animathic API starting up...")
+    
+    # Verify services
+    if enhanced_features:
+        logger.info("✅ Enhanced features enabled")
+    else:
+        logger.warning("⚠️ Enhanced features disabled - running in basic mode")
+    
+    logger.info("🎯 Ready to generate animations!")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Application shutdown event"""
+    logger.info("🛑 Animathic API shutting down...")
+    
+    # Cleanup resources
+    if feedback_collector:
+        try:
+            await feedback_collector.close()
+        except:
+            pass
+
 if __name__ == "__main__":
     import uvicorn
-    api_config = get_api_config()
+    
+    config = get_config()
+    
     uvicorn.run(
         "main:app",
-        host=api_config["host"],
-        port=api_config["port"],
-        reload=False,
-        workers=1,
-        access_log=True
+        host=config.host,
+        port=config.port,
+        reload=not is_production(),
+        log_level=log_level.lower()
     )

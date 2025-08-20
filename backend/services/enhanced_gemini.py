@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 import json
 import time
@@ -10,9 +8,11 @@ from datetime import datetime
 import uuid
 
 try:
-    import httpx
+    import google.generativeai as genai
+    from google.generativeai.types import GenerationConfig
 except ImportError:
-    httpx = None
+    genai = None
+    GenerationConfig = None
 
 from schemas.manim_schema import ManimScene
 from schemas.feedback_schema import GenerationRecord, ModelType, GenerationQuality
@@ -20,36 +20,38 @@ from schemas.feedback_schema import GenerationRecord, ModelType, GenerationQuali
 logger = logging.getLogger(__name__)
 
 
-class LocalLLMService:
-    """Local LLM service using Ollama for cost-effective processing"""
+class EnhancedGeminiService:
+    """Enhanced Gemini service for generating structured Manim JSON with feedback collection"""
     
     def __init__(self):
-        self.base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        self.model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
-        self.timeout = int(os.getenv("OLLAMA_TIMEOUT", "30"))
+        self.api_key = os.getenv("GOOGLE_AI_API_KEY")
+        self.model_name = os.getenv("GOOGLE_AI_MODEL", "gemini-2.0-flash-exp")
+        self.temperature = float(os.getenv("GOOGLE_AI_TEMPERATURE", "0.1"))
+        self.max_output_tokens = int(os.getenv("GOOGLE_AI_MAX_TOKENS", "4096"))
+        self.top_p = float(os.getenv("GOOGLE_AI_TOP_P", "0.8"))
+        self.top_k = int(os.getenv("GOOGLE_AI_TOP_K", "40"))
         
-        if not httpx:
-            raise ImportError("httpx library is not installed")
+        if not self.api_key:
+            raise ValueError("GOOGLE_AI_API_KEY environment variable is required")
         
-        # Test connection
-        self._test_connection()
+        if not genai:
+            raise ImportError("google.generativeai library is not installed")
         
-        logger.info(f"✅ Local LLM service initialized with {self.model} at {self.base_url}")
-    
-    def _test_connection(self):
-        """Test connection to Ollama service"""
-        try:
-            with httpx.Client(timeout=5.0) as client:
-                response = client.get(f"{self.base_url}/api/tags")
-                if response.status_code != 200:
-                    raise ConnectionError(f"Ollama service returned status {response.status_code}")
-                logger.info("✅ Ollama service connection successful")
-        except Exception as e:
-            logger.warning(f"⚠️ Ollama service connection failed: {e}")
-            raise ConnectionError(f"Cannot connect to Ollama service: {str(e)}")
+        genai.configure(api_key=self.api_key)
+        self.model = genai.GenerativeModel(
+            model_name=self.model_name,
+            generation_config=GenerationConfig(
+                temperature=self.temperature,
+                top_p=self.top_p,
+                top_k=self.top_k,
+                max_output_tokens=self.max_output_tokens,
+            )
+        )
+        
+        logger.info(f"✅ Enhanced Gemini service initialized with {self.model_name}")
     
     async def generate_structured_scene(self, prompt: str, user_id: str) -> Tuple[ManimScene, GenerationRecord]:
-        """Generate structured Manim scene JSON using local LLM"""
+        """Generate structured Manim scene JSON using Gemini with comprehensive feedback tracking"""
         
         generation_start = time.time()
         generation_id = str(uuid.uuid4())
@@ -58,10 +60,10 @@ class LocalLLMService:
             # Build enhanced prompt for JSON generation
             enhanced_prompt = self._build_enhanced_prompt(prompt)
             
-            # Generate with local LLM
-            logger.info(f"🎯 Generating with local LLM {self.model} for prompt: {prompt[:100]}...")
+            # Generate with Gemini
+            logger.info(f"🎯 Generating with Gemini {self.model_name} for prompt: {prompt[:100]}...")
             
-            response = await self._generate_with_local_llm(enhanced_prompt)
+            response = await self._generate_with_gemini(enhanced_prompt)
             
             # Extract and validate JSON
             json_str = self._extract_json_from_response(response)
@@ -77,7 +79,7 @@ class LocalLLMService:
                 id=generation_id,
                 user_id=user_id,
                 prompt=prompt,
-                primary_model=ModelType.LOCAL_TRAINED,
+                primary_model=ModelType.GEMINI_25_FLASH,
                 fallback_used=False,
                 generated_json=scene_obj,
                 compiled_manim="",  # Will be filled by compiler
@@ -87,24 +89,24 @@ class LocalLLMService:
                 render_time=0.0,
                 total_time=generation_time,
                 suitable_for_training=True,
-                training_notes="Local LLM generation"
+                training_notes="High-quality Gemini generation"
             )
             
-            logger.info(f"✅ Local LLM generated valid JSON in {generation_time:.2f}s")
+            logger.info(f"✅ Gemini generated valid JSON in {generation_time:.2f}s")
             return manim_scene, generation_record
             
         except Exception as e:
             generation_time = time.time() - generation_start
             error_msg = str(e)
             
-            logger.error(f"❌ Local LLM generation failed: {error_msg}")
+            logger.error(f"❌ Gemini generation failed: {error_msg}")
             
             # Create error record
             generation_record = GenerationRecord(
                 id=generation_id,
                 user_id=user_id,
                 prompt=prompt,
-                primary_model=ModelType.LOCAL_TRAINED,
+                primary_model=ModelType.GEMINI_25_FLASH,
                 fallback_used=False,
                 generated_json={},
                 compiled_manim="",
@@ -114,10 +116,10 @@ class LocalLLMService:
                 render_time=0.0,
                 total_time=generation_time,
                 suitable_for_training=False,
-                training_notes=f"Local LLM generation failed: {error_msg}"
+                training_notes=f"Gemini generation failed: {error_msg}"
             )
             
-            raise RuntimeError(f"Local LLM generation failed: {error_msg}")
+            raise RuntimeError(f"Gemini generation failed: {error_msg}")
     
     def _build_enhanced_prompt(self, user_prompt: str) -> str:
         """Build an enhanced prompt that ensures structured JSON output"""
@@ -182,51 +184,24 @@ Generate the JSON now:
         
         return enhanced_prompt.strip()
     
-    async def _generate_with_local_llm(self, prompt: str) -> str:
-        """Generate response using local LLM via Ollama API"""
+    async def _generate_with_gemini(self, prompt: str) -> str:
+        """Generate response using Gemini API"""
         
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                # Prepare request payload
-                payload = {
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.1,
-                        "top_p": 0.8,
-                        "top_k": 40,
-                        "num_predict": 2048
-                    }
-                }
-                
-                # Make request to Ollama
-                response = await client.post(
-                    f"{self.base_url}/api/generate",
-                    json=payload,
-                    timeout=self.timeout
-                )
-                
-                if response.status_code != 200:
-                    raise RuntimeError(f"Ollama API returned status {response.status_code}")
-                
-                response_data = response.json()
-                
-                if "response" not in response_data:
-                    raise RuntimeError("No response field in Ollama API response")
-                
-                return response_data["response"]
-                
-        except httpx.TimeoutException:
-            raise RuntimeError("Local LLM request timed out")
-        except httpx.RequestError as e:
-            raise RuntimeError(f"Local LLM request failed: {str(e)}")
+            # Generate content
+            response = self.model.generate_content(prompt)
+            
+            if not response or not response.text:
+                raise RuntimeError("Empty response from Gemini")
+            
+            return response.text
+            
         except Exception as e:
-            logger.error(f"❌ Local LLM generation failed: {e}")
-            raise RuntimeError(f"Local LLM generation failed: {str(e)}")
+            logger.error(f"❌ Gemini API call failed: {e}")
+            raise RuntimeError(f"Gemini API call failed: {str(e)}")
     
     def _extract_json_from_response(self, response_text: str) -> str:
-        """Extract JSON from local LLM response"""
+        """Extract JSON from Gemini response"""
         
         try:
             # Try to find JSON in the response
@@ -256,22 +231,22 @@ Generate the JSON now:
             raise ValueError(f"JSON extraction failed: {str(e)}")
     
     async def test_connection(self) -> bool:
-        """Test connection to local LLM service"""
+        """Test connection to Gemini API"""
         try:
             test_prompt = "Generate a simple JSON: {\"test\": true}"
-            response = await self._generate_with_local_llm(test_prompt)
+            response = await self._generate_with_gemini(test_prompt)
             return "test" in response.lower()
         except Exception as e:
-            logger.error(f"❌ Local LLM connection test failed: {e}")
+            logger.error(f"❌ Gemini connection test failed: {e}")
             return False
     
     def get_model_info(self) -> Dict[str, Any]:
-        """Get information about the current local LLM model"""
+        """Get information about the current model"""
         return {
-            "model": self.model,
-            "base_url": self.base_url,
-            "timeout": self.timeout,
-            "service_available": True
+            "model_name": self.model_name,
+            "temperature": self.temperature,
+            "max_tokens": self.max_output_tokens,
+            "top_p": self.top_p,
+            "top_k": self.top_k,
+            "api_key_configured": bool(self.api_key)
         }
-
-

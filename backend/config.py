@@ -1,153 +1,180 @@
 """
-Animathic Backend Configuration
-Optimized for Google Cloud Platform deployment
+Production-ready configuration management for Animathic Backend
 """
 
 import os
-from typing import Dict, Any, Optional
-from dotenv import load_dotenv
+import logging
+from typing import Optional, Dict, Any, List
+from pathlib import Path
 
-# Load environment variables
-load_dotenv()
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    try:
+        from pydantic import BaseSettings
+    except ImportError:
+        # Fallback for older versions
+        BaseSettings = None
 
-# Base configuration
-BASE_CONFIG = {
-    "app_name": "Animathic Backend",
-    "version": "3.0.0",
-    "environment": os.getenv("ENVIRONMENT", "production"),
-    "debug": os.getenv("DEBUG", "false").lower() == "true",
-    "log_level": os.getenv("LOG_LEVEL", "INFO"),
-}
+from pydantic import validator
 
-# Google Cloud Platform Configuration
-GCP_CONFIG = {
-    "project_id": os.getenv("GCP_PROJECT_ID", "animathic-backend"),
-    "region": os.getenv("GCP_REGION", "us-central1"),
-    "service_name": os.getenv("GCP_SERVICE_NAME", "animathic-backend"),
-    "image_name": f"gcr.io/{os.getenv('GCP_PROJECT_ID', 'animathic-backend')}/animathic-backend",
-    "memory": os.getenv("GCP_MEMORY", "2Gi"),
-    "cpu": int(os.getenv("GCP_CPU", "1")),
-    "timeout": int(os.getenv("GCP_TIMEOUT", "600")),
-    "max_instances": int(os.getenv("GCP_MAX_INSTANCES", "10")),
-    "min_instances": int(os.getenv("GCP_MIN_INSTANCES", "1")),
-    "concurrency": int(os.getenv("GCP_CONCURRENCY", "40")),
-}
+# Environment detection
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+IS_PRODUCTION = ENVIRONMENT.lower() == "production"
+IS_DEVELOPMENT = ENVIRONMENT.lower() == "development"
 
-# API Configuration
-API_CONFIG = {
-    "host": os.getenv("HOST", "0.0.0.0"),
-    "port": int(os.getenv("PORT", "8080")),
-    # Default to allowing animathic.com, localhost dev, and wildcard
-    "cors_origins": os.getenv(
-        "CORS_ORIGINS",
-        "https://animathic.com,https://www.animathic.com,http://localhost:5173,http://127.0.0.1:5173,*",
-    ).split(","),
-    "rate_limit_requests": int(os.getenv("RATE_LIMIT_REQUESTS", "10")),
-    "rate_limit_window": int(os.getenv("RATE_LIMIT_WINDOW", "60")),
-}
+class DatabaseConfig:
+    """Database configuration"""
+    def __init__(self):
+        self.url = os.getenv("DATABASE_URL", "sqlite:///./animathic.db")
+        self.pool_size = int(os.getenv("DB_POOL_SIZE", "5"))
+        self.max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+        self.pool_timeout = int(os.getenv("DB_POOL_TIMEOUT", "30"))
 
-# Google AI Configuration
-GOOGLE_AI_CONFIG = {
-    "api_key": os.getenv("GOOGLE_AI_API_KEY"),
-    "model_name": os.getenv("GOOGLE_AI_MODEL", "gemini-2.0-flash-exp"),
-    "temperature": float(os.getenv("GOOGLE_AI_TEMPERATURE", "0.1")),
-    "max_output_tokens": int(os.getenv("GOOGLE_AI_MAX_TOKENS", "4096")),
-    "top_p": float(os.getenv("GOOGLE_AI_TOP_P", "0.8")),
-    "top_k": int(os.getenv("GOOGLE_AI_TOP_K", "40")),
-    # Toggle for structured generation backend: local|gemini
-    "structured_backend": os.getenv("STRUCTURED_BACKEND", "local"),
-}
+class GoogleAIConfig:
+    """Google AI configuration"""
+    def __init__(self):
+        self.api_key = os.getenv("GOOGLE_AI_API_KEY", "")
+        self.model = os.getenv("GOOGLE_AI_MODEL", "gemini-2.0-flash-exp")
+        self.temperature = float(os.getenv("GOOGLE_AI_TEMPERATURE", "0.1"))
+        self.max_tokens = int(os.getenv("GOOGLE_AI_MAX_TOKENS", "4096"))
+        self.top_p = float(os.getenv("GOOGLE_AI_TOP_P", "0.8"))
+        self.top_k = int(os.getenv("GOOGLE_AI_TOP_K", "40"))
+        self.confidence_threshold = float(os.getenv("GEMINI_CONFIDENCE_THRESHOLD", "0.7"))
+        
+        if not self.api_key and IS_PRODUCTION:
+            raise ValueError("GOOGLE_AI_API_KEY is required in production")
 
-# Supabase Configuration
-SUPABASE_CONFIG = {
-    "url": os.getenv("SUPABASE_URL"),
-    "anon_key": os.getenv("SUPABASE_ANON_KEY"),
-    "service_role_key": os.getenv("SUPABASE_SERVICE_ROLE_KEY"),
-    "bucket_name": os.getenv("SUPABASE_BUCKET_NAME", "animathic-media"),
-}
+class LocalLLMConfig:
+    """Local LLM configuration"""
+    def __init__(self):
+        self.enabled = os.getenv("LOCAL_FALLBACK_ENABLED", "true").lower() == "true"
+        self.base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        self.model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+        self.timeout = int(os.getenv("OLLAMA_TIMEOUT", "30"))
 
-# Database Configuration
-DATABASE_CONFIG = {
-    "url": os.getenv("DATABASE_URL"),
-    "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
-    "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "10")),
-    "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
-}
+class MediaConfig:
+    """Media handling configuration"""
+    def __init__(self):
+        self.base_dir = Path(os.getenv("MEDIA_BASE_DIR", "./media"))
+        self.max_file_size = int(os.getenv("MAX_FILE_SIZE", "104857600"))  # 100MB
+        self.cleanup_interval = int(os.getenv("CLEANUP_INTERVAL", "3600"))  # 1 hour
+        self.retention_hours = int(os.getenv("RETENTION_HOURS", "24"))
+        self.supported_formats = ["mp4", "gif", "png", "jpg", "jpeg"]
 
-# Media Configuration
-MEDIA_CONFIG = {
-    "base_dir": os.getenv("MEDIA_BASE_DIR", "./media"),
-    "max_file_size": int(os.getenv("MAX_FILE_SIZE", "104857600")),  # 100MB
-    "allowed_extensions": [".mp4", ".gif", ".png", ".jpg", ".jpeg"],
-    "cleanup_interval": int(os.getenv("CLEANUP_INTERVAL", "3600")),  # 1 hour
-    "retention_hours": int(os.getenv("RETENTION_HOURS", "24")),
-}
+class SecurityConfig:
+    """Security configuration"""
+    def __init__(self):
+        self.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+        self.jwt_algorithm = os.getenv("JWT_ALGORITHM", "HS256")
+        self.access_token_expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+        self.refresh_token_expire_days = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+        self.cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+        
+        if self.secret_key == "dev-secret-key-change-in-production" and IS_PRODUCTION:
+            raise ValueError("SECRET_KEY must be changed in production")
 
-# Security Configuration
-SECURITY_CONFIG = {
-    "secret_key": os.getenv("SECRET_KEY", "your-secret-key-change-in-production"),
-    "algorithm": os.getenv("JWT_ALGORITHM", "HS256"),
-    "access_token_expire_minutes": int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
-    "refresh_token_expire_days": int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
-}
+class RateLimitConfig:
+    """Rate limiting configuration"""
+    def __init__(self):
+        self.enabled = os.getenv("ENABLE_RATE_LIMITING", "true").lower() == "true"
+        self.max_requests = int(os.getenv("RATE_LIMIT_REQUESTS", "10"))
+        self.window_minutes = int(os.getenv("RATE_LIMIT_WINDOW", "1"))
 
-# Monitoring Configuration
-MONITORING_CONFIG = {
-    "enable_metrics": os.getenv("ENABLE_METRICS", "true").lower() == "true",
-    "enable_health_checks": os.getenv("ENABLE_HEALTH_CHECKS", "true").lower() == "true",
-    "enable_logging": os.getenv("ENABLE_LOGGING", "true").lower() == "true",
-    "log_retention_days": int(os.getenv("LOG_RETENTION_DAYS", "30")),
-}
+class MonitoringConfig:
+    """Monitoring and logging configuration"""
+    def __init__(self):
+        self.log_level = os.getenv("LOG_LEVEL", "INFO" if IS_PRODUCTION else "DEBUG")
+        self.enable_metrics = os.getenv("ENABLE_METRICS", "true").lower() == "true"
+        self.enable_health_checks = os.getenv("ENABLE_HEALTH_CHECKS", "true").lower() == "true"
+        self.metrics_port = int(os.getenv("METRICS_PORT", "9090"))
 
-# Feature Flags
-FEATURE_FLAGS = {
-    "enhanced_database": os.getenv("ENABLE_ENHANCED_DATABASE", "true").lower() == "true",
-    "ai_animations": os.getenv("ENABLE_AI_ANIMATIONS", "true").lower() == "true",
-    "user_management": os.getenv("ENABLE_USER_MANAGEMENT", "true").lower() == "true",
-    "file_upload": os.getenv("ENABLE_FILE_UPLOAD", "true").lower() == "true",
-    "rate_limiting": os.getenv("ENABLE_RATE_LIMITING", "true").lower() == "true",
-    # Enable structured pipeline primary by default
-    "structured_pipeline": os.getenv("ENABLE_STRUCTURED_PIPELINE", "true").lower() == "true",
-}
+class FeatureFlags:
+    """Feature flags configuration"""
+    def __init__(self):
+        self.enhanced_database = os.getenv("ENABLE_ENHANCED_DATABASE", "true").lower() == "true"
+        self.ai_animations = os.getenv("ENABLE_AI_ANIMATIONS", "true").lower() == "true"
+        self.user_management = os.getenv("ENABLE_USER_MANAGEMENT", "true").lower() == "true"
+        self.file_upload = os.getenv("ENABLE_FILE_UPLOAD", "true").lower() == "true"
+        self.hybrid_ai = os.getenv("ENABLE_HYBRID_AI", "true").lower() == "true"
+        self.feedback_collection = os.getenv("ENABLE_FEEDBACK_COLLECTION", "true").lower() == "true"
 
-def get_config() -> Dict[str, Any]:
-    """Get complete configuration"""
-    return {
-        "base": BASE_CONFIG,
-        "gcp": GCP_CONFIG,
-        "api": API_CONFIG,
-        "google_ai": GOOGLE_AI_CONFIG,
-        "supabase": SUPABASE_CONFIG,
-        "database": DATABASE_CONFIG,
-        "media": MEDIA_CONFIG,
-        "security": SECURITY_CONFIG,
-        "monitoring": MONITORING_CONFIG,
-        "features": FEATURE_FLAGS,
-    }
+class AppConfig:
+    """Main application configuration"""
+    def __init__(self):
+        self.environment = ENVIRONMENT
+        self.debug = os.getenv("DEBUG", "false").lower() == "true"
+        self.host = os.getenv("HOST", "0.0.0.0")
+        self.port = int(os.getenv("PORT", "8080"))
+        self.workers = int(os.getenv("WORKERS", "1"))
+        
+        # Sub-configurations
+        self.database = DatabaseConfig()
+        self.google_ai = GoogleAIConfig()
+        self.local_llm = LocalLLMConfig()
+        self.media = MediaConfig()
+        self.security = SecurityConfig()
+        self.rate_limit = RateLimitConfig()
+        self.monitoring = MonitoringConfig()
+        self.features = FeatureFlags()
 
-def get_gcp_config() -> Dict[str, Any]:
-    """Get Google Cloud specific configuration"""
-    return GCP_CONFIG
+# Global configuration instance
+_config: Optional[AppConfig] = None
+
+def get_config() -> AppConfig:
+    """Get the global configuration instance"""
+    global _config
+    if _config is None:
+        _config = AppConfig()
+    return _config
 
 def get_api_config() -> Dict[str, Any]:
-    """Get API configuration"""
-    return API_CONFIG
+    """Get API-specific configuration"""
+    config = get_config()
+    return {
+        "title": "Animathic API",
+        "description": "AI-Powered Mathematical Animation Generation",
+        "version": "1.0.0",
+        "docs_url": "/docs" if not IS_PRODUCTION else None,
+        "redoc_url": "/redoc" if not IS_PRODUCTION else None,
+        "openapi_url": "/openapi.json" if not IS_PRODUCTION else None,
+    }
 
-def get_feature_flags() -> Dict[str, bool]:
-    """Get feature flags"""
-    return FEATURE_FLAGS
+def get_feature_flags() -> FeatureFlags:
+    """Get feature flags configuration"""
+    return get_config().features
 
 def is_production() -> bool:
     """Check if running in production"""
-    return BASE_CONFIG["environment"] == "production"
-
-def is_debug_enabled() -> bool:
-    """Check if debug mode is enabled"""
-    return BASE_CONFIG["debug"]
+    return IS_PRODUCTION
 
 def get_log_level() -> str:
-    """Get log level"""
-    return BASE_CONFIG["log_level"]
+    """Get logging level"""
+    return get_config().monitoring.log_level
 
-def get_structured_backend() -> str:
-    return GOOGLE_AI_CONFIG.get("structured_backend", "local")
+def get_cors_origins() -> List[str]:
+    """Get CORS origins"""
+    return get_config().security.cors_origins
+
+def get_rate_limit_config() -> Dict[str, Any]:
+    """Get rate limiting configuration"""
+    config = get_config().rate_limit
+    return {
+        "enabled": config.enabled,
+        "max_requests": config.max_requests,
+        "window_minutes": config.window_minutes
+    }
+
+# Environment-specific configurations
+if IS_PRODUCTION:
+    # Production-specific overrides
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+else:
+    # Development-specific overrides
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
+    )

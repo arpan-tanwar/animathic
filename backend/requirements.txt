@@ -1,18 +1,43 @@
+# Core web framework and server
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
+gunicorn>=21.2.0
+
+# Environment and configuration
 python-dotenv>=1.0.0
-supabase>=2.0.0
-python-jose[cryptography]>=3.3.0
-python-multipart>=0.0.6
-pydantic>=2.5.0
-aiofiles>=23.2.1
-python-slugify>=8.0.1
-manim>=0.19.0
-google-generativeai>=0.8.0
-httpx>=0.26.0
-ffmpeg-python>=0.2.0
+
+# Database and ORM
 sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.0
 alembic>=1.13.0
+
+# AI and ML services
+google-generativeai>=0.8.0
+manim>=0.19.0
+
+# HTTP client and utilities
+httpx>=0.26.0
+ffmpeg-python>=0.2.0
+
+# Core utilities
+pydantic>=2.5.0
+aiofiles>=23.2.1
+python-slugify>=8.0.1
 psutil>=5.9.0
-gunicorn>=21.2.0 
+
+# Production monitoring and logging
+structlog>=23.2.0
+prometheus-client>=0.19.0
+
+# Security and validation
+python-multipart>=0.0.6
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Testing and development
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# Local LLM support (optional)
+# ollama>=0.1.0  # Uncomment if using Ollama locally 

@@ -31,16 +31,15 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir "manim>=0.19.0"
+# Install Python dependencies (use interpreter-qualified pip to bind to the correct Python)
+RUN python -m pip install --no-cache-dir --upgrade pip && \
+    python -m pip install --no-cache-dir -r requirements.txt && \
+    python -m pip install --no-cache-dir "manim>=0.19.0"
 
 # Copy application code
-COPY . .
+COPY backend/ .
 
 # Create media directories
 RUN mkdir -p media/images media/videos media/temp media/Tex media/texts
