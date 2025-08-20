@@ -395,15 +395,24 @@ class GeneratedScene(MovingCameraScene):
             except Exception:
                 pass
 
-        def camera_fit(ids, margin=0.1):
+        def camera_fit(ids, margin=0.15):
             try:
                 g = get_group(ids)
                 if len(g) == 0:
                     return
                 bbox = g.get_bounding_box()
-                width = max(1e-3, bbox[1][0] - bbox[0][0]) * (1.0 + margin)
+                # Ensure minimum frame size for better visibility
+                min_width = 8.0
+                min_height = 6.0
+                
+                width = max(min_width, bbox[1][0] - bbox[0][0]) * (1.0 + margin)
+                height = max(min_height, bbox[1][1] - bbox[0][1]) * (1.0 + margin)
+                
+                # Use the larger dimension to ensure all objects fit
+                frame_width = max(width, height * 1.4)  # 1.4 aspect ratio
+                
                 center = g.get_center()
-                self.camera.frame.set(width=width)
+                self.camera.frame.set_width(frame_width)
                 self.camera.frame.move_to(center)
             except Exception:
                 pass
@@ -412,6 +421,48 @@ class GeneratedScene(MovingCameraScene):
             try:
                 cur_w = float(self.camera.frame.get_width())
                 self.camera.frame.set_width(cur_w * (1.0 + max(0.0, float(margin))))
+            except Exception:
+                pass
+
+        def dynamic_camera_adjust(active_objects, target_margin=0.2):
+            """Dynamically adjust camera based on object distribution and prevent overlaps"""
+            try:
+                if not active_objects:
+                    return
+                
+                # Get bounding box of all active objects
+                bbox = get_bbox(active_objects)
+                if not bbox:
+                    return
+                
+                (x0, y0), (x1, y1) = bbox
+                width = x1 - x0
+                height = y1 - y0
+                
+                # Calculate optimal frame size with margin
+                frame_width = max(width, height * 1.4) * (1.0 + target_margin)
+                frame_height = max(height, width / 1.4) * (1.0 + target_margin)
+                
+                # Use the larger dimension to ensure all objects fit
+                optimal_width = max(frame_width, frame_height * 1.4)
+                
+                # Ensure minimum frame size
+                optimal_width = max(optimal_width, 10.0)
+                
+                # Smoothly adjust camera
+                current_width = float(self.camera.frame.get_width())
+                if abs(current_width - optimal_width) > 0.5:
+                    # Animate camera adjustment
+                    safe_play(self.camera.frame.animate.set_width(optimal_width), run_time=0.8)
+                
+                # Center camera on objects
+                center_x = (x0 + x1) / 2
+                center_y = (y0 + y1) / 2
+                current_center = self.camera.frame.get_center()
+                
+                if abs(current_center[0] - center_x) > 0.5 or abs(current_center[1] - center_y) > 0.5:
+                    safe_play(self.camera.frame.animate.move_to([center_x, center_y, 0]), run_time=0.6)
+                    
             except Exception:
                 pass
 
@@ -532,7 +583,8 @@ class GeneratedScene(MovingCameraScene):
             except Exception:
                 pass
 
-        def resolve_label_overlaps(group_ids, max_shifts=3, delta=0.2):
+        def resolve_label_overlaps(group_ids, max_shifts=5, delta=0.3):
+            """Enhanced overlap resolution with better collision detection"""
             try:
                 labels = [id_to_mobject[i] for i in group_ids if i in id_to_mobject and id_to_meta.get(i, {{}}).get('type') == 'text']
                 for _ in range(int(max_shifts)):
@@ -547,10 +599,164 @@ class GeneratedScene(MovingCameraScene):
                             (bi0, bj0), (bi1, bj1), wj, hj = bj
                             overlap = not (ai1 < bi0 or bi1 < ai0 or aj1 < bj0 or bj1 < aj0)
                             if overlap:
-                                labels[j].shift(RIGHT*float(delta))
-                                moved = True
+                                # Try different directions to avoid overlaps
+                                directions = [RIGHT, LEFT, UP, DOWN, RIGHT+UP, RIGHT+DOWN, LEFT+UP, LEFT+DOWN]
+                                for direction in directions:
+                                    test_pos = labels[j].get_center() + direction * float(delta)
+                                    # Check if this position avoids overlap
+                                    labels[j].move_to(test_pos)
+                                    new_bj = _mobj_bbox(labels[j])
+                                    if new_bj:
+                                        (new_bi0, new_bj0), (new_bi1, new_bj1), _, _ = new_bj
+                                        new_overlap = not (ai1 < new_bi0 or new_bi1 < ai0 or aj1 < new_bj0 or new_bj1 < aj0)
+                                        if not new_overlap:
+                                            moved = True
+                                            break
+                                if not moved:
+                                    # Fallback: move in original direction
+                                    labels[j].shift(RIGHT*float(delta))
+                                    moved = True
                     if not moved:
                         break
+            except Exception:
+                pass
+
+        def resolve_object_overlaps():
+            """Resolve overlaps between all objects, not just labels"""
+            try:
+                all_objects = list(id_to_mobject.values())
+                for i in range(len(all_objects)):
+                    for j in range(i+1, len(all_objects)):
+                        obj1, obj2 = all_objects[i], all_objects[j]
+                        
+                        # Get bounding boxes
+                        bbox1 = _mobj_bbox(obj1)
+                        bbox2 = _mobj_bbox(obj2)
+                        
+                        if not bbox1 or not bbox2:
+                            continue
+                        
+                        (x1_0, y1_0), (x1_1, y1_1), w1, h1 = bbox1
+                        (x2_0, y2_0), (x2_1, y2_1), w2, h2 = bbox2
+                        
+                        # Check for overlap
+                        overlap_x = not (x1_1 < x2_0 or x2_1 < x1_0)
+                        overlap_y = not (y1_1 < y2_0 or y2_1 < y1_0)
+                        
+                        if overlap_x and overlap_y:
+                            # Calculate separation distance
+                            separation = max(w1, w2, h1, h2) * 0.3
+                            
+                            # Move objects apart
+                            center1 = obj1.get_center()
+                            center2 = obj2.get_center()
+                            
+                            # Calculate direction vector
+                            direction = center2 - center1
+                            if direction.norm() < 0.1:
+                                direction = RIGHT  # Default direction if objects are at same position
+                            else:
+                                direction = direction.normalize()
+                            
+                            # Move objects apart
+                            obj1.move_to(center1 - direction * separation * 0.5)
+                            obj2.move_to(center2 + direction * separation * 0.5)
+                            
+            except Exception:
+                pass
+
+        def resolve_label_overlaps(group_ids, max_shifts=5, delta=0.3):
+            """Enhanced overlap resolution with better collision detection"""
+            try:
+                labels = [id_to_mobject[i] for i in group_ids if i in id_to_mobject and id_to_meta.get(i, {{}}).get('type') == 'text']
+                for _ in range(int(max_shifts)):
+                    moved = False
+                    for i in range(len(labels)):
+                        for j in range(i+1, len(labels)):
+                            bi = _mobj_bbox(labels[i])
+                            bj = _mobj_bbox(labels[j])
+                            if not bi or not bj:
+                                continue
+                            (ai0, aj0), (ai1, aj1), wi, hi = bi
+                            (bi0, bj0), (bi1, bj1), wj, hj = bj
+                            overlap = not (ai1 < bi0 or bi1 < ai0 or aj1 < bj0 or bj1 < aj0)
+                            if overlap:
+                                # Try different directions to avoid overlaps
+                                directions = [RIGHT, LEFT, UP, DOWN, RIGHT+UP, RIGHT+DOWN, LEFT+UP, LEFT+DOWN]
+                                for direction in directions:
+                                    test_pos = labels[j].get_center() + direction * float(delta)
+                                    # Check if this position avoids overlap
+                                    labels[j].move_to(test_pos)
+                                    new_bj = _mobj_bbox(labels[j])
+                                    if new_bj:
+                                        (new_bi0, new_bj0), (new_bi1, new_bj1), _, _ = new_bj
+                                        new_overlap = not (ai1 < new_bi0 or new_bi1 < ai0 or aj1 < new_bj0 or new_bj1 < aj0)
+                                        if not new_overlap:
+                                            moved = True
+                                            break
+                                if not moved:
+                                    # Fallback: move in original direction
+                                    labels[j].shift(RIGHT*float(delta))
+                                    moved = True
+                    if not moved:
+                        break
+            except Exception:
+                pass
+
+        def smart_position_objects(objects_data):
+            """Smart positioning system to prevent overlaps and ensure good distribution"""
+            try:
+                if not objects_data:
+                    return
+                
+                # Create a grid-based positioning system
+                grid_size = 2.0
+                grid_margin = 0.5
+                used_positions = set()
+                
+                for obj_data in objects_data:
+                    obj_type = obj_data.get('type', 'circle')
+                    props = obj_data.get('properties', {{}})
+                    
+                    # Get object size for collision detection
+                    if obj_type == 'circle':
+                        size = props.get('size', 1.0) * 2  # diameter
+                    elif obj_type == 'square':
+                        size = props.get('size', 2.0)
+                    elif obj_type == 'text':
+                        size = max(1.0, props.get('size', 36) / 20)  # approximate text width
+                    else:
+                        size = 1.0
+                    
+                    # Find a good position that doesn't overlap
+                    best_pos = [0, 0, 0]
+                    min_overlap = float('inf')
+                    
+                    # Try grid positions first
+                    for x in range(-3, 4):
+                        for y in range(-2, 3):
+                            test_pos = [x * grid_size, y * grid_size, 0]
+                            
+                            # Check overlap with existing objects
+                            overlap_count = 0
+                            for used_pos in used_positions:
+                                dist = ((test_pos[0] - used_pos[0])**2 + (test_pos[1] - used_pos[1])**2)**0.5
+                                if dist < (size + grid_margin):
+                                    overlap_count += 1
+                            
+                            if overlap_count < min_overlap:
+                                min_overlap = overlap_count
+                                best_pos = test_pos
+                            
+                            if overlap_count == 0:
+                                break
+                        if min_overlap == 0:
+                            break
+                    
+                    # Update object position
+                    props['position'] = best_pos
+                    used_positions.add(tuple(best_pos))
+                    
             except Exception:
                 pass
 
@@ -666,7 +872,10 @@ class GeneratedScene(MovingCameraScene):
             try:
                 reg("{obj_id}", {obj_type}_obj, {int(props.get('z_index', 100))})
                 activate("{obj_id}")
-                camera_fit(active_ids, margin=0.1)
+                # Resolve any overlaps after adding new object
+                resolve_object_overlaps()
+                # Use dynamic camera adjustment for better framing
+                dynamic_camera_adjust(active_ids, target_margin=0.25)
             except Exception:
                 pass
         except Exception:
@@ -693,7 +902,10 @@ class GeneratedScene(MovingCameraScene):
             try:
                 reg("{obj_id}", {obj_type}_obj, {int(props.get('z_index', 100))})
                 activate("{obj_id}")
-                camera_fit(active_ids, margin=0.1)
+                # Resolve any overlaps after adding new object
+                resolve_object_overlaps()
+                # Use dynamic camera adjustment for better framing
+                dynamic_camera_adjust(active_ids, target_margin=0.25)
             except Exception:
                 pass
         except Exception:
@@ -744,7 +956,10 @@ class GeneratedScene(MovingCameraScene):
             try:
                 reg("{obj_id}", {obj_type}_obj, {int(props.get('z_index', 150))})
                 activate("{obj_id}")
-                camera_fit(active_ids, margin=0.1)
+                # Resolve any overlaps after adding new object
+                resolve_object_overlaps()
+                # Use dynamic camera adjustment for better framing
+                dynamic_camera_adjust(active_ids, target_margin=0.25)
             except Exception:
                 pass
         except Exception:
@@ -911,8 +1126,19 @@ class GeneratedScene(MovingCameraScene):
             pass
 '''
             
-            # Add final wait
+            # Final overlap resolution and camera adjustment
             manim_code += '''
+        # Final overlap resolution and camera optimization
+        try:
+            # Resolve any remaining overlaps
+            resolve_object_overlaps()
+            # Final camera adjustment for optimal viewing
+            dynamic_camera_adjust(active_ids, target_margin=0.3)
+            # Resolve label overlaps specifically
+            resolve_label_overlaps(active_ids)
+        except Exception:
+            pass
+        
         # Final pause
         try:
             self.wait(2)
