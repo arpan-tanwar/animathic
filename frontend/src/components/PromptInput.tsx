@@ -69,8 +69,8 @@ export function PromptInput({
         >
           <Textarea
             className={`
-              min-h-[120px] w-full resize-none border-0 bg-transparent 
-              p-6 text-base placeholder:text-muted focus:ring-0 focus:outline-none
+              min-h-[160px] w-full resize-none border-0 bg-transparent 
+              p-6 pr-32 pb-20 text-base placeholder:text-muted focus:ring-0 focus:outline-none
               transition-all duration-300
             `}
             placeholder={placeholder}
@@ -80,26 +80,26 @@ export function PromptInput({
             onBlur={() => setIsFocused(false)}
             disabled={isSubmitting}
           />
-        </div>
-        {/* Always-visible submit button below textarea */}
-        <div className="mt-4">
-          <Button
-            type="submit"
-            className="w-full h-12 rounded-xl font-medium bg-accent-primary hover:bg-accent-secondary interactive focus-ring"
-          >
-            {isSubmitting ? (
-              <div className="flex items-center justify-center gap-3">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Creating...</span>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-3">
-                <Sparkles className="h-4 w-4" />
-                <span>Generate</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            )}
-          </Button>
+          {/* In-box overlay submit button (all screen sizes) */}
+          <div className="absolute bottom-4 right-4 z-10">
+            <Button
+              type="submit"
+              className="btn-primary h-12 px-6 rounded-xl font-medium interactive focus-ring"
+            >
+              {isSubmitting ? (
+                <div className="flex items-center gap-3 text-white">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Creating...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 text-white">
+                  <Sparkles className="h-4 w-4" />
+                  <span>Generate</span>
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              )}
+            </Button>
+          </div>
         </div>
       </form>
 
