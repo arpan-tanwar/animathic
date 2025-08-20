@@ -1,0 +1,27 @@
+# Exclude unnecessary files from App Engine deployment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+*.log
+.git/
+.github/
+.pytest_cache/
+tests/
+notebooks/
+media/
+migrations/
+training_data/
+*.db
+*.sqlite
+# Dockerfile must be included for Cloud Run builds
+# Dockerfile*
+#.dockerignore
+deploy.sh
+start.sh
+test_*.py
+*.md

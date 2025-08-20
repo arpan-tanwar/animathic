@@ -1,5 +1,13 @@
 steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '${_IMAGE}', '-f', 'backend/inference/Dockerfile', 'backend/inference']
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "${_IMAGE}",
+        "-f",
+        "backend/inference/Dockerfile",
+        "backend/inference",
+      ]
 images:
-  - '${_IMAGE}'
+  - "${_IMAGE}"

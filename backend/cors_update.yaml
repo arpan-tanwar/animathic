@@ -1,4 +1,0 @@
-ENVIRONMENT: "production"
-LOG_LEVEL: "INFO"
-SUPABASE_BUCKET_NAME: "animathic-media"
-CORS_ORIGINS: "https://animathic.com,http://localhost:3000"
