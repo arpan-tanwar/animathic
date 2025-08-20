@@ -69,7 +69,7 @@ export function PromptInput({
         >
           <Textarea
             className={`
-              min-h[120px] w-full resize-none border-0 bg-transparent 
+              min-h-[120px] w-full resize-none border-0 bg-transparent 
               p-6 text-base placeholder:text-muted focus:ring-0 focus:outline-none
               transition-all duration-300
             `}
@@ -80,37 +80,11 @@ export function PromptInput({
             onBlur={() => setIsFocused(false)}
             disabled={isSubmitting}
           />
-          {/* Overlay submit button (desktop/tablet) */}
-          <div className="absolute bottom-4 right-4 hidden sm:block">
-            <Button
-              type="submit"
-              className="
-                h-12 px-6 rounded-xl font-medium
-                bg-accent-primary hover:bg-accent-secondary
-                transition-all duration-300 interactive
-                focus-ring
-              "
-            >
-              {isSubmitting ? (
-                <div className="flex items-center gap-3">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Creating...</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <Sparkles className="h-4 w-4" />
-                  <span>Generate</span>
-                  <ArrowRight className="h-4 w-4" />
-                </div>
-              )}
-            </Button>
-          </div>
         </div>
-        {/* Fallback submit button (mobile) */}
-        <div className="mt-4 sm:hidden">
+        {/* Always-visible submit button below textarea */}
+        <div className="mt-4">
           <Button
-            type="button"
-            onClick={() => handleSubmit()}
+            type="submit"
             className="w-full h-12 rounded-xl font-medium bg-accent-primary hover:bg-accent-secondary interactive focus-ring"
           >
             {isSubmitting ? (

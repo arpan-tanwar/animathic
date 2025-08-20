@@ -279,19 +279,6 @@ const GeneratePage = () => {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
             </Button>
-            {showPromptInput && (
-              <Button
-                onClick={() => {
-                  const el = document.querySelector<HTMLButtonElement>(
-                    'form button[type="submit"]'
-                  );
-                  el?.click();
-                }}
-                className="btn-primary interactive"
-              >
-                <Sparkles className="h-4 w-4 mr-2" /> Generate
-              </Button>
-            )}
           </div>
 
           <div className="space-y-2">
