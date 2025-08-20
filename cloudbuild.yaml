@@ -1,11 +1,11 @@
 steps:
-  - name: 'gcr.io/cloud-builders/docker'
+  - name: "gcr.io/cloud-builders/docker"
     args:
-      - 'build'
-      - '-t'
-      - '${_IMAGE}'
-      - '-f'
-      - 'backend/Dockerfile.gcp'
-      - 'backend'
+      - "build"
+      - "-t"
+      - "${_IMAGE}"
+      - "-f"
+      - "backend/Dockerfile"
+      - "backend"
 images:
-  - '${_IMAGE}'
+  - "${_IMAGE}"

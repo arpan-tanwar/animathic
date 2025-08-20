@@ -7,7 +7,13 @@ import json
 import logging
 from typing import Dict, Any, Optional
 import google.generativeai as genai
+try:
+    # Newer SDK (google-genai) optional types; fall back if unavailable
+    from google.genai import types as genai_types  # type: ignore
+except Exception:  # pragma: no cover
+    genai_types = None  # type: ignore
 from dotenv import load_dotenv
+import httpx
 
 load_dotenv()
 
@@ -20,48 +26,126 @@ class AIService:
     def __init__(self, api_key: str):
         """Initialize AI service with Gemini"""
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        # Use latest free/GA Gemini Flash; disable thinking if supported
+        if genai_types is not None:
+            try:
+                self.model = genai.GenerativeModel(
+                    'gemini-2.5-flash',
+                    system_instruction=(
+                        "You are an expert Manim animation planner."
+                        " Always reason internally to ensure outputs are valid and executable,"
+                        " but never include your reasoning in the response."
+                        " Output must be a single JSON object that strictly follows the provided schema."
+                        " Validate numeric ranges (e.g., axis steps must be positive, >= 0.5),"
+                        " default missing fields sensibly, and avoid features that require LaTeX or GPU."
+                    ),
+                    config=genai_types.GenerateContentConfig(
+                        thinking_config=genai_types.ThinkingConfig(thinking_budget=0)
+                    ),
+                )
+            except Exception:
+                self.model = genai.GenerativeModel(
+                    'gemini-2.5-flash',
+                    system_instruction=(
+                        "You are an expert Manim animation planner."
+                        " Always reason internally to ensure outputs are valid and executable,"
+                        " but never include your reasoning in the response."
+                        " Output must be a single JSON object that strictly follows the provided schema."
+                        " Validate numeric ranges (e.g., axis steps must be positive, >= 0.5),"
+                        " default missing fields sensibly, and avoid features that require LaTeX or GPU."
+                    ),
+                )
+        else:
+            self.model = genai.GenerativeModel(
+                'gemini-2.5-flash',
+                system_instruction=(
+                    "You are an expert Manim animation planner."
+                    " Always reason internally to ensure outputs are valid and executable,"
+                    " but never include your reasoning in the response."
+                    " Output must be a single JSON object that strictly follows the provided schema."
+                    " Validate numeric ranges (e.g., axis steps must be positive, >= 0.5),"
+                    " default missing fields sensibly, and avoid features that require LaTeX or GPU."
+                ),
+            )
+
+        # Note: Avoid SDK response_schema due to field support variability; enforce via prompt and post-parse.
         
         # Animation generation prompt template
+        # Strict JSON-only instruction with an explicit schema to minimize parse errors
         self.animation_prompt_template = """
-You are an expert animation creator using Manim (Mathematical Animation Engine). 
-Create a detailed animation specification based on the user's prompt.
+You are an expert animation creator using Manim (Mathematical Animation Engine).
+Given the user's prompt below, produce a STRICT JSON object that follows this schema exactly.
 
-User Prompt: {prompt}
+Rules (must follow):
+- Output ONLY a JSON object. No prose, no code fences, no comments.
+- Use double quotes for all keys and string values.
+- No trailing commas. No NaN/Infinity. Use numbers for durations/zoom and arrays for positions.
+- ALWAYS use a dark background color (#1a1a1a or #000000) unless explicitly requested otherwise
+- Choose bright, contrasting colors for all objects to ensure visibility on dark backgrounds
+- Axis steps must be positive and >= 0.5. If invalid or missing, default to 1.
+- Prefer simple text labels (avoid LaTeX/MathTex). Keep scenes lightweight and compatible with headless Cairo.
+- Placement rules: Every object must have either an explicit numeric "position" [x,y,z], or an "anchor" (e.g.,
+  "center", "top_left", "bottom_right", "axis_origin", "axis_x_at:1", "axis_y_at:-2") optionally with
+  an "offset" [dx,dy,dz]. Use the global bounds or axes to keep objects on-screen and non-overlapping.
+- Each object must have a unique string "id" and an integer "z_index" (higher draws on top; default 0..5 sane range).
+- Provide either an "axes" object or a global "bounds" field {"x":[min,max],"y":[min,max]} describing scene extents.
+- Provide a top-level "timeline" array of events with fields: {"id": string, "type": string, "start": number,
+  "duration": number, "parameters": object}. Use ids to reference objects unambiguously.
+- Validate internally that the JSON is self-consistent and executable in Manim 0.19; silently fix minor issues.
 
-Generate a JSON response with the following structure:
+Schema:
 {
-    "animation_type": "string (e.g., 'geometric', 'mathematical', 'text', 'object')",
-    "scene_description": "string (detailed description of what the animation shows)",
-    "objects": [
+  "animation_type": string,                // e.g. "geometric", "mathematical", "text"
+  "scene_description": string,             // detailed summary of the scene
+  "objects": [
+    {
+      "id": string,                        // unique id for timeline reference
+      "type": string,                      // one of: "circle" | "square" | "text" | "line" | "dot" | "axes" | "plot"
+      "properties": {
+        // common
+        "position": [number, number, number],
+        "anchor": string,                 // e.g. "center", "top_left", "axis_origin", "axis_x_at:1"
+        "offset": [number, number, number],
+        "z_index": number,
+        "color": string,                   // Use bright colors: WHITE, YELLOW, CYAN, GREEN, RED, BLUE, MAGENTA
+        "size": number,
+        "text": string,
+
+        // line-specific
+        "start": [number, number, number],
+        "end": [number, number, number],
+
+        // axes-specific
+        "x_range": [number, number, number],  // [min, max, step]
+        "y_range": [number, number, number],
+        "show_labels": boolean,
+
+        // plot-specific
+        "expression": string,                 // e.g. "sin(x)" or "x**2 - 1"
+        "x_range_plot": [number, number],     // [min, max]
+      },
+      "animations": [
         {
-            "type": "string (e.g., 'circle', 'square', 'text', 'line')",
-            "properties": {
-                "position": [x, y, z],
-                "color": "string",
-                "size": "number",
-                "other_properties": "as needed"
-            },
-            "animations": [
-                {
-                    "type": "string (e.g., 'move', 'scale', 'rotate', 'fade')",
-                    "duration": "number (seconds)",
-                    "easing": "string (e.g., 'linear', 'ease_in', 'ease_out')",
-                    "parameters": {}
-                }
-            ]
+          "type": string,                  // "move" | "scale" | "rotate"
+          "duration": number,              // seconds
+          "easing": string,                // e.g. "linear"
+          "parameters": object             // e.g. {"target_position": [x,y,z]} or {"scale_factor": 1.2}
         }
-    ],
-    "camera_settings": {
-        "position": [x, y, z],
-        "zoom": "number"
-    },
-    "duration": "number (total animation duration in seconds)",
-    "background_color": "string",
-    "style": "string (e.g., 'modern', 'classic', 'minimal')"
+      ]
+    }
+  ],
+  "camera_settings": {"position": [number,number,number], "zoom": number},
+  "bounds": {"x": [number, number], "y": [number, number]},
+  "duration": number,
+  "background_color": string,              // Default to #1a1a1a (dark gray) for aesthetic appeal
+  "style": string,
+  "timeline": [
+    {"id": string, "type": string, "start": number, "duration": number, "parameters": object}
+  ]
 }
 
-Make the animation engaging and visually appealing. Ensure all coordinates and properties are realistic for a mathematical animation.
+User Prompt:
+{prompt}
 """
 
     async def generate_animation_spec(self, prompt: str) -> Dict[str, Any]:
@@ -71,32 +155,73 @@ Make the animation engaging and visually appealing. Ensure all coordinates and p
         try:
             logger.info(f"Generating animation spec for prompt: {prompt}")
             
-            # Format the prompt
-            formatted_prompt = self.animation_prompt_template.format(prompt=prompt)
+            # Format the prompt without invoking str.format on JSON braces
+            formatted_prompt = self.animation_prompt_template.replace("{prompt}", prompt)
             
-            # Generate response from Gemini
-            response = self.model.generate_content(formatted_prompt)
+            # Generate response from Gemini (force JSON MIME type)
+            response = self.model.generate_content(
+                formatted_prompt,
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "temperature": 0.2,
+                    "top_p": 0.8,
+                },
+            )
             
             if not response.text:
                 raise ValueError("Empty response from Gemini")
             
-            # Parse JSON response
+            # Parse JSON response robustly and normalize
+            raw_text = (response.text or "").strip()
             try:
-                animation_spec = json.loads(response.text)
-                logger.info("Successfully generated animation specification")
-                return animation_spec
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response: {e}")
-                # Try to extract JSON from the response
+                spec = json.loads(raw_text)
+            except Exception:
                 import re
-                json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group())
+                # Prefer fenced code blocks
+                m = re.search(r"```(?:json)?\s*\n(\{[\s\S]*?\})\s*```", raw_text)
+                if m:
+                    spec = json.loads(m.group(1))
                 else:
-                    raise ValueError("Invalid JSON response from AI model")
+                    m2 = re.search(r"\{[\s\S]*\}", raw_text)
+                    if not m2:
+                        raise ValueError("Invalid JSON response from AI model")
+                    spec = json.loads(m2.group())
+
+            if not isinstance(spec, dict):
+                # Sometimes the model returns a top-level list; wrap it
+                spec = {"objects": spec}
+
+            # Provide safe defaults to avoid KeyErrors like "animation_type"
+            normalized: Dict[str, Any] = {
+                "animation_type": spec.get("animation_type", "geometric"),
+                "scene_description": spec.get("scene_description", f"Animation for: {prompt}"),
+                "objects": spec.get("objects") or [],
+                "camera_settings": spec.get("camera_settings") or {"position": [0, 0, 0], "zoom": 8},
+                "duration": spec.get("duration", 5),
+                "background_color": spec.get("background_color", "#1a1a1a"),  # Dark gray for aesthetic appeal
+                "style": spec.get("style", "modern"),
+            }
+            if not isinstance(normalized["objects"], list):
+                try:
+                    normalized["objects"] = list(normalized["objects"])  # convert mapping->list of keys
+                except Exception:
+                    normalized["objects"] = []
+            if not normalized["objects"]:
+                normalized["objects"].append({
+                    "type": "text",
+                    "properties": {"text": prompt, "color": "WHITE", "size": 36, "position": [0, 0, 0]},
+                    "animations": []
+                })
+
+            logger.info("Successfully generated and normalized animation specification")
+            return normalized
                     
         except Exception as e:
             logger.error(f"Error generating animation spec: {e}")
+            # Try local fallback generator if configured
+            fallback = await self._try_local_fallback(prompt)
+            if fallback is not None:
+                return fallback
             raise
 
     def generate_manim_code(self, animation_spec: Dict[str, Any]) -> str:
@@ -106,61 +231,635 @@ Make the animation engaging and visually appealing. Ensure all coordinates and p
         try:
             logger.info("Converting animation spec to Manim code")
             
-            # Basic Manim scene template
-            manim_code = f'''from manim import *
+            # Sanitize spec to avoid invalid shapes/values
+            def _coerce_vec3(v):
+                try:
+                    if not isinstance(v, (list, tuple)):
+                        return [0, 0, 0]
+                    out = []
+                    for i in range(3):
+                        out.append(float(v[i]) if i < len(v) and isinstance(v[i], (int, float)) else 0.0)
+                    return out
+                except Exception:
+                    return [0, 0, 0]
 
-class GeneratedScene(Scene):
+            allowed_types = {"circle", "square", "text", "line", "dot", "axes", "plot"}
+            allowed_anims = {"move", "scale", "rotate", "fade_in", "fade_out", "transform"}
+            sanitized_objects = []
+            for obj in animation_spec.get("objects", []) or []:
+                otype = str(obj.get("type", "")).lower()
+                if otype not in allowed_types:
+                    continue
+                props = obj.get("properties", {}) or {}
+                props.setdefault("position", [0, 0, 0])
+                props["position"] = _coerce_vec3(props.get("position"))
+                if otype == "circle":
+                    try:
+                        props["size"] = float(props.get("size", 1)) or 1.0
+                    except Exception:
+                        props["size"] = 1.0
+                if otype == "square":
+                    try:
+                        props["size"] = float(props.get("size", 2)) or 2.0
+                    except Exception:
+                        props["size"] = 2.0
+                if otype == "line":
+                    props["start"] = _coerce_vec3(props.get("start", [-2, 0, 0]))
+                    props["end"] = _coerce_vec3(props.get("end", [2, 0, 0]))
+                if otype == "axes":
+                    def _rng(r, d):
+                        try:
+                            r = list(r)
+                            xmin = float(r[0])
+                            xmax = float(r[1])
+                            step = float(r[2])
+                            # Sanitize step: must be positive and not too small
+                            if step <= 0:
+                                step = 1.0
+                            # Coerce to reasonable tick granularity
+                            if step < 0.5:
+                                step = 0.5
+                            return [xmin, xmax, step]
+                        except Exception:
+                            return d
+                    props["x_range"] = _rng(props.get("x_range", [-5, 5, 1]), [-5, 5, 1])
+                    props["y_range"] = _rng(props.get("y_range", [-3, 3, 1]), [-3, 3, 1])
+                    props["show_labels"] = bool(props.get("show_labels", True))
+                if otype == "plot":
+                    try:
+                        xr = props.get("x_range_plot", [-5, 5])
+                        props["x_range_plot"] = [float(xr[0]), float(xr[1])]
+                    except Exception:
+                        props["x_range_plot"] = [-5, 5]
+                    props["expression"] = str(props.get("expression", "sin(x)"))
+                # Sanitize animations
+                anims = []
+                for anim in obj.get("animations", []) or []:
+                    a = dict(anim or {})
+                    a_type_raw = str(a.get("type", "move")).lower()
+                    # Normalize/allow only known animations
+                    if a_type_raw in {"fadein", "appear"}:
+                        a["type"] = "fade_in"
+                    elif a_type_raw in {"fadeout", "disappear"}:
+                        a["type"] = "fade_out"
+                    elif a_type_raw in {"transform_to", "morph", "transformto"}:
+                        a["type"] = "transform"
+                    elif a_type_raw in allowed_anims:
+                        a["type"] = a_type_raw
+                    else:
+                        # Skip unknown animation types
+                        continue
+                    try:
+                        a["duration"] = max(0.1, float(a.get("duration", 1)))
+                    except Exception:
+                        a["duration"] = 1.0
+                    a.setdefault("parameters", {})
+                    anims.append(a)
+                sanitized_objects.append({"type": otype, "properties": props, "animations": anims})
+            animation_spec = {**animation_spec, "objects": sanitized_objects}
+            # Bounds defaults
+            try:
+                _b = animation_spec.get("bounds") or {}
+                _bx = _b.get("x", [-6, 6])
+                _by = _b.get("y", [-3.5, 3.5])
+                x_bounds = [float(_bx[0]), float(_bx[1])]
+                y_bounds = [float(_by[0]), float(_by[1])]
+            except Exception:
+                x_bounds = [-6.0, 6.0]
+                y_bounds = [-3.5, 3.5]
+
+            # Basic Manim scene template with numpy for plotting support
+            manim_code = f'''from manim import *
+import numpy as np
+
+class GeneratedScene(MovingCameraScene):
     def construct(self):
         # Animation: {animation_spec.get('scene_description', 'Generated animation')}
         
-        # Set background color
-        self.camera.background_color = "{animation_spec.get('background_color', '#000000')}"
+        # Set background color - ensure dark background for aesthetic appeal
+        bg_color = "{animation_spec.get('background_color', '#1a1a1a')}"
+        if bg_color.lower() in ['#ffffff', '#fff', 'white', 'ffffff']:
+            bg_color = "#1a1a1a"  # Force dark background if white is specified
+        self.camera.background_color = bg_color
         
+        def safe_color(c):
+            try:
+                if not isinstance(c, str):
+                    return "WHITE"
+                upper = c.upper()
+                if upper in ["BLACK", "#000000", "#000"]:
+                    return "WHITE"
+                return c
+            except Exception:
+                return "WHITE"
+
+        def safe_play(*args, run_time=1.0):
+            try:
+                self.play(*args, run_time=run_time)
+            except Exception:
+                pass
+
+        # Simple layout registry and helpers
+        id_to_mobject = {{}}
+        id_to_meta = {{}}  # stores metadata for each object: type and z_index
+
+        def reg(oid, mobj, z_index=0, otype=""):
+            try:
+                if mobj is None:
+                    return
+                id_to_mobject[oid] = mobj
+                id_to_meta[oid] = {{'type': str(otype).lower(), 'z': int(z_index)}}
+                try:
+                    mobj.set_z_index(int(z_index))
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        def get_group(ids):
+            try:
+                g = VGroup(*[id_to_mobject[i] for i in ids if i in id_to_mobject])
+                return g
+            except Exception:
+                return VGroup()
+
+        def exit_fade(ids, duration=0.4, stagger=0.05):
+            try:
+                seq = []
+                for i, oid in enumerate(ids):
+                    m = id_to_mobject.get(oid)
+                    if m is not None:
+                        seq.append(FadeOut(m))
+                if seq:
+                    safe_play(*seq, run_time=duration)
+            except Exception:
+                pass
+
+        def camera_fit(ids, margin=0.1):
+            try:
+                g = get_group(ids)
+                if len(g) == 0:
+                    return
+                bbox = g.get_bounding_box()
+                width = max(1e-3, bbox[1][0] - bbox[0][0]) * (1.0 + margin)
+                center = g.get_center()
+                self.camera.frame.set(width=width)
+                self.camera.frame.move_to(center)
+            except Exception:
+                pass
+
+        def camera_pad(margin=0.05):
+            try:
+                cur_w = float(self.camera.frame.get_width())
+                self.camera.frame.set_width(cur_w * (1.0 + max(0.0, float(margin))))
+            except Exception:
+                pass
+
+        def camera_zoom(factor=1.0, anchor=None):
+            try:
+                factor = float(factor) if isinstance(factor, (int, float)) else 1.0
+                if factor <= 0:
+                    return
+                new_w = float(self.camera.frame.get_width()) / factor
+                self.camera.frame.set_width(new_w)
+                if anchor and isinstance(anchor, (list, tuple)) and len(anchor) >= 2:
+                    self.camera.frame.move_to([float(anchor[0]), float(anchor[1]), 0])
+            except Exception:
+                pass
+
+        def camera_pan_to(pos, duration=0.6):
+            try:
+                if not isinstance(pos, (list, tuple)) or len(pos) < 2:
+                    return
+                safe_play(self.camera.frame.animate.move_to([float(pos[0]), float(pos[1]), 0]), run_time=float(duration))
+            except Exception:
+                pass
+
+        def camera_set(frame_center=None, frame_width=None):
+            try:
+                if isinstance(frame_width, (int, float)) and frame_width > 0:
+                    self.camera.frame.set_width(float(frame_width))
+                if isinstance(frame_center, (list, tuple)) and len(frame_center) >= 2:
+                    self.camera.frame.move_to([float(frame_center[0]), float(frame_center[1]), 0])
+            except Exception:
+                pass
+
+        def _mobj_bbox(m):
+            try:
+                bb = m.get_bounding_box()
+                w = max(1e-6, bb[1][0] - bb[0][0])
+                h = max(1e-6, bb[1][1] - bb[0][1])
+                return ((bb[0][0], bb[0][1]), (bb[1][0], bb[1][1]), w, h)
+            except Exception:
+                return None
+
+        def get_bbox(ids):
+            try:
+                g = get_group(ids)
+                if len(g) == 0:
+                    return None
+                bb = g.get_bounding_box()
+                return ((bb[0][0], bb[0][1]), (bb[1][0], bb[1][1]))
+            except Exception:
+                return None
+
+        def bbox_union(bboxes):
+            try:
+                xs = []
+                ys = []
+                for b in bboxes:
+                    if not b:
+                        continue
+                    (x0, y0), (x1, y1) = b
+                    xs += [x0, x1]
+                    ys += [y0, y1]
+                if not xs or not ys:
+                    return None
+                return ((min(xs), min(ys)), (max(xs), max(ys)))
+            except Exception:
+                return None
+
+        def fits_in_view(bbox, margin=0.1):
+            try:
+                if not bbox:
+                    return True
+                (x0, y0), (x1, y1) = bbox
+                bw = max(1e-6, x1 - x0)
+                bh = max(1e-6, y1 - y0)
+                fw = float(self.camera.frame.get_width())
+                fh = float(self.camera.frame.get_height())
+                return (bw <= fw * (1.0 - margin)) and (bh <= fh * (1.0 - margin))
+            except Exception:
+                return True
+
+        # Track active objects and apply simple exit/camera policies
+        active_ids = []
+
+        def _is_axes(mobj):
+            try:
+                return 'Axes' in str(type(mobj))
+            except Exception:
+                return False
+
+        def _priority_for(oid):
+            try:
+                t = id_to_meta.get(oid, {{}}).get('type', '')
+                if t in ('text', 'dot'):
+                    return 0  # secondary/annotation
+                if t in ('line',):
+                    return 1  # ephemeral/helpers
+                if t in ('axes', 'plot', 'square', 'circle'):
+                    return 2  # primary
+                return 1
+            except Exception:
+                return 1
+
+        def exit_minimize_to_corner(ids, corner="TR", scale=0.3, duration=0.4):
+            try:
+                target = {{
+                    'TR': RIGHT*5 + UP*3,
+                    'TL': LEFT*5 + UP*3,
+                    'BR': RIGHT*5 + DOWN*3,
+                    'BL': LEFT*5 + DOWN*3,
+                }}.get(str(corner).upper(), RIGHT*5 + UP*3)
+                anims = []
+                for oid in ids:
+                    m = id_to_mobject.get(oid)
+                    if m is not None:
+                        anims.append(m.animate.scale(float(scale)).move_to(target))
+                if anims:
+                    safe_play(*anims, run_time=duration)
+            except Exception:
+                pass
+
+        def resolve_label_overlaps(group_ids, max_shifts=3, delta=0.2):
+            try:
+                labels = [id_to_mobject[i] for i in group_ids if i in id_to_mobject and id_to_meta.get(i, {{}}).get('type') == 'text']
+                for _ in range(int(max_shifts)):
+                    moved = False
+                    for i in range(len(labels)):
+                        for j in range(i+1, len(labels)):
+                            bi = _mobj_bbox(labels[i])
+                            bj = _mobj_bbox(labels[j])
+                            if not bi or not bj:
+                                continue
+                            (ai0, aj0), (ai1, aj1), wi, hi = bi
+                            (bi0, bj0), (bi1, bj1), wj, hj = bj
+                            overlap = not (ai1 < bi0 or bi1 < ai0 or aj1 < bj0 or bj1 < aj0)
+                            if overlap:
+                                labels[j].shift(RIGHT*float(delta))
+                                moved = True
+                    if not moved:
+                        break
+            except Exception:
+                pass
+
+        def policy_exit_before(new_type):
+            try:
+                major_types = {"axes", "plot", "square", "circle", "line"}
+                if str(new_type).lower() not in major_types:
+                    return
+                # Keep axes by default, prefer removing low-priority items first
+                keep = []
+                for oid in list(active_ids):
+                    m = id_to_mobject.get(oid)
+                    if m is not None and _is_axes(m):
+                        keep.append(oid)
+                others = [oid for oid in list(active_ids) if oid not in keep]
+                # Sort by priority low->high
+                others.sort(key=_priority_for)
+                # Try camera fit first with current + incoming kept
+                try:
+                    union = get_bbox(keep + others)
+                    if not fits_in_view(union, margin=0.15):
+                        camera_fit(keep + others, margin=0.12)
+                        camera_pad(0.04)
+                except Exception:
+                    pass
+                # If still crowded, fade lowest priority half
+                try:
+                    union2 = get_bbox(keep + others)
+                    if not fits_in_view(union2, margin=0.15) and others:
+                        cut = max(1, len(others)//2)
+                        to_drop = others[:cut]
+                        exit_fade(to_drop, duration=0.25)
+                        for oid in to_drop:
+                            try:
+                                active_ids.remove(oid)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        def activate(oid):
+            try:
+                if oid and oid not in active_ids:
+                    active_ids.append(oid)
+            except Exception:
+                pass
+
         # Camera settings
-        self.camera.frame.set_width({animation_spec.get('camera_settings', {}).get('zoom', 8)})
+        try:
+            _cam = {animation_spec.get('camera_settings', {})}
+            _zoom = _cam.get('zoom', 1.0)
+            _pos = _cam.get('position', [0, 0, 0])
+            # Interpret zoom as a factor: higher => more zoom-in (smaller frame width)
+            _frame_width = 14 / _zoom if isinstance(_zoom, (int, float)) and _zoom not in (0, None) else 14
+            self.camera.frame.set(width=_frame_width)
+            self.camera.frame.move_to([{', '.join(map(str, animation_spec.get('camera_settings', {}).get('position', [0, 0, 0])))}])
+        except Exception:
+            pass
+
+        # Log resolved bounds for reproducibility (avoid braces in outer f-string)
+        try:
+            _bx = ({x_bounds[0]}, {x_bounds[1]})
+            _by = ({y_bounds[0]}, {y_bounds[1]})
+            print("Resolved bounds: x=", _bx, " y=", _by)
+        except Exception:
+            pass
         
         # Create objects and animations
+        def _safe_eval(expr, x):
+            try:
+                allowed = {{
+                    'np': np,
+                    'sin': np.sin, 'cos': np.cos, 'tan': np.tan,
+                    'exp': np.exp, 'log': np.log, 'sqrt': np.sqrt,
+                    'abs': np.abs, 'pi': np.pi, 'e': np.e,
+                    'arcsin': np.arcsin, 'arccos': np.arccos, 'arctan': np.arctan,
+                }}
+                allowed_dict = {{**allowed, 'x': x}}
+                return eval(expr, {{"__builtins__": {{}}}}, allowed_dict)
+            except Exception:
+                return 0
 '''
             
             # Generate objects and animations
-            for obj in animation_spec.get('objects', []):
+            axes_defined = False
+            for _idx, obj in enumerate(animation_spec.get('objects', [])):
+                obj_id = obj.get('id') or f"obj_{_idx}"
                 obj_type = obj.get('type', 'circle')
                 props = obj.get('properties', {})
                 animations = obj.get('animations', [])
                 
-                # Create object
+                # Create object with enhanced color contrast
                 if obj_type == 'circle':
+                    color = props.get('color', 'WHITE')
+                    # Ensure bright, visible colors on dark background
+                    if color.upper() in ['BLACK', '#000000', '#000']:
+                        color = 'WHITE'
                     manim_code += f'''
         # Create {obj_type}
-        {obj_type}_obj = Circle(
-            radius={props.get('size', 1)},
-            color="{props.get('color', 'WHITE')}",
-            fill_opacity=0.8
-        )
-        {obj_type}_obj.move_to([{', '.join(map(str, props.get('position', [0, 0, 0])))}])
-        self.play(Create({obj_type}_obj))
+        {obj_type}_obj = None
+        try:
+            policy_exit_before("{obj_type}")
+            {obj_type}_obj = Circle(
+                radius={props.get('size', 1)},
+                color=safe_color("{color}"),
+                fill_opacity=0.8,
+                stroke_width=2
+            )
+            {obj_type}_obj.move_to([{', '.join(map(str, props.get('position', [0, 0, 0])))}])
+            safe_play(Create({obj_type}_obj), run_time=0.5)
+            try:
+                reg("{obj_id}", {obj_type}_obj, {int(props.get('z_index', 100))})
+                activate("{obj_id}")
+                camera_fit(active_ids, margin=0.1)
+            except Exception:
+                pass
+        except Exception:
+            {obj_type}_obj = None
 '''
                 elif obj_type == 'square':
+                    color = props.get('color', 'CYAN')
+                    if color.upper() in ['BLACK', '#000000', '#000']:
+                        color = 'CYAN'
                     manim_code += f'''
         # Create {obj_type}
-        {obj_type}_obj = Square(
-            side_length={props.get('size', 2)},
-            color="{props.get('color', 'BLUE')}",
-            fill_opacity=0.8
-        )
-        {obj_type}_obj.move_to([{', '.join(map(str, props.get('position', [0, 0, 0])))}])
-        self.play(Create({obj_type}_obj))
+        {obj_type}_obj = None
+        try:
+            policy_exit_before("{obj_type}")
+            {obj_type}_obj = Square(
+                side_length={props.get('size', 2)},
+                color=safe_color("{color}"),
+                fill_opacity=0.8,
+                stroke_width=2
+            )
+            {obj_type}_obj.move_to([{', '.join(map(str, props.get('position', [0, 0, 0])))}])
+            safe_play(Create({obj_type}_obj), run_time=0.5)
+        
+            try:
+                reg("{obj_id}", {obj_type}_obj, {int(props.get('z_index', 100))})
+                activate("{obj_id}")
+                camera_fit(active_ids, margin=0.1)
+            except Exception:
+                pass
+        except Exception:
+            {obj_type}_obj = None
 '''
                 elif obj_type == 'text':
+                    color = props.get('color', 'WHITE')
+                    if color.upper() in ['BLACK', '#000000', '#000']:
+                        color = 'WHITE'
                     manim_code += f'''
         # Create {obj_type}
-        {obj_type}_obj = Text(
-            "{props.get('text', 'Hello')}",
-            color="{props.get('color', 'WHITE')}",
-            font_size={props.get('size', 36)}
-        )
-        {obj_type}_obj.move_to([{', '.join(map(str, props.get('position', [0, 0, 0])))}])
-        self.play(Write({obj_type}_obj))
+        {obj_type}_obj = None
+        try:
+            # Text is secondary; may not trigger exit
+            {obj_type}_obj = Text(
+                "{props.get('text', 'Hello')}",
+                color=safe_color("{color}"),
+                font_size={props.get('size', 36)}
+            )
+            {obj_type}_obj.move_to([{', '.join(map(str, props.get('position', [0, 0, 0])))}])
+            safe_play(Write({obj_type}_obj), run_time=0.5)
+            try:
+                reg("{obj_id}", {obj_type}_obj, {int(props.get('z_index', 200))})
+                activate("{obj_id}")
+            except Exception:
+                pass
+        except Exception:
+            {obj_type}_obj = None
+'''
+                elif obj_type == 'line':
+                    start = props.get('start', [-2, 0, 0])
+                    end = props.get('end', [2, 0, 0])
+                    color = props.get('color', 'YELLOW')
+                    if color.upper() in ['BLACK', '#000000', '#000']:
+                        color = 'YELLOW'
+                    manim_code += f'''
+        # Create {obj_type}
+        {obj_type}_obj = None
+        try:
+            policy_exit_before("{obj_type}")
+            {obj_type}_obj = Line(
+                start=[{', '.join(map(str, start))}],
+                end=[{', '.join(map(str, end))}],
+                color=safe_color("{color}"),
+                stroke_width=3
+            )
+            safe_play(Create({obj_type}_obj), run_time=0.5)
+            try:
+                reg("{obj_id}", {obj_type}_obj, {int(props.get('z_index', 150))})
+                activate("{obj_id}")
+                camera_fit(active_ids, margin=0.1)
+            except Exception:
+                pass
+        except Exception:
+            {obj_type}_obj = None
+'''
+                elif obj_type == 'dot':
+                    color = props.get('color', 'YELLOW')
+                    if color.upper() in ['BLACK', '#000000', '#000']:
+                        color = 'YELLOW'
+                    manim_code += f'''
+        # Create {obj_type}
+        {obj_type}_obj = None
+        try:
+            # Dot is secondary; may not trigger exit
+            {obj_type}_obj = Dot(
+                point=[{', '.join(map(str, props.get('position', [0, 0, 0])))}],
+                color=safe_color("{color}"),
+                radius=0.1
+            )
+            safe_play(FadeIn({obj_type}_obj), run_time=0.5)
+            try:
+                reg("{obj_id}", {obj_type}_obj, {int(props.get('z_index', 250))})
+                activate("{obj_id}")
+            except Exception:
+                pass
+        except Exception:
+            {obj_type}_obj = None
+'''
+                elif obj_type == 'axes':
+                    axes_defined = True
+                    xr = props.get('x_range', [-5, 5, 1])
+                    yr = props.get('y_range', [-3, 3, 1])
+                    show_labels = props.get('show_labels', True)
+                    manim_code += f'''
+        # Create coordinate axes with enhanced visibility
+        axes_obj = None
+        try:
+            policy_exit_before("{obj_type}")
+            axes_obj = Axes(
+                x_range=[{', '.join(map(str, xr))}],
+                y_range=[{', '.join(map(str, yr))}],
+                tips=False,
+                axis_config={{
+                    "stroke_color": "WHITE",
+                    "stroke_width": 2,
+                    "font_size": 24,
+                    "color": "WHITE"
+                }}
+            )
+            # Add default axis numbers safely (no custom tick computation)
+            try:
+                axes_obj.get_x_axis().add_numbers()
+                axes_obj.get_y_axis().add_numbers()
+            except Exception:
+                pass
+            safe_play(Create(axes_obj), run_time=0.8)
+            try:
+                reg("{obj_id}", axes_obj, {int(props.get('z_index', 80))})
+                activate("{obj_id}")
+                camera_fit(active_ids, margin=0.1)
+            except Exception:
+                pass
+        except Exception:
+            axes_obj = None
+'''
+                    if show_labels:
+                        manim_code += '''
+        x_label = axes_obj.get_x_axis_label(Text("x", color="WHITE", font_size=28))
+        y_label = axes_obj.get_y_axis_label(Text("y", color="WHITE", font_size=28))
+        safe_play(FadeIn(x_label), FadeIn(y_label), run_time=0.5)
+'''
+                elif obj_type == 'plot':
+                    expr = props.get('expression', 'sin(x)')
+                    xrp = props.get('x_range_plot', [-5, 5])
+                    color = props.get('color', 'CYAN')
+                    if color.upper() in ['BLACK', '#000000', '#000']:
+                        color = 'CYAN'
+                    # Ensure axes_obj exists
+                    manim_code += f'''
+        # Plot function with enhanced visibility
+        try:
+            if 'axes_obj' not in locals() or axes_obj is None:
+                axes_obj = Axes(
+                    x_range=[-5,5,1], 
+                    y_range=[-3,3,1], 
+                    tips=False,
+                    axis_config={{
+                        "stroke_color": "WHITE",
+                        "stroke_width": 2,
+                        "font_size": 24,
+                        "color": "WHITE"
+                    }}
+                )
+                try:
+                    axes_obj.get_x_axis().add_numbers()
+                    axes_obj.get_y_axis().add_numbers()
+                except Exception:
+                    pass
+                safe_play(Create(axes_obj), run_time=0.8)
+            policy_exit_before("{obj_type}")
+            graph_obj = axes_obj.plot(
+                lambda x: _safe_eval(r"""{expr}""", x), 
+                x_range=({xrp[0]}, {xrp[1]}), 
+                color=safe_color("{color}"),
+                stroke_width=3
+            )
+            safe_play(Create(graph_obj), run_time=0.8)
+            try:
+                reg("{obj_id}", graph_obj, {int(props.get('z_index', 120))})
+                activate("{obj_id}")
+                camera_fit(active_ids, margin=0.1)
+            except Exception:
+                pass
+        except Exception:
+            pass
 '''
                 
                 # Add animations
@@ -172,34 +871,53 @@ class GeneratedScene(Scene):
                         target_pos = anim.get('parameters', {}).get('target_position', [1, 1, 0])
                         manim_code += f'''
         # Animate {obj_type} {anim_type}
-        self.play(
-            {obj_type}_obj.animate.move_to([{', '.join(map(str, target_pos))}]),
-            run_time={duration}
-        )
+        try:
+            safe_play({obj_type}_obj.animate.move_to([{', '.join(map(str, target_pos))}]), run_time={duration})
+        except Exception:
+            pass
 '''
                     elif anim_type == 'scale':
                         scale_factor = anim.get('parameters', {}).get('scale_factor', 1.5)
                         manim_code += f'''
         # Animate {obj_type} {anim_type}
-        self.play(
-            {obj_type}_obj.animate.scale({scale_factor}),
-            run_time={duration}
-        )
+        try:
+            safe_play({obj_type}_obj.animate.scale({scale_factor}), run_time={duration})
+        except Exception:
+            pass
 '''
                     elif anim_type == 'rotate':
                         angle = anim.get('parameters', {}).get('angle', PI/2)
                         manim_code += f'''
         # Animate {obj_type} {anim_type}
-        self.play(
-            Rotate({obj_type}_obj, angle={angle}),
-            run_time={duration}
-        )
+        try:
+            safe_play(Rotate({obj_type}_obj, angle={angle}), run_time={duration})
+        except Exception:
+            pass
+'''
+                    elif anim_type == 'fade_in':
+                        manim_code += f'''
+        # Animate {obj_type} {anim_type}
+        try:
+            safe_play(FadeIn({obj_type}_obj), run_time={duration})
+        except Exception:
+            pass
+'''
+                    elif anim_type == 'fade_out':
+                        manim_code += f'''
+        # Animate {obj_type} {anim_type}
+        try:
+            safe_play(FadeOut({obj_type}_obj), run_time={duration})
+        except Exception:
+            pass
 '''
             
             # Add final wait
             manim_code += '''
         # Final pause
-        self.wait(2)
+        try:
+            self.wait(2)
+        except Exception:
+            pass
 '''
             
             logger.info("Successfully generated Manim code")
@@ -228,10 +946,47 @@ class GeneratedScene(Scene):
             
         except Exception as e:
             logger.error(f"Error in animation processing workflow: {e}")
-            return {
-                "status": "failed",
-                "error": str(e)
-            }
+            return {"status": "failed", "error": str(e)}
+
+    async def _try_local_fallback(self, prompt: str) -> Optional[Dict[str, Any]]:
+        """Attempt to generate a spec using a local inference service if available."""
+        local_url = os.getenv("LOCAL_INFERENCE_URL")
+        if not local_url:
+            return None
+        try:
+            timeout = httpx.Timeout(20.0, connect=5.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(local_url, json={"prompt": prompt})
+                if resp.status_code != 200:
+                    logger.error(f"Local fallback returned {resp.status_code}")
+                    return None
+                data = resp.json()
+                spec = data.get("animation_spec") or data
+                if not isinstance(spec, dict):
+                    return None
+                # Normalize like primary path
+                normalized: Dict[str, Any] = {
+                    "animation_type": spec.get("animation_type", "geometric"),
+                    "scene_description": spec.get("scene_description", f"Animation for: {prompt}"),
+                    "objects": spec.get("objects") or [],
+                    "camera_settings": spec.get("camera_settings") or {"position": [0, 0, 0], "zoom": 8},
+                    "duration": spec.get("duration", 5),
+                    "background_color": spec.get("background_color", "#000000"),
+                    "style": spec.get("style", "modern"),
+                }
+                if not isinstance(normalized["objects"], list):
+                    normalized["objects"] = []
+                if not normalized["objects"]:
+                    normalized["objects"].append({
+                        "type": "text",
+                        "properties": {"text": prompt, "color": "WHITE", "size": 36, "position": [0, 0, 0]},
+                        "animations": []
+                    })
+                logger.info("Local fallback produced an animation spec")
+                return normalized
+        except Exception as ex:
+            logger.error(f"Local fallback error: {ex}")
+            return None
 
 
 _ai_service_singleton: Optional[AIService] = None

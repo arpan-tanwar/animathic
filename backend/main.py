@@ -10,6 +10,7 @@ Complete workflow:
 """
 
 import os
+import json
 import time
 import logging
 from datetime import datetime
@@ -17,12 +18,17 @@ from typing import Optional, Dict, Any, List
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Depends, Header
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+import asyncio
+from datetime import datetime as _dt
+from slugify import slugify
+import httpx
 
-from database import get_db, init_database
+from database import get_db, init_database, SessionLocal
 from models.database import User, Video, GenerationJob, Feedback
 from schemas import (
     GenerateRequest, GenerateResponse, StatusResponse, 
@@ -60,8 +66,152 @@ app.add_middleware(
 # Initialize database
 init_database()
 
+# Ensure generation_jobs table exists (for cross-instance job status)
+def _ensure_generation_jobs_table() -> None:
+    try:
+        with SessionLocal() as _db:
+            _db.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS generation_jobs (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    prompt TEXT NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    current_step INTEGER DEFAULT 0,
+                    total_steps INTEGER DEFAULT 4,
+                    ai_response TEXT,
+                    manim_code TEXT,
+                    error_message TEXT,
+                    result_video_id TEXT,
+                    created_at TIMESTAMPTZ DEFAULT now(),
+                    updated_at TIMESTAMPTZ DEFAULT now()
+                );
+                """
+            ))
+            _db.commit()
+    except Exception as _e:
+        logger.warning(f"generation_jobs table ensure failed (continuing): {_e}")
+
+_ensure_generation_jobs_table()
+
 # In-memory storage for generation jobs (in production, use Redis or database)
 generation_jobs = {}
+
+# Supabase public URL base (for public buckets)
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://cclnoqiorysuciutdera.supabase.co").rstrip("/")
+SUPABASE_PUBLIC_BASE = f"{SUPABASE_URL}/storage/v1/object/public"
+NEW_BUCKET = os.getenv("SUPABASE_NEW_BUCKET", "animathic-media")
+OLD_BUCKET = os.getenv("SUPABASE_OLD_BUCKET", "manim-videos")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+
+
+async def resolve_public_video_url(file_path: str) -> Optional[str]:
+    """Return a working public URL for the given file_path, trying new bucket then old.
+    Assumes buckets are public. Falls back to None if both not accessible.
+    """
+    if not file_path:
+        return None
+    path = file_path.lstrip("/")
+    candidates = [
+        f"{SUPABASE_PUBLIC_BASE}/{NEW_BUCKET}/{path}",
+        f"{SUPABASE_PUBLIC_BASE}/{OLD_BUCKET}/{path}",
+    ]
+    timeout = httpx.Timeout(2.0, connect=2.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for url in candidates:
+            try:
+                r = await client.head(url)
+                if r.status_code == 200:
+                    return url
+            except Exception:
+                continue
+    return None
+
+
+async def supabase_copy_object(source_bucket: str, source_key: str, dest_bucket: str, dest_key: str) -> bool:
+    """Use Supabase Storage copy API to duplicate an object."""
+    if not SUPABASE_SERVICE_KEY:
+        return False
+    url = f"{SUPABASE_URL}/storage/v1/object/copy"
+    payload = {
+        "bucketId": source_bucket,
+        "sourceKey": source_key,
+        "destinationBucket": dest_bucket,
+        "destinationKey": dest_key,
+        "upsert": True,
+    }
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_SERVICE_KEY,
+    }
+    timeout = httpx.Timeout(10.0, connect=5.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.post(url, json=payload, headers=headers)
+        return r.status_code in (200, 201)
+
+
+async def ensure_placeholder_uploaded(db: Session, dest_path: str) -> bool:
+    """Ensure there is a file at dest_path in NEW_BUCKET by copying an existing video as placeholder."""
+    try:
+        # Find a recent existing file_path to clone
+        row = db.execute(
+            text("""
+                SELECT file_path
+                FROM videos
+                WHERE file_path IS NOT NULL AND file_path <> ''
+                ORDER BY created_at DESC NULLS LAST
+                LIMIT 1
+            """),
+        ).fetchone()
+        if not row:
+            return False
+        source_key = (getattr(row, "file_path", None) or row[0]).lstrip("/")
+
+        # Detect which bucket has the source
+        # Try new bucket URL
+        source_new = f"{SUPABASE_PUBLIC_BASE}/{NEW_BUCKET}/{source_key}"
+        source_old = f"{SUPABASE_PUBLIC_BASE}/{OLD_BUCKET}/{source_key}"
+        timeout = httpx.Timeout(3.0, connect=2.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            src_bucket = None
+            try:
+                h = await client.head(source_new)
+                if h.status_code == 200:
+                    src_bucket = NEW_BUCKET
+            except Exception:
+                pass
+            if not src_bucket:
+                try:
+                    h2 = await client.head(source_old)
+                    if h2.status_code == 200:
+                        src_bucket = OLD_BUCKET
+                except Exception:
+                    pass
+        if not src_bucket:
+            return False
+
+        # Copy to destination in NEW_BUCKET
+        ok = await supabase_copy_object(src_bucket, source_key, NEW_BUCKET, dest_path)
+        return ok
+    except Exception as e:
+        logger.error(f"ensure_placeholder_uploaded error: {e}")
+        return False
+
+
+async def supabase_delete_object(bucket: str, key: str) -> bool:
+    """Delete an object from Supabase Storage."""
+    if not SUPABASE_SERVICE_KEY:
+        return False
+    url = f"{SUPABASE_URL}/storage/v1/object/{bucket}/{key}"
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "apikey": SUPABASE_SERVICE_KEY,
+    }
+    timeout = httpx.Timeout(10.0, connect=5.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.delete(url, headers=headers)
+        return r.status_code in (200, 204)
 
 @app.get("/", response_model=Dict[str, Any])
 async def root():
@@ -99,32 +249,15 @@ async def generate_animation(
     request: GenerateRequest,
     db: Session = Depends(get_db)
 ):
-    """Start animation generation process"""
+    """Start animation generation process without requiring extra DB tables."""
     try:
         logger.info(f"Starting animation generation for user {request.user_id}")
-        
-        # Create or get user
-        user = db.query(User).filter(User.id == request.user_id).first()
-        if not user:
-            user = User(id=request.user_id, email=f"user_{request.user_id}@example.com")
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-        
-        # Create generation job
-        job = GenerationJob(
-            user_id=request.user_id,
-            prompt=request.prompt,
-            status="pending",
-            current_step=0,
-            total_steps=4
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # Store job in memory for status tracking
-        generation_jobs[job.id] = {
+
+        import uuid
+        job_id = str(uuid.uuid4())
+
+        # Store job in memory for fast local tracking
+        generation_jobs[job_id] = {
             "status": "pending",
             "current_step": 0,
             "total_steps": 4,
@@ -132,67 +265,202 @@ async def generate_animation(
             "user_id": request.user_id,
             "created_at": datetime.utcnow()
         }
-        
+
+        # Persist job to database for cross-instance status
+        try:
+            db.execute(
+                text(
+                    """
+                    INSERT INTO generation_jobs (id, user_id, prompt, status, current_step, total_steps, created_at)
+                    VALUES (:id, :uid, :prompt, 'pending', 0, 4, now())
+                    """
+                ),
+                {"id": job_id, "uid": request.user_id, "prompt": request.prompt},
+            )
+            db.commit()
+        except Exception as ie:
+            logger.warning(f"Failed to persist generation job to DB (continuing with in-memory only): {ie}")
+
         # Start async processing
         import asyncio
-        asyncio.create_task(process_generation_job(job.id, request.prompt, db))
-        
+        asyncio.create_task(process_generation_job(job_id, request.prompt, request.user_id))
+
         return GenerateResponse(
-            id=job.id,
+            id=job_id,
             status="started",
             message="Animation generation started successfully"
         )
-        
+
     except Exception as e:
         logger.error(f"Error starting generation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def process_generation_job(job_id: str, prompt: str, db: Session):
+async def process_generation_job(job_id: str, prompt: str, user_id: str):
     """Process animation generation asynchronously"""
     try:
         logger.info(f"Processing generation job {job_id}")
+        # Open a fresh DB session for background work
+        db = SessionLocal()
         
         # Update job status
         generation_jobs[job_id]["status"] = "processing"
         generation_jobs[job_id]["current_step"] = 1
+        try:
+            db.execute(
+                text("UPDATE generation_jobs SET status='processing', current_step=1, updated_at=now() WHERE id=:id"),
+                {"id": job_id},
+            )
+            db.commit()
+        except Exception as ue:
+            logger.warning(f"DB update failed (processing step 1): {ue}")
         
-        # Step 1: Generate animation specification with Gemini
-        logger.info(f"Step 1: Generating animation spec for job {job_id}")
-        ai_result = await get_ai_service().process_animation_request(prompt)
-        
-        if ai_result["status"] == "failed":
-            raise Exception(f"AI generation failed: {ai_result.get('error', 'Unknown error')}")
-        
-        # Update job with AI response
-        generation_jobs[job_id]["current_step"] = 2
-        generation_jobs[job_id]["ai_response"] = ai_result["animation_spec"]
-        generation_jobs[job_id]["manim_code"] = ai_result["manim_code"]
-        
-        # Step 2: Create video record
-        logger.info(f"Step 2: Creating video record for job {job_id}")
-        video = Video(
-            user_id=generation_jobs[job_id]["user_id"],
-            prompt=prompt,
-            status="completed",
-            generation_job_id=job_id
-        )
-        db.add(video)
-        db.commit()
-        db.refresh(video)
-        
-        # Step 3: Generate sample video URL (in production, this would be actual video generation)
-        logger.info(f"Step 3: Generating video for job {job_id}")
-        generation_jobs[job_id]["current_step"] = 3
-        
-        # For now, create a placeholder video URL
-        video_url = f"/api/videos/{video.id}/download"
-        video.video_url = video_url
-        db.commit()
-        
-        # Update job status
-        generation_jobs[job_id]["status"] = "completed"
+        # Steps 1-2 with retry: generate -> render -> upload
+        last_error_summary = ""
+        success = False
+        new_video_id = None
+        for attempt in range(1, 4):
+            try:
+                logger.info(f"Attempt {attempt}/3: Generating animation spec for job {job_id}")
+                augmented_prompt = prompt if attempt == 1 else (
+                    f"{prompt}\n\nConstraints: The previous attempt failed with error: {last_error_summary}. "
+                    "Regenerate a corrected JSON spec that avoids this issue and remains compatible with Manim v0.19, "
+                    "ensuring safe numeric types (no float steps in Python range) and robust axes numbering."
+                )
+                ai_result = await get_ai_service().process_animation_request(augmented_prompt)
+                if ai_result["status"] == "failed":
+                    raise Exception(f"AI generation failed: {ai_result.get('error', 'Unknown error')}")
+
+                # Update job with AI response
+                generation_jobs[job_id]["current_step"] = 2
+                generation_jobs[job_id]["ai_response"] = ai_result["animation_spec"]
+                generation_jobs[job_id]["manim_code"] = ai_result["manim_code"]
+                try:
+                    db.execute(
+                        text(
+                            "UPDATE generation_jobs SET current_step=2, ai_response=:ar, manim_code=:mc, updated_at=now() WHERE id=:id"
+                        ),
+                        {
+                            "id": job_id,
+                            "ar": json.dumps(ai_result["animation_spec"])[:50000],
+                            "mc": ai_result["manim_code"][:50000],
+                        },
+                    )
+                    db.commit()
+                except Exception as ue2:
+                    logger.warning(f"DB update failed (after AI result): {ue2}")
+
+                # Render and upload
+                logger.info(f"Attempt {attempt}/3: Rendering video for job {job_id}")
+                import uuid
+                new_video_id = str(uuid.uuid4())
+                ts = _dt.utcnow().strftime("%Y%m%d_%H%M%S")
+                safe_prompt = slugify(prompt)[:80] or "animation"
+                file_path = f"{user_id}/{safe_prompt}_{ts}_{new_video_id[:8]}.mp4"
+                import tempfile, subprocess
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    scene_file = Path(tmpdir) / "generated_scene.py"
+                    scene_file.write_text(generation_jobs[job_id]["manim_code"], encoding="utf-8")
+                    cmd = [
+                        "manim",
+                        str(scene_file),
+                        "GeneratedScene",
+                        "-ql",
+                        "--renderer=cairo",
+                        "--format=mp4",
+                        "--media_dir",
+                        tmpdir,
+                    ]
+                    logger.info(f"Running render: {' '.join(cmd)}")
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=420)
+                    if proc.returncode != 0:
+                        logger.error(proc.stdout)
+                        logger.error(proc.stderr)
+                        err_out = (proc.stderr or proc.stdout or "Manim render failed").strip()
+                        raise Exception(err_out)
+                    out = next(Path(tmpdir).rglob("*.mp4"), None)
+                    if not out or not out.exists():
+                        raise Exception("Rendered MP4 not found")
+                    if not SUPABASE_SERVICE_KEY:
+                        raise Exception("Storage misconfigured")
+                    upload_url = f"{SUPABASE_URL}/storage/v1/object/{NEW_BUCKET}/{file_path}"
+                    headers = {"Authorization": f"Bearer {SUPABASE_SERVICE_KEY}", "apikey": SUPABASE_SERVICE_KEY, "Content-Type": "video/mp4"}
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=5.0)) as client:
+                        resp = await client.post(upload_url, headers=headers, content=out.read_bytes())
+                        if resp.status_code not in (200, 201):
+                            raise Exception(f"Upload failed: {resp.status_code} {resp.text}")
+
+                success = True
+                break
+            except Exception as attempt_err:
+                last_error_summary = str(attempt_err)[:500]
+                logger.error(f"Attempt {attempt} failed: {last_error_summary}")
+                try:
+                    db.execute(
+                        text("UPDATE generation_jobs SET error_message=:err, updated_at=now() WHERE id=:id"),
+                        {"id": job_id, "err": f"Attempt {attempt} failed: {last_error_summary}"[:1000]},
+                    )
+                    db.commit()
+                except Exception:
+                    pass
+
+        if not success:
+            raise Exception(f"All attempts failed. Last error: {last_error_summary}")
+
+        # Insert DB row now that file exists
+        try:
+            db.execute(
+                text(
+                    """
+                    INSERT INTO videos (id, user_id, file_path, prompt, status, mime_type, created_at, generation_job_id)
+                    VALUES (:id, :uid, :file_path, :prompt, :status, :mime_type, now(), :gjid)
+                    """
+                ),
+                {
+                    "id": new_video_id,
+                    "uid": user_id,
+                    "file_path": file_path,
+                    "prompt": prompt,
+                    "status": "completed",
+                    "mime_type": "video/mp4",
+                    "gjid": job_id,
+                },
+            )
+            db.commit()
+        except Exception:
+            # Fallback if generation_job_id column doesn't exist
+            db.rollback()
+            db.execute(
+                text(
+                    """
+                    INSERT INTO videos (id, user_id, file_path, prompt, status, mime_type, created_at)
+                    VALUES (:id, :uid, :file_path, :prompt, :status, :mime_type, now())
+                    """
+                ),
+                {
+                    "id": new_video_id,
+                    "uid": user_id,
+                    "file_path": file_path,
+            "prompt": prompt,
+                    "status": "completed",
+                    "mime_type": "video/mp4",
+                },
+            )
+            db.commit()
+
+        # Finalize job and point to streaming endpoint
         generation_jobs[job_id]["current_step"] = 4
-        generation_jobs[job_id]["video_url"] = video_url
+        generation_jobs[job_id]["status"] = "completed"
+        generation_jobs[job_id]["video_url"] = f"/api/videos/{new_video_id}/stream"
+        try:
+            db.execute(
+                text(
+                    "UPDATE generation_jobs SET status='completed', current_step=4, result_video_id=:vid, updated_at=now() WHERE id=:id"
+                ),
+                {"id": job_id, "vid": new_video_id},
+            )
+            db.commit()
+        except Exception as ue3:
+            logger.warning(f"DB update failed (finalize job): {ue3}")
         
         logger.info(f"Generation job {job_id} completed successfully")
         
@@ -200,32 +468,67 @@ async def process_generation_job(job_id: str, prompt: str, db: Session):
         logger.error(f"Error processing generation job {job_id}: {e}")
         generation_jobs[job_id]["status"] = "failed"
         generation_jobs[job_id]["error"] = str(e)
-        
-        # Update video status if it exists
         try:
-            video = db.query(Video).filter(Video.generation_job_id == job_id).first()
-            if video:
-                video.status = "failed"
-                video.error_message = str(e)
-                db.commit()
-        except Exception as db_error:
-            logger.error(f"Error updating video status: {db_error}")
+            with SessionLocal() as _db2:
+                _db2.execute(
+                    text("UPDATE generation_jobs SET status='failed', error_message=:err, updated_at=now() WHERE id=:id"),
+                    {"id": job_id, "err": str(e)[:1000]},
+                )
+                _db2.commit()
+        except Exception:
+            pass
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+        
+        # No DB-side job/video updates needed on failure for minimal schema
 
 @app.get("/api/status/{job_id}", response_model=StatusResponse)
-async def get_generation_status(job_id: str):
+async def get_generation_status(job_id: str, request: Request, db: Session = Depends(get_db)):
     """Get the status of a generation job"""
     try:
-        if job_id not in generation_jobs:
-            raise HTTPException(status_code=404, detail="Generation job not found")
+        if job_id in generation_jobs:
+            job = generation_jobs[job_id]
+        else:
+            # Fallback to DB (cross-instance polling)
+            row = db.execute(
+                text(
+                    "SELECT status, current_step, total_steps, result_video_id, error_message FROM generation_jobs WHERE id = :id LIMIT 1"
+                ),
+                {"id": job_id},
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Generation job not found")
+            job = {
+                "status": getattr(row, "status", None) or row[0],
+                "current_step": getattr(row, "current_step", None) or (len(row) > 1 and row[1]) or 0,
+                "total_steps": getattr(row, "total_steps", None) or (len(row) > 2 and row[2]) or 4,
+                "result_video_id": getattr(row, "result_video_id", None) or (len(row) > 3 and row[3]) or None,
+                "error": getattr(row, "error_message", None) or (len(row) > 4 and row[4]) or None,
+            }
         
-        job = generation_jobs[job_id]
-        
+        # Ensure video_url is absolute for frontend playback
+        base = str(request.base_url).rstrip("/")
+        job_video_url = job.get("video_url")
+        if not job_video_url and job.get("result_video_id"):
+            job_video_url = f"/api/videos/{job['result_video_id']}/stream"
+        if job_video_url:
+            if job_video_url.startswith("http://") or job_video_url.startswith("https://"):
+                absolute_url = job_video_url
+            else:
+                # Guarantee single slash between base and path
+                absolute_url = f"{base}{job_video_url if job_video_url.startswith('/') else '/' + job_video_url}"
+        else:
+            absolute_url = None
+
         return StatusResponse(
             id=job_id,
             status=job["status"],
             current_step=job["current_step"],
             total_steps=job["total_steps"],
-            video_url=job.get("video_url"),
+            video_url=absolute_url,
             error=job.get("error")
         )
         
@@ -238,35 +541,157 @@ async def get_generation_status(job_id: str):
 @app.get("/api/videos", response_model=List[VideoResponse])
 async def get_user_videos(
     user_id: str = Header(..., alias="user-id"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None,
 ):
-    """Get all videos for a user"""
+    """Get all videos for a user, compatible with existing Supabase schema."""
     try:
         logger.info(f"Fetching videos for user {user_id}")
-        
-        videos = db.query(Video).filter(Video.user_id == user_id).all()
-        
-        return [VideoResponse.from_orm(video) for video in videos]
-        
+
+        # Use resilient select limited to commonly existing columns
+        rows = db.execute(
+            text("""
+                SELECT id, prompt, created_at, file_path, status, mime_type
+                FROM videos
+                WHERE user_id = :uid
+                ORDER BY created_at DESC NULLS LAST
+            """),
+            {"uid": user_id},
+        ).fetchall()
+
+        results: List[VideoResponse] = []
+        # Resolve URLs concurrently
+        async def build_response(r):
+            # Row may be a RowMapping or tuple depending on driver
+            rid = getattr(r, "id", None) or r[0]
+            rprompt = getattr(r, "prompt", None) or r[1]
+            rcreated = getattr(r, "created_at", None) or (len(r) > 2 and r[2]) or datetime.utcnow()
+            rfile = getattr(r, "file_path", None) or (len(r) > 3 and r[3]) or None
+            rstatus = getattr(r, "status", None) or (len(r) > 4 and r[4]) or "completed"
+            url = await resolve_public_video_url(rfile or "")
+            return VideoResponse(
+                id=str(rid),
+                prompt=rprompt or "",
+                video_url=url,
+                thumbnail_url=None,
+                mime_type=(getattr(r, "mime_type", None) or (len(r) > 5 and r[5]) or None),
+                status=rstatus or "completed",
+                error_message=None,
+                created_at=rcreated,
+            )
+
+        # For reliable playback (CORS/range), serve via backend stream endpoint
+        base = str(request.base_url).rstrip("/") if request else ""
+        async def build_with_stream(r):
+            vr = await build_response(r)
+            vr.video_url = f"{base}/api/videos/{vr.id}/stream"
+            return vr
+
+        results = await asyncio.gather(*(build_with_stream(r) for r in rows))
+
+        return results
+
     except Exception as e:
         logger.error(f"Error fetching videos: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to fetch videos")
 
 @app.get("/api/videos/{video_id}", response_model=VideoResponse)
-async def get_video(video_id: str, db: Session = Depends(get_db)):
-    """Get a specific video by ID"""
+async def get_video(video_id: str, db: Session = Depends(get_db), request: Request = None):
+    """Get a specific video by ID, compatible with existing Supabase schema."""
     try:
-        video = db.query(Video).filter(Video.id == video_id).first()
-        if not video:
+        row = db.execute(
+            text("""
+                SELECT id, prompt, created_at, file_path, status, mime_type
+                FROM videos
+                WHERE id = :vid
+                LIMIT 1
+            """),
+            {"vid": video_id},
+        ).fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="Video not found")
-        
-        return VideoResponse.from_orm(video)
-        
+
+        rid = getattr(row, "id", None) or row[0]
+        rprompt = getattr(row, "prompt", None) or row[1]
+        rcreated = getattr(row, "created_at", None) or (len(row) > 2 and row[2]) or datetime.utcnow()
+        rfile = getattr(row, "file_path", None) or (len(row) > 3 and row[3]) or None
+        rstatus = getattr(row, "status", None) or (len(row) > 4 and row[4]) or "completed"
+
+        # Serve via backend stream endpoint for reliability
+        base = str(request.base_url).rstrip("/") if request else ""
+        url = f"{base}/api/videos/{rid}/stream"
+
+        return VideoResponse(
+            id=str(rid),
+            prompt=rprompt or "",
+            video_url=url,
+            thumbnail_url=None,
+            mime_type=(getattr(row, "mime_type", None) or (len(row) > 5 and row[5]) or None),
+            status=rstatus or "completed",
+            error_message=None,
+            created_at=rcreated,
+        )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching video: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to fetch video")
+
+@app.get("/api/videos/{video_id}/stream")
+async def stream_video(video_id: str, request: Request, db: Session = Depends(get_db)):
+    """Proxy stream the video from Supabase storage (new bucket first, then old) with Range support.
+    Uses service key for private buckets.
+    """
+    try:
+        row = db.execute(
+            text("""
+                SELECT file_path, mime_type
+                FROM videos
+                WHERE id = :vid
+                LIMIT 1
+            """),
+            {"vid": video_id},
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        file_path = (getattr(row, "file_path", None) or (len(row) > 0 and row[0]) or "").lstrip("/")
+        mime_type = getattr(row, "mime_type", None) or (len(row) > 1 and row[1]) or "video/mp4"
+
+        if not SUPABASE_SERVICE_KEY:
+            logger.error("SUPABASE_SERVICE_KEY missing; cannot stream from private storage")
+            raise HTTPException(status_code=500, detail="Storage misconfigured")
+
+        # Private storage endpoints (authorized with service key)
+        candidates = [
+            f"{SUPABASE_URL}/storage/v1/object/{NEW_BUCKET}/{file_path}",
+            f"{SUPABASE_URL}/storage/v1/object/{OLD_BUCKET}/{file_path}",
+        ]
+
+        range_header = request.headers.get("range")
+        timeout = httpx.Timeout(10.0, connect=5.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            for url in candidates:
+                try:
+                    headers = {"Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
+                    if range_header:
+                        headers["Range"] = range_header
+                    resp = await client.get(url, headers=headers)
+                    if resp.status_code in (200, 206):
+                        stream = resp.aiter_bytes()
+                        forward_headers = {}
+                        for h in ("Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control"):
+                            if h in resp.headers:
+                                forward_headers[h] = resp.headers[h]
+                        return StreamingResponse(stream, status_code=resp.status_code, media_type=mime_type, headers=forward_headers)
+                except Exception:
+                    continue
+        raise HTTPException(status_code=404, detail="Video file not found in buckets")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error streaming video: {e}")
+        raise HTTPException(status_code=500, detail="Failed to stream video")
 
 @app.delete("/api/videos/{video_id}")
 async def delete_video(
@@ -276,17 +701,38 @@ async def delete_video(
 ):
     """Delete a video"""
     try:
-        video = db.query(Video).filter(
-            Video.id == video_id,
-            Video.user_id == user_id
-        ).first()
-        
-        if not video:
+        # Resolve file_path first (raw SQL since ORM tables may differ)
+        row = db.execute(
+            text(
+                """
+                SELECT file_path
+                FROM videos
+                WHERE id = :vid AND user_id = :uid
+                LIMIT 1
+                """
+            ),
+            {"vid": video_id, "uid": user_id},
+        ).fetchone()
+
+        if not row:
             raise HTTPException(status_code=404, detail="Video not found")
-        
-        db.delete(video)
+
+        file_path = (getattr(row, "file_path", None) or row[0] or "").lstrip("/")
+
+        # Delete DB row
+        db.execute(
+            text("DELETE FROM videos WHERE id = :vid AND user_id = :uid"),
+            {"vid": video_id, "uid": user_id},
+        )
         db.commit()
-        
+
+        # Best-effort delete from storage
+        if file_path:
+            try:
+                await supabase_delete_object(NEW_BUCKET, file_path)
+            except Exception:
+                pass
+
         return {"message": "Video deleted successfully"}
         
     except HTTPException:

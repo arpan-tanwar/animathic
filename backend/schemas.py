@@ -34,6 +34,7 @@ class VideoResponse(BaseModel):
     prompt: str
     video_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
+    mime_type: Optional[str] = None
     status: str
     error_message: Optional[str] = None
     created_at: datetime
