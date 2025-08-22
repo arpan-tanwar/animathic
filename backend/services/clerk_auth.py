@@ -27,6 +27,9 @@ class ClerkAuthService:
         # Audience should be the frontend domain or can be None for Clerk
         self.clerk_audience = None
         
+        # Store Clerk secret key for fallback JWKS fetch
+        self.clerk_secret_key = os.getenv("CLERK_SECRET_KEY")
+        
         # For development/testing, allow simplified tokens
         self.allow_dev_tokens = os.getenv("ENVIRONMENT", "production") != "production"
         
@@ -50,16 +53,56 @@ class ClerkAuthService:
             # Fetch public keys from Clerk
             logger.info("Fetching public keys from Clerk...")
             async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    "https://api.clerk.dev/v1/jwks",
-                    timeout=10.0
-                )
+                # Try multiple JWKS endpoints - Clerk might have different public endpoints
+                jwks_urls = [
+                    "https://clerk.animathic.com/.well-known/jwks.json",
+                    "https://clerk.dev/.well-known/jwks.json",
+                    "https://api.clerk.dev/v1/jwks"
+                ]
                 
-                if response.status_code != 200:
-                    logger.error(f"Failed to fetch Clerk JWKS: {response.status_code}")
+                jwks = None
+                for url in jwks_urls:
+                    try:
+                        logger.info(f"Trying JWKS endpoint: {url}")
+                        response = await client.get(url, timeout=10.0)
+                        if response.status_code == 200:
+                            jwks = response.json()
+                            logger.info(f"Successfully retrieved JWKS from: {url}")
+                            break
+                        else:
+                            logger.warning(f"Failed to fetch from {url}: {response.status_code}")
+                    except Exception as e:
+                        logger.warning(f"Error fetching from {url}: {e}")
+                        continue
+                
+                if not jwks:
+                    # Fallback: Try using the Clerk secret key to fetch JWKS
+                    logger.info("Public JWKS endpoints failed, trying with secret key...")
+                    try:
+                        if hasattr(self, 'clerk_secret_key') and self.clerk_secret_key:
+                            headers = {
+                                "Authorization": f"Bearer {self.clerk_secret_key}",
+                                "Content-Type": "application/json"
+                            }
+                            response = await client.get(
+                                "https://api.clerk.dev/v1/jwks",
+                                headers=headers,
+                                timeout=10.0
+                            )
+                            if response.status_code == 200:
+                                jwks = response.json()
+                                logger.info("Successfully retrieved JWKS using secret key")
+                            else:
+                                logger.error(f"Failed to fetch JWKS with secret key: {response.status_code}")
+                        else:
+                            logger.error("No Clerk secret key available for fallback")
+                    except Exception as e:
+                        logger.error(f"Error in fallback JWKS fetch: {e}")
+                
+                if not jwks:
+                    logger.error("Failed to fetch JWKS from all endpoints and fallback methods")
                     raise HTTPException(status_code=500, detail="Failed to fetch public keys from Clerk")
                 
-                jwks = response.json()
                 logger.info(f"Retrieved {len(jwks.get('keys', []))} public keys from Clerk")
                 
                 public_key = None
@@ -80,7 +123,7 @@ class ClerkAuthService:
                             )
                             
                             public_numbers = RSAPublicNumbers(e, n)
-                            public_key = rsa.RSAPublicKey(public_numbers)
+                            public_key = public_numbers.public_key()
                             break
                         except Exception as e:
                             logger.warning(f"Failed to convert JWK to PEM: {e}")

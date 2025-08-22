@@ -32,36 +32,18 @@ print('3. Testing FastAPI...')
 from fastapi import FastAPI
 print('✓ FastAPI import successful')
 
-print('4. Testing SQLAlchemy...')
-from sqlalchemy import create_engine
-print('✓ SQLAlchemy import successful')
+print('4. Testing Supabase client...')
+from supabase import create_client
+print('✓ Supabase client import successful')
 
-print('5. Testing database module...')
-try:
-    from database import engine, SessionLocal
-    print('✓ Database module import successful')
-    if engine:
-        print('✓ Database engine available')
-    else:
-        print('⚠ Database engine not available')
-except Exception as e:
-    print(f'✗ Database module import failed: {e}')
-
-print('6. Testing models...')
-try:
-    from models.database import User, Video, GenerationJob, Feedback
-    print('✓ Models import successful')
-except Exception as e:
-    print(f'✗ Models import failed: {e}')
-
-print('7. Testing services...')
+print('5. Testing services...')
 try:
     from services.ai_service_new import AIService
     print('✓ AI Service import successful')
 except Exception as e:
     print(f'✗ AI Service import failed: {e}')
 
-print('8. Testing production config...')
+print('6. Testing production config...')
 try:
     from production_config import ALLOWED_ORIGINS, DEBUG
     print('✓ Production config import successful')

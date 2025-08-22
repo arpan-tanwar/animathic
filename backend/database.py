@@ -59,6 +59,10 @@ else:
         DATABASE_URL,
         pool_pre_ping=True,
         pool_recycle=300,
+        pool_size=2,  # Very small pool size for Supabase Session Pooler
+        max_overflow=3,  # Minimal overflow connections
+        pool_timeout=10,  # Shorter timeout
+        pool_reset_on_return='commit',  # Reset connections on return
     )
 
     # Create async engine for async operations
@@ -78,7 +82,10 @@ else:
         async_database_url,
         pool_pre_ping=True,
         pool_recycle=300,
-        poolclass=None,  # Disable connection pooling entirely
+        pool_size=2,  # Very small pool size for Supabase Session Pooler
+        max_overflow=3,  # Minimal overflow connections
+        pool_timeout=10,  # Shorter timeout
+        pool_reset_on_return='commit',  # Reset connections on return
         connect_args={"statement_cache_size": 0}  # Disable statement cache for pgbouncer compatibility
     )
 

@@ -6,6 +6,8 @@ Handles video uploads and storage management
 import os
 import logging
 import httpx
+from datetime import datetime, timezone
+from slugify import slugify
 from typing import Optional, Dict, Any
 from pathlib import Path
 from dotenv import load_dotenv
@@ -30,8 +32,10 @@ class SupabaseStorageService:
             self.enabled = True
             logger.info(f"Supabase storage service initialized with bucket: {self.bucket_name}")
     
-    async def upload_video(self, file_path: str, job_id: str, user_id: str) -> Optional[str]:
-        """Upload a video file to Supabase storage"""
+    async def upload_video(self, file_path: str, job_id: str, user_id: str, prompt: str = "") -> Optional[str]:
+        """Upload a video file to Supabase storage using a descriptive filename.
+        Returns {"url": public_url, "object_key": object_key}
+        """
         if not self.enabled:
             logger.warning("Supabase storage disabled - cannot upload video")
             return None
@@ -42,8 +46,12 @@ class SupabaseStorageService:
                 logger.error(f"Video file not found: {file_path}")
                 return None
             
-            # Generate unique filename
-            filename = f"{job_id}_{file_path_obj.name}"
+            # Generate descriptive object key under user-specific folder
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            short_id = job_id.split("-")[0]
+            safe_prompt = (slugify(prompt)[:80] or "animation")
+            filename = f"{safe_prompt}_{ts}_{short_id}.mp4"
+            object_key = f"{user_id}/{filename}"
             
             # Read file content
             with open(file_path, 'rb') as f:
@@ -56,7 +64,7 @@ class SupabaseStorageService:
                 "Content-Type": "video/mp4"
             }
             
-            upload_url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{filename}"
+            upload_url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{object_key}"
             logger.info(f"Attempting upload to: {upload_url}")
             logger.info(f"File size: {len(file_content)} bytes")
             logger.info(f"Headers: {headers}")
@@ -69,10 +77,11 @@ class SupabaseStorageService:
                 )
                 
                 if response.status_code in (200, 201):
-                    # Get public URL
-                    public_url = f"{self.supabase_url}/storage/v1/object/public/{self.bucket_name}/{filename}"
+                    # Get public URL (if bucket is public, else backend streams)
+                    public_url = f"{self.supabase_url}/storage/v1/object/public/{self.bucket_name}/{object_key}"
                     logger.info(f"Video uploaded successfully: {public_url}")
-                    return public_url
+                    # Return both URL and object key for DB persistence
+                    return {"url": public_url, "object_key": object_key}
                 else:
                     logger.error(f"Failed to upload video: {response.status_code} - {response.text}")
                     logger.error(f"Response headers: {dict(response.headers)}")
@@ -93,6 +102,7 @@ class SupabaseStorageService:
                 "Authorization": f"Bearer {self.supabase_service_key}"
             }
             
+            # filename can be a full object key like "<user_id>/<name>.mp4"
             delete_url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{filename}"
             
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -130,20 +140,22 @@ class SupabaseStorageService:
             list_url = f"{self.supabase_url}/storage/v1/object/list/{self.bucket_name}"
             
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(list_url, headers=headers)
+                # Filter objects by prefix (user folder)
+                response = await client.post(list_url, headers=headers, json={"prefix": f"{user_id}/"})
                 
                 if response.status_code == 200:
                     data = response.json()
                     videos = []
                     
                     for item in data.get('data', []):
-                        if item.get('name', '').startswith(f"{user_id}_"):
-                            videos.append({
-                                'name': item['name'],
-                                'size': item.get('metadata', {}).get('size', 0),
-                                'created_at': item.get('created_at'),
-                                'url': await self.get_video_url(item['name'])
-                            })
+                        # item['name'] is already relative to the prefix when provided
+                        object_key = f"{user_id}/{item['name']}"
+                        videos.append({
+                            'name': object_key,
+                            'size': item.get('metadata', {}).get('size', 0),
+                            'created_at': item.get('created_at'),
+                            'url': await self.get_video_url(object_key)
+                        })
                     
                     logger.info(f"Found {len(videos)} videos for user {user_id}")
                     return videos
@@ -153,6 +165,32 @@ class SupabaseStorageService:
                     
         except Exception as e:
             logger.error(f"Error listing videos: {e}")
+            return []
+
+    async def list_user_videos_in_bucket(self, bucket: str, user_id: str) -> list:
+        """List all videos for a specific user in a given bucket"""
+        if not self.enabled:
+            return []
+        try:
+            headers = {"Authorization": f"Bearer {self.supabase_service_key}"}
+            list_url = f"{self.supabase_url}/storage/v1/object/list/{bucket}"
+            prefix = f"{user_id}/"
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(list_url, headers=headers, json={"prefix": prefix})
+                if response.status_code != 200:
+                    return []
+                data = response.json()
+                items = []
+                for item in data.get('data', []):
+                    object_key = f"{user_id}/{item['name']}"
+                    items.append({
+                        'bucket': bucket,
+                        'object_key': object_key,
+                        'size': item.get('metadata', {}).get('size', 0),
+                        'created_at': item.get('created_at'),
+                    })
+                return items
+        except Exception:
             return []
 
 # Global instance
