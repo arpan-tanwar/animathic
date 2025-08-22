@@ -186,9 +186,12 @@ class ManimCodeGenerator:
         """Generate the complete Manim code template - minimal and precise"""
         code_parts = []
         
-        # Scene class definition
+        # Scene class definition with explicit color imports
         code_parts.append("""from manim import *
 import numpy as np
+
+# Explicitly import color constants to ensure they are available
+from manim import RED, GREEN, BLUE, WHITE, BLACK, YELLOW, PURPLE, ORANGE, PINK, BROWN, GRAY, CYAN, MAGENTA
 
 class GeneratedScene(MovingCameraScene):
     def construct(self):
@@ -275,9 +278,25 @@ class GeneratedScene(MovingCameraScene):
                         
                         # Debug logging
                         print(f"Color mapping: '{color_name}' -> {color}")
-                except Exception:
+                        
+                except (ValueError, TypeError) as e:
+                    # Only catch specific color-related errors, not all exceptions
+                    print(f"Color parsing error for '{color_name}': {e}")
                     color = WHITE
-                    print(f"Color mapping failed for '{color_name}', using WHITE")
+                except Exception as e:
+                    # For any other unexpected errors, still use the color mapping fallback
+                    print(f"Unexpected error in color handling for '{color_name}': {e}")
+                    # Try to use color mapping as fallback instead of defaulting to WHITE
+                    try:
+                        color_mapping = {
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }
+                        color = color_mapping.get(str(color_name), WHITE)
+                        print(f"Fallback color mapping: '{color_name}' -> {color}")
+                    except Exception:
+                        color = WHITE
+                        print(f"Final fallback: using WHITE for '{color_name}'")
                 
                 circle_obj = Circle(
                     radius=size,
@@ -348,8 +367,25 @@ class GeneratedScene(MovingCameraScene):
                             'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
                         color = color_mapping.get(str(color_name), BLUE)
-                except Exception:
+                        
+                except (ValueError, TypeError) as e:
+                    # Only catch specific color-related errors, not all exceptions
+                    print(f"Color parsing error for '{color_name}': {e}")
                     color = BLUE
+                except Exception as e:
+                    # For any other unexpected errors, still use the color mapping fallback
+                    print(f"Unexpected error in color handling for '{color_name}': {e}")
+                    # Try to use color mapping as fallback instead of defaulting to BLUE
+                    try:
+                        color_mapping = {
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }
+                        color = color_mapping.get(str(color_name), BLUE)
+                        print(f"Fallback color mapping: '{color_name}' -> {color}")
+                    except Exception:
+                        color = BLUE
+                        print(f"Final fallback: using BLUE for '{color_name}'")
                 
                 square_obj = Square(
                     side_length=size,

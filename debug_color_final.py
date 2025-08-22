@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive debug script to find the exact color issue
+Debug script to test the improved color exception handling
 """
 
 import sys
@@ -13,7 +13,7 @@ from services.manim_code_generator import ManimCodeGenerator
 
 def test_color_generation():
     """Test the exact color generation process"""
-    print("🔍 Comprehensive Color Debug Test...")
+    print("🔍 Testing Improved Color Exception Handling...")
     
     # Create a test animation spec (exactly what the AI would generate)
     test_spec = {
@@ -59,29 +59,17 @@ def test_color_generation():
             if any(keyword in line for keyword in ['color_name', 'color_mapping', 'fill_color', 'stroke_color', 'Circle(']):
                 print(f"Line {i+1}: {line.strip()}")
         
-        # Check if the color mapping is correct
-        print(f"\n🎨 Color Mapping Verification:")
-        if 'fill_color=color' in manim_code:
-            print("✅ fill_color=color found in Circle creation")
+        # Check if the improved exception handling is there
+        print(f"\n🎨 Exception Handling Check:")
+        if 'except (ValueError, TypeError)' in manim_code:
+            print("✅ Improved exception handling found")
         else:
-            print("❌ fill_color=color NOT found in Circle creation")
+            print("❌ Improved exception handling NOT found")
             
-        if 'stroke_color=color' in manim_code:
-            print("✅ stroke_color=color found in Circle creation")
+        if 'Fallback color mapping' in manim_code:
+            print("✅ Fallback color mapping found")
         else:
-            print("❌ stroke_color=color NOT found in Circle creation")
-        
-        # Check if RED is properly mapped
-        print(f"\n🔴 RED Color Check:")
-        if 'RED' in manim_code:
-            print("✅ RED color found in generated code")
-        else:
-            print("❌ RED color missing from generated code")
-            
-        if 'color_mapping' in manim_code:
-            print("✅ color_mapping found in generated code")
-        else:
-            print("❌ color_mapping missing from generated code")
+            print("❌ Fallback color mapping NOT found")
         
         # Show the exact Circle creation code
         print(f"\n🎯 Exact Circle Creation Code:")
@@ -89,19 +77,9 @@ def test_color_generation():
             if 'Circle(' in line:
                 print(f"Line {i+1}: {line.strip()}")
                 # Show next few lines for context
-                for j in range(i+1, min(i+6, len(lines))):
+                for j in range(i+1, min(i+10, len(lines))):
                     if lines[j].strip():
                         print(f"Line {j+1}: {lines[j].strip()}")
-                break
-        
-        # Check the color variable assignment
-        print(f"\n🎨 Color Variable Assignment:")
-        for i, line in enumerate(lines):
-            if 'color = color_mapping.get' in line:
-                print(f"Line {i+1}: {line.strip()}")
-                # Show the debug print line
-                if i+1 < len(lines) and 'print(f"Color mapping' in lines[i+1]:
-                    print(f"Line {i+2}: {lines[i+1].strip()}")
                 break
         
         # Show the full generated code for manual inspection
