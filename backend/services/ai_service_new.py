@@ -216,107 +216,239 @@ class AIService:
             return animation_spec
     
     async def process_animation_request(self, prompt: str) -> Dict[str, Any]:
-        """Process animation request with intelligent workflow selection"""
+        """Process animation request with intelligent workflow selection - IMPROVED VERSION"""
         try:
             logger.info(f"Processing animation request: {prompt[:100]}...")
             
             # Phase 1: Generate initial animation specification
+            logger.info("Phase 1: Generating animation specification")
             initial_spec = await self._generate_animation_specification(prompt)
             if not initial_spec:
+                logger.error("Failed to generate animation specification")
                 return {'error': 'Failed to generate animation specification'}
             
+            logger.info(f"Initial spec generated with {len(initial_spec.get('objects', []))} objects")
+            
             # Phase 2: Analyze prompt complexity and choose workflow
+            logger.info("Phase 2: Analyzing prompt complexity")
             prompt_complexity = self._analyze_prompt_complexity(prompt)
+            
+            logger.info(f"Complexity analysis: {prompt_complexity['level']} (score: {prompt_complexity['score']})")
             
             if prompt_complexity['requires_enhancement']:
                 logger.info("Using enhanced workflow for complex prompt")
-                # Use enhanced workflow for complex prompts
-                enhanced_result = self.enhanced_orchestrator.process_complex_animation_request(
-                    initial_spec, prompt
-                )
-                
-                if 'error' in enhanced_result:
-                    logger.warning(f"Enhanced workflow failed, falling back to basic: {enhanced_result['error']}")
-                    # Fall back to basic workflow
+                try:
+                    # Use enhanced workflow for complex prompts
+                    enhanced_result = self.enhanced_orchestrator.process_complex_animation_request(
+                        initial_spec, prompt
+                    )
+                    
+                    if 'error' in enhanced_result:
+                        logger.warning(f"Enhanced workflow failed, falling back to basic: {enhanced_result['error']}")
+                        # Fall back to basic workflow
+                        final_spec = self._apply_basic_workflow(initial_spec, prompt)
+                        workflow_type = 'enhanced_fallback'
+                    else:
+                        final_spec = enhanced_result['enhanced_animation_spec']
+                        workflow_type = 'enhanced'
+                        logger.info(f"Enhanced workflow applied {len(enhanced_result.get('enhancements_applied', []))} enhancements")
+                        
+                except Exception as e:
+                    logger.warning(f"Enhanced workflow failed with exception, falling back to basic: {e}")
                     final_spec = self._apply_basic_workflow(initial_spec, prompt)
-                else:
-                    final_spec = enhanced_result['enhanced_animation_spec']
-                    logger.info(f"Enhanced workflow applied {len(enhanced_result.get('enhancements_applied', []))} enhancements")
+                    workflow_type = 'enhanced_fallback'
             else:
                 logger.info("Using restrictive workflow for simple prompt")
                 # Use restrictive workflow for simple prompts
                 final_spec = self._apply_basic_workflow(initial_spec, prompt)
+                workflow_type = 'restrictive'
             
-            # Phase 3: Generate Manim code
+            # Phase 3: Validate final specification
+            logger.info("Phase 3: Validating final specification")
+            if not self._validate_final_spec(final_spec):
+                logger.error("Final specification validation failed")
+                return {'error': 'Generated specification is invalid'}
+            
+            # Phase 4: Generate Manim code
+            logger.info("Phase 4: Generating Manim code")
             manim_code = self._generate_manim_code(final_spec)
             if not manim_code:
+                logger.error("Failed to generate Manim code")
                 return {'error': 'Failed to generate Manim code'}
+            
+            logger.info("Manim code generated successfully")
+            
+            # Phase 5: Validate generated code
+            logger.info("Phase 5: Validating generated code")
+            if not self._validate_manim_code(manim_code):
+                logger.error("Generated Manim code validation failed")
+                return {'error': 'Generated Manim code is invalid'}
+            
+            logger.info("All phases completed successfully")
             
             return {
                 'animation_spec': final_spec,
                 'manim_code': manim_code,
-                'workflow_type': 'enhanced' if prompt_complexity['requires_enhancement'] else 'restrictive',
+                'workflow_type': workflow_type,
                 'complexity_analysis': prompt_complexity,
-                'enhancements_applied': enhanced_result.get('enhancements_applied', []) if prompt_complexity['requires_enhancement'] else []
+                'enhancements_applied': enhanced_result.get('enhancements_applied', []) if workflow_type == 'enhanced' else []
             }
             
         except Exception as e:
             logger.error(f"Error in animation request processing: {e}")
-            return {'error': str(e)}
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return {'error': f'Animation processing failed: {str(e)}'}
     
     def _analyze_prompt_complexity(self, prompt: str) -> Dict[str, Any]:
-        """Analyze prompt complexity to determine workflow selection"""
+        """Analyze prompt complexity to determine workflow selection - IMPROVED VERSION"""
         prompt_lower = prompt.lower()
         
+        # Simplified, more reliable complexity indicators
         complexity_indicators = {
             'mathematical_content': any(keyword in prompt_lower for keyword in 
-                ['function', 'plot', 'graph', 'equation', 'formula', 'sine', 'cosine', 'polynomial']),
+                ['function', 'plot', 'graph', 'equation', 'formula', 'sine', 'cosine', 'polynomial', 'math', 'calculate']),
             'multiple_objects': any(keyword in prompt_lower for keyword in 
-                ['multiple', 'several', 'many', 'various', 'both', 'and', 'with']),
+                ['multiple', 'several', 'many', 'various', 'both', 'and', 'with', 'together', 'group']),
             'sequence_requirements': any(keyword in prompt_lower for keyword in 
-                ['sequence', 'step', 'progression', 'evolution', 'then', 'next', 'after']),
+                ['sequence', 'step', 'progression', 'evolution', 'then', 'next', 'after', 'first', 'second', 'third']),
             'interaction_requirements': any(keyword in prompt_lower for keyword in 
-                ['interact', 'connect', 'relate', 'combine', 'between', 'among']),
+                ['interact', 'connect', 'relate', 'combine', 'between', 'among', 'link', 'join']),
             'temporal_aspects': any(keyword in prompt_lower for keyword in 
-                ['time', 'duration', 'speed', 'timing', 'slow', 'fast']),
+                ['time', 'duration', 'speed', 'timing', 'slow', 'fast', 'seconds', 'minutes']),
             'spatial_relationships': any(keyword in prompt_lower for keyword in 
-                ['above', 'below', 'left', 'right', 'near', 'far', 'position']),
-            # NEW: Animation effects should trigger enhancement
+                ['above', 'below', 'left', 'right', 'near', 'far', 'position', 'location', 'place']),
+            # Animation effects - only for complex animations
             'animation_effects': any(keyword in prompt_lower for keyword in 
-                ['fade', 'appear', 'disappear', 'animate', 'transition', 'effect']),
-            # NEW: Color specifications should trigger enhancement
+                ['fade', 'appear', 'disappear', 'animate', 'transition', 'effect', 'morph', 'transform']),
+            # Color specifications - only for multiple colors or complex color schemes
             'color_specifications': any(keyword in prompt_lower for keyword in 
-                ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'color', 'colored'])
+                ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'color', 'colored', 'rainbow', 'gradient'])
         }
         
-        complexity_score = sum(complexity_indicators.values())
-        complexity_level = 'simple' if complexity_score <= 1 else 'moderate' if complexity_score <= 3 else 'complex'
+        # Calculate complexity score with weighted indicators
+        base_score = sum(complexity_indicators.values())
         
-        # Ensure prompts with animation effects or colors get enhancement
-        requires_enhancement = complexity_score >= 2 or complexity_indicators['animation_effects'] or complexity_indicators['color_specifications']
+        # Weight certain indicators more heavily
+        weighted_score = base_score
+        if complexity_indicators['mathematical_content']:
+            weighted_score += 2  # Math is complex
+        if complexity_indicators['multiple_objects'] and complexity_indicators['interaction_requirements']:
+            weighted_score += 1  # Multiple interacting objects are complex
+        if complexity_indicators['sequence_requirements'] and complexity_indicators['temporal_aspects']:
+            weighted_score += 1  # Complex timing sequences are complex
+        
+        # Determine complexity level with better thresholds
+        if weighted_score <= 2:
+            complexity_level = 'simple'
+        elif weighted_score <= 4:
+            complexity_level = 'moderate'
+        else:
+            complexity_level = 'complex'
+        
+        # More conservative enhancement triggering
+        # Only enhance if truly complex or has specific advanced features
+        requires_enhancement = (
+            weighted_score >= 5 or  # High complexity
+            (complexity_indicators['mathematical_content'] and complexity_indicators['multiple_objects']) or  # Math + multiple objects
+            (complexity_indicators['sequence_requirements'] and complexity_indicators['interaction_requirements']) or  # Complex sequences
+            (complexity_indicators['animation_effects'] and weighted_score >= 3)  # Animation effects + some complexity
+        )
+        
+        logger.info(f"Prompt complexity analysis: score={weighted_score}, level={complexity_level}, enhance={requires_enhancement}")
         
         return {
             'level': complexity_level,
-            'score': complexity_score,
+            'score': weighted_score,
             'indicators': complexity_indicators,
             'requires_enhancement': requires_enhancement,
             'workflow_recommendation': 'enhanced' if requires_enhancement else 'restrictive'
         }
     
     def _apply_basic_workflow(self, animation_spec: Dict[str, Any], prompt: str = "") -> Dict[str, Any]:
-        """Apply basic restrictive workflow (minimal intervention)"""
+        """Apply basic restrictive workflow (minimal intervention) - IMPROVED VERSION"""
         try:
+            logger.info("Applying basic workflow with minimal intervention")
+            
             # Apply minimal normalization
             normalized_spec = self._normalize_animation_spec(animation_spec, prompt)
             
-            # Apply minimal enhancement (no automatic additions)
-            enhanced_spec = self._enhance_animation_spec_with_analysis(normalized_spec)
+            # For basic workflow, keep it simple - no complex enhancements
+            # Only ensure the spec is valid for Manim rendering
+            validated_spec = self._validate_basic_spec(normalized_spec)
             
-            return enhanced_spec
+            logger.info("Basic workflow completed successfully")
+            return validated_spec
             
         except Exception as e:
             logger.error(f"Error in basic workflow: {e}")
+            # Return the original spec if validation fails
             return animation_spec
+    
+    def _validate_basic_spec(self, spec: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate basic animation spec for Manim compatibility"""
+        try:
+            validated = spec.copy()
+            
+            # Ensure basic structure
+            if 'objects' not in validated:
+                validated['objects'] = []
+            
+            # Validate each object
+            valid_objects = []
+            for obj in validated['objects']:
+                if isinstance(obj, dict) and obj.get('type'):
+                    # Ensure basic properties exist
+                    if 'properties' not in obj:
+                        obj['properties'] = {}
+                    
+                    # Set safe defaults for critical properties
+                    props = obj['properties']
+                    if 'position' not in props:
+                        props['position'] = [0, 0, 0]
+                    if 'size' not in props and obj['type'] in ['circle', 'square']:
+                        props['size'] = 1.0
+                    if 'color' not in props:
+                        props['color'] = 'WHITE'
+                    
+                    # Ensure animations array exists
+                    if 'animations' not in obj:
+                        obj['animations'] = []
+                    
+                    # Validate animations
+                    valid_animations = []
+                    for anim in obj['animations']:
+                        if isinstance(anim, dict) and anim.get('type'):
+                            # Ensure animation has required properties
+                            if 'duration' not in anim:
+                                anim['duration'] = 1.0
+                            if 'parameters' not in anim:
+                                anim['parameters'] = {}
+                            valid_animations.append(anim)
+                    
+                    obj['animations'] = valid_animations
+                    valid_objects.append(obj)
+            
+            validated['objects'] = valid_objects
+            
+            # Ensure camera settings are valid
+            if 'camera_settings' not in validated:
+                validated['camera_settings'] = {"position": [0, 0, 0], "zoom": 8}
+            
+            # Ensure duration is reasonable
+            if 'duration' not in validated or not isinstance(validated['duration'], (int, float)):
+                validated['duration'] = 5.0
+            
+            # Ensure background color is valid
+            if 'background_color' not in validated:
+                validated['background_color'] = "#000000"
+            
+            logger.info(f"Basic spec validation completed: {len(valid_objects)} valid objects")
+            return validated
+            
+        except Exception as e:
+            logger.error(f"Error in basic spec validation: {e}")
+            return spec
     
     async def _try_local_fallback(self, prompt: str) -> Optional[Dict[str, Any]]:
         """Attempt to generate a spec using a local inference service if available."""
@@ -472,6 +604,86 @@ class AIService:
         except Exception as e:
             logger.error(f"Error generating Manim code: {e}")
             return None
+
+    def _validate_final_spec(self, spec: Dict[str, Any]) -> bool:
+        """Validate final animation specification"""
+        try:
+            # Basic structure validation
+            if not isinstance(spec, dict):
+                logger.error("Spec is not a dictionary")
+                return False
+            
+            if 'objects' not in spec:
+                logger.error("Spec missing objects array")
+                return False
+            
+            if not isinstance(spec['objects'], list):
+                logger.error("Objects is not a list")
+                return False
+            
+            # Object validation
+            for i, obj in enumerate(spec['objects']):
+                if not isinstance(obj, dict):
+                    logger.error(f"Object {i} is not a dictionary")
+                    return False
+                
+                if 'type' not in obj:
+                    logger.error(f"Object {i} missing type")
+                    return False
+                
+                if 'properties' not in obj:
+                    logger.error(f"Object {i} missing properties")
+                    return False
+            
+            logger.info("Final spec validation passed")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in final spec validation: {e}")
+            return False
+    
+    def _validate_manim_code(self, code: str) -> bool:
+        """Validate generated Manim code"""
+        try:
+            # Basic syntax validation
+            if not code or not isinstance(code, str):
+                logger.error("Code is empty or not a string")
+                return False
+            
+            # Check for required components
+            required_components = [
+                'from manim import',
+                'class GeneratedScene',
+                'def construct(self)',
+                'self.add(',
+                'self.play('
+            ]
+            
+            for component in required_components:
+                if component not in code:
+                    logger.error(f"Missing required component: {component}")
+                    return False
+            
+            # Check for dangerous patterns
+            dangerous_patterns = [
+                'eval(',
+                '__import__(',
+                'exec(',
+                'open(',
+                'file('
+            ]
+            
+            for pattern in dangerous_patterns:
+                if pattern in code:
+                    logger.error(f"Dangerous pattern found: {pattern}")
+                    return False
+            
+            logger.info("Manim code validation passed")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in Manim code validation: {e}")
+            return False
 
 
 # Singleton instance management

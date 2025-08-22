@@ -342,20 +342,38 @@ async def supabase_delete_object(bucket: str, key: str) -> bool:
         return r.status_code in (200, 204)
 
 async def generate_video_from_manim(manim_code: str, job_id: str) -> Optional[str]:
-    """Generate video from Manim code"""
+    """Generate video from Manim code - IMPROVED VERSION"""
     try:
+        logger.info(f"Starting video generation for job {job_id}")
+        
+        # Validate input code
+        if not manim_code or not isinstance(manim_code, str):
+            logger.error("Invalid Manim code provided")
+            return None
+        
+        # Check for dangerous patterns
+        dangerous_patterns = ['eval(', '__import__(', 'exec(', 'open(', 'file(']
+        for pattern in dangerous_patterns:
+            if pattern in manim_code:
+                logger.error(f"Dangerous pattern found in Manim code: {pattern}")
+                return None
+        
         # Create temporary directory for Manim execution
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
+            logger.info(f"Created temp directory: {temp_path}")
             
             # Create Manim scene file
             scene_file = temp_path / "animation_scene.py"
-            scene_file.write_text(manim_code)
+            scene_file.write_text(manim_code, encoding='utf-8')
+            logger.info(f"Created scene file: {scene_file}")
             
             # Run Manim command in headless mode - FIXED 2025-08-21 for v0.19.0
             cmd = [
                 "manim", "render", "-ql", str(scene_file), "GeneratedScene"
             ]
+            
+            logger.info(f"Running Manim command: {' '.join(cmd)}")
             
             result = subprocess.run(
                 cmd, 
@@ -365,8 +383,30 @@ async def generate_video_from_manim(manim_code: str, job_id: str) -> Optional[st
                 timeout=300  # 5 minutes timeout
             )
             
+            logger.info(f"Manim process completed with return code: {result.returncode}")
+            
             if result.returncode != 0:
-                logger.error(f"Manim execution failed: {result.stderr}")
+                logger.error(f"Manim execution failed with return code {result.returncode}")
+                logger.error(f"Manim stdout: {result.stdout}")
+                logger.error(f"Manim stderr: {result.stderr}")
+                
+                # Try to identify specific errors
+                error_output = result.stderr or result.stdout or ""
+                if "ImportError" in error_output:
+                    logger.error("Import error detected - missing dependencies")
+                elif "SyntaxError" in error_output:
+                    logger.error("Syntax error detected - invalid Python code")
+                elif "AttributeError" in error_output:
+                    logger.error("Attribute error detected - invalid object usage")
+                elif "NameError" in error_output:
+                    logger.error("Name error detected - undefined variables")
+                elif "TypeError" in error_output:
+                    logger.error("Type error detected - invalid parameter types")
+                elif "ValueError" in error_output:
+                    logger.error("Value error detected - invalid parameter values")
+                else:
+                    logger.error("Unknown Manim execution error")
+                
                 return None
             
             # Add small delay to ensure file is fully written
@@ -377,6 +417,10 @@ async def generate_video_from_manim(manim_code: str, job_id: str) -> Optional[st
             media_dir = temp_path / "media"
             logger.info(f"Searching for video files in: {media_dir}")
             
+            if not media_dir.exists():
+                logger.error(f"Media directory does not exist: {media_dir}")
+                return None
+            
             # Search recursively for MP4 files
             video_files = list(media_dir.rglob("*.mp4"))
             logger.info(f"Found {len(video_files)} video files: {[str(f) for f in video_files]}")
@@ -386,11 +430,34 @@ async def generate_video_from_manim(manim_code: str, job_id: str) -> Optional[st
                 # List all files in media directory for debugging
                 all_files = list(media_dir.rglob("*"))
                 logger.error(f"All files in media directory: {[str(f) for f in all_files]}")
+                
+                # Check if there are any error files
+                error_files = list(media_dir.rglob("*.log"))
+                if error_files:
+                    for error_file in error_files:
+                        try:
+                            error_content = error_file.read_text(encoding='utf-8')
+                            logger.error(f"Error log content from {error_file}: {error_content}")
+                        except Exception as e:
+                            logger.error(f"Could not read error log {error_file}: {e}")
+                
                 return None
             
             # Return path to the first video file
             video_path = str(video_files[0])
             logger.info(f"Selected video file: {video_path}")
+            
+            # Verify video file is valid
+            if not Path(video_path).exists():
+                logger.error(f"Selected video file does not exist: {video_path}")
+                return None
+            
+            file_size = Path(video_path).stat().st_size
+            if file_size == 0:
+                logger.error(f"Video file is empty: {video_path}")
+                return None
+            
+            logger.info(f"Video file size: {file_size} bytes")
             
             # Persist video to a stable temp path so it's available after context exits
             stable_path = Path("/tmp") / f"animathic_{job_id}.mp4"
@@ -402,8 +469,19 @@ async def generate_video_from_manim(manim_code: str, job_id: str) -> Optional[st
                 logger.warning(f"Failed to copy video to stable path, returning original: {copy_err}")
                 return video_path
             
+    except subprocess.TimeoutExpired:
+        logger.error(f"Manim execution timed out after 5 minutes for job {job_id}")
+        return None
+    except FileNotFoundError:
+        logger.error("Manim command not found - Manim may not be installed")
+        return None
+    except PermissionError:
+        logger.error("Permission denied when running Manim command")
+        return None
     except Exception as e:
-        logger.error(f"Error generating video from Manim: {e}")
+        logger.error(f"Unexpected error generating video from Manim: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return None
 
 async def upload_video_to_supabase(video_path: str, job_id: str, user_id: str, prompt: str = "") -> Optional[Dict[str, str]]:
