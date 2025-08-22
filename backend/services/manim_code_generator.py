@@ -281,7 +281,8 @@ class GeneratedScene(MovingCameraScene):
                 
                 circle_obj = Circle(
                     radius=size,
-                    color=color,
+                    fill_color=color,
+                    stroke_color=color,
                     fill_opacity=0.8,
                     stroke_width=2
                 )
@@ -345,7 +346,8 @@ class GeneratedScene(MovingCameraScene):
                 
                 square_obj = Square(
                     side_length=size,
-                    color=color,
+                    fill_color=color,
+                    stroke_color=color,
                     fill_opacity=0.8,
                     stroke_width=2
                 )
