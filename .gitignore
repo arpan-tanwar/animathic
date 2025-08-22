@@ -1,0 +1,26 @@
+# Node/React
+node_modules/
+.next/
+dist/
+.build/
+.vercel
+
+# Python/venv
+backend/venv/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Build artifacts
+backend/media/
+backend/*.db
+backend/*.sqlite
+
+# Env
+backend/.env
+.env

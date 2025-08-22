@@ -1,3 +1,0 @@
-# This file is used internally by FFMPEG.
-file 'file:/Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0000266e_attempt_0/720p30/partial_movie_files/GeneratedScene/uncached_00000.mp4'
-file 'file:/Users/arpan/Desktop/Coding/Projects/Animathic/backend/media/videos/manim_scene_0000266e_attempt_0/720p30/partial_movie_files/GeneratedScene/uncached_00001.mp4'

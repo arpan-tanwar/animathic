@@ -1,0 +1,13 @@
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_IMAGE}"
+      - "-f"
+      - "backend/Dockerfile"
+      - "backend"
+images:
+  - "${_IMAGE}"
+substitutions:
+  _IMAGE: "gcr.io/animathic-backend/animathic-backend:latest"

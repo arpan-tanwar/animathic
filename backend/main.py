@@ -1,771 +1,1480 @@
 """
-Animathic - Consolidated AI Manim Generator API
+Animathic - Complete AI Animation Generator API
 
-This is the unified, optimized backend combining all best features:
-- Enhanced security with input validation and rate limiting
-- Performance monitoring and resource management  
-- Memory leak prevention and automated cleanup
-- Comprehensive error handling and logging
-- Database integration with user tracking
-- Health monitoring and metrics endpoints
+Complete workflow:
+1. User provides prompt
+2. Gemini 2.5 Flash generates structured JSON
+3. JSON converts to Manim Python code
+4. Code is compiled and provided to user
+5. User feedback collected for fine-tuning
 """
 
 import os
+import json
 import time
 import logging
-import traceback
-import asyncio
-from datetime import datetime
-from typing import Optional, Dict, Any
-from collections import defaultdict, deque
-from pathlib import Path
+import tempfile
+import subprocess
 import uuid
+import shutil
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Header, Request, Depends
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request, Depends, Header, Query
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, validator
-from dotenv import load_dotenv
-import psutil
+# SQLAlchemy removed in favor of Supabase client
+# Removed SQLAlchemy usage; using Supabase client instead
+import asyncio
+from datetime import datetime as _dt, timezone
+from slugify import slugify
+import httpx
+from urllib.parse import urlparse
 
-# Load environment variables FIRST - before any imports that need them
+from services.supabase_db import supabase_db
+# Legacy ORM models not used; database operations now use Supabase client
+from schemas import (
+    GenerateRequest, GenerateResponse, StatusResponse, 
+    VideoResponse, FeedbackRequest, HealthResponse
+)
+from services.ai_service_new import AIService
+from services.clerk_auth import require_authentication, optional_authentication
+from services.supabase_storage import supabase_storage
+
+# Load environment variables
+from dotenv import load_dotenv
 load_dotenv()
 
-# Import configuration
-from config import get_config, get_api_config, get_feature_flags, is_production, get_log_level
-
-# Configure logging first
-log_level = get_log_level()
-logging.basicConfig(
-    level=getattr(logging, log_level.upper()),
-    format='%(asctime)s - %(name)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()  # Cloud Run handles file logging
-    ]
-)
+# Get logger first
 logger = logging.getLogger(__name__)
 
-# Import services
+# Production logging configuration
 try:
-    from services.manim import get_manim_service, generate_video_from_prompt
-    from services.storage import StorageService
-    enhanced_features = True
-    logger.info("✅ Using optimized Manim service")
-except ImportError as e:
-    logger.error(f"❌ Failed to import services: {e}")
-    enhanced_features = False
-
-# Try to initialize database if available
-try:
-    from models.database import init_database
-    init_database()
-    logger.info("✅ Enhanced database features enabled")
+    from production_config import LOG_LEVEL, LOG_FORMAT, LOG_FILE
+    log_level = getattr(logging, LOG_LEVEL.upper(), logging.INFO)
+    
+    # Configure logging with file handler for production
+    handlers = [logging.StreamHandler()]  # Always log to console
+    
+    # Add file handler if LOG_FILE is specified and writable
+    if LOG_FILE and LOG_FILE != "-":
+        try:
+            # Create directory if it doesn't exist
+            log_dir = os.path.dirname(LOG_FILE)
+            if log_dir:
+                os.makedirs(log_dir, exist_ok=True)
+            handlers.append(logging.FileHandler(LOG_FILE))
+        except Exception as e:
+            logger.warning(f"Could not create log file {LOG_FILE}: {e}")
+    
+    logging.basicConfig(
+        level=log_level,
+        format=LOG_FORMAT,
+        handlers=handlers
+    )
 except ImportError:
-    logger.info("📝 Using basic storage (enhanced database not available)")
-except Exception as e:
-    logger.warning(f"📝 Database initialization skipped: {e}")
-
-
-
-# Environment variables already loaded above
-
-class RateLimiter:
-    """Rate limiting for API endpoints"""
-    
-    def __init__(self, max_requests: int = 10, window_minutes: int = 1):
-        self.max_requests = max_requests
-        self.window_seconds = window_minutes * 60
-        self.requests = defaultdict(deque)
-    
-    def is_allowed(self, client_id: str) -> bool:
-        """Check if request is allowed for client"""
-        now = time.time()
-        window_start = now - self.window_seconds
-        
-        # Clean old requests
-        client_requests = self.requests[client_id]
-        while client_requests and client_requests[0] < window_start:
-            client_requests.popleft()
-        
-        # Check if under limit
-        if len(client_requests) < self.max_requests:
-            client_requests.append(now)
-            return True
-        
-        return False
-
-class PerformanceMonitor:
-    """Monitor application performance and resource usage"""
-    
-    def __init__(self):
-        self.request_times = deque(maxlen=1000)
-        self.error_count = 0
-        self.total_requests = 0
-    
-    def log_request(self, duration: float, success: bool = True):
-        """Log request performance"""
-        self.request_times.append(duration)
-        self.total_requests += 1
-        if not success:
-            self.error_count += 1
-    
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get performance metrics"""
-        if not self.request_times:
-            return {"status": "no_data"}
-        
-        avg_time = sum(self.request_times) / len(self.request_times)
-        memory_usage = psutil.Process().memory_info().rss / 1024 / 1024  # MB
-        cpu_percent = psutil.cpu_percent()
-        
-        return {
-            "avg_response_time": round(avg_time, 3),
-            "total_requests": self.total_requests,
-            "error_rate": round(self.error_count / self.total_requests * 100, 2) if self.total_requests > 0 else 0,
-            "memory_usage_mb": round(memory_usage, 2),
-            "cpu_percent": cpu_percent,
-            "active_requests": len(self.request_times),
-            "enhanced_features": enhanced_features
-        }
-
-# Initialize services
-rate_limiter = RateLimiter(max_requests=5, window_minutes=1)
-performance_monitor = PerformanceMonitor()
-
-# In-memory video storage for status tracking
-video_storage = {}
-
-# Initialize configuration
-config = get_config()
-
-# Create FastAPI app
-app = FastAPI(
-    title=config["base"]["app_name"],
-    description="AI-Powered Mathematical Animation Generator",
-    version=config["base"]["version"],
-    docs_url="/docs" if not is_production() else None,
-    redoc_url="/redoc"
+    # Fallback to basic logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# Security headers middleware
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    """Add security headers and performance monitoring"""
-    start_time = time.time()
-    
-    try:
-        response = await call_next(request)
-        
-        # Add security headers
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        
-        # Log performance
-        duration = time.time() - start_time
-        performance_monitor.log_request(duration, response.status_code < 400)
-        
-        return response
-        
-    except Exception as e:
-        duration = time.time() - start_time
-        performance_monitor.log_request(duration, False)
-        logger.error(f"Request failed: {e}")
-        raise
+# Initialize FastAPI app
+app = FastAPI(
+    title="Animathic API",
+    description="AI-powered animation generation using Gemini and Manim",
+    version="1.0.0"
+)
 
-# CORS configuration
+# Production configuration
+try:
+    from production_config import ALLOWED_ORIGINS, DEBUG
+except ImportError:
+    ALLOWED_ORIGINS = ["*"]
+    DEBUG = False
+
+# CORS middleware with production settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config["api"]["cors_origins"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "user-id", "User-Id"],
-    max_age=600,
+    allow_headers=["*"],
 )
 
-# Mount static files
-app.mount("/media", StaticFiles(directory="media"), name="media")
+# Global variables for lazy initialization
+_database_initialized = False
+_ai_service = None
 
-# Initialize services with error handling
-try:
-    if enhanced_features:
-        storage_service = StorageService()
-        logger.info("✅ Supabase storage service initialized successfully")
-    else:
-        storage_service = None
-        logger.info("📝 Enhanced features disabled, using basic storage")
-except Exception as e:
-    logger.warning(f"⚠️ Supabase storage service failed to initialize: {e}")
-    logger.info("📝 Falling back to local storage only")
-    storage_service = None
-
-logger.info("✅ All services initialized successfully")
-
-# Pydantic models with validation
-class GenerateRequest(BaseModel):
-    prompt: str
-    user_id: Optional[str] = None
-    
-    @validator('prompt')
-    def validate_prompt(cls, v):
-        if not v or len(v.strip()) < 5:
-            raise ValueError('Prompt must be at least 5 characters long')
-        if len(v) > 500:
-            raise ValueError('Prompt must be less than 500 characters')
-        
-        # Basic sanitization
-        dangerous_chars = ['<', '>', '"', "'", '&', 'script', 'exec', 'eval']
-        v_lower = v.lower()
-        for char in dangerous_chars:
-            if char in v_lower:
-                raise ValueError(f'Prompt contains potentially dangerous content: {char}')
-        
-        return v.strip()
-
-class VideoResponse(BaseModel):
-    id: str
-    video_url: str
-    metadata: Dict[str, Any]
-    status: str = "completed"
-    generation_time: Optional[float] = None
-
-class StatusResponse(BaseModel):
-    status: str
-    video_url: Optional[str] = None
-    error: Optional[str] = None
-
-class HealthResponse(BaseModel):
-    status: str
-    timestamp: str
-    version: str
-    performance: Dict[str, Any]
-
-# Rate limiting dependency
-async def check_rate_limit(request: Request):
-    """Check rate limit for request"""
-    client_ip = request.client.host
-    user_agent = request.headers.get("user-agent", "unknown")
-    client_id = f"{client_ip}:{user_agent}"
-    
-    if not rate_limiter.is_allowed(client_id):
-        raise HTTPException(
-            status_code=429,
-            detail="Rate limit exceeded. Please wait before making more requests."
-        )
-
-# Authentication dependency
-async def verify_user(user_id: Optional[str] = Header(None)):
-    """Verify user authentication"""
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Missing user_id header")
-    return user_id
-
-# API Routes
-@app.post("/api/generate", response_model=VideoResponse, dependencies=[Depends(check_rate_limit)])
-async def generate_video(
-    request: GenerateRequest,
-    user_id: str = Depends(verify_user)
-):
-    """Generate a video with enhanced security and performance monitoring"""
-    start_time = time.time()
+def initialize_database_lazy():
+    """Initialize Supabase database service only when needed"""
+    global _database_initialized
+    if _database_initialized:
+        return
     
     try:
-        logger.info(f"Generating video for user {user_id}: {request.prompt}")
-        
-        # Generate video using new optimized service
-        if enhanced_features:
-            result = await generate_video_from_prompt(
-                prompt=request.prompt,
-                media_dir="./media"
-            )
-            
-            generation_time = time.time() - start_time
-            
-            if result.success:
-                try:
-                    # Upload video to Supabase storage
-                    if storage_service and result.video_path:
-                        logger.info(f"Uploading video to Supabase: {result.video_path}")
-                        
-                        # Prepare metadata for Supabase
-                        upload_metadata = {
-                            "duration": result.duration,
-                            "resolution": result.resolution,
-                            "generation_time": round(generation_time, 2),
-                            "code_used": result.code_used[:500] if result.code_used else None
-                        }
-                        
-                        # Upload to Supabase
-                        upload_result = await storage_service.upload_video(
-                            user_id=user_id,
-                            prompt=request.prompt,
-                            video_path=result.video_path,
-                            metadata=upload_metadata
-                        )
-                        
-                        video_id = upload_result["metadata"]["id"]
-                        video_url = upload_result["video_url"]
-                        
-                        logger.info(f"Video uploaded successfully. ID: {video_id}")
-                        
-                        # Clean up local file after successful upload
-                        try:
-                            if os.path.exists(result.video_path):
-                                os.remove(result.video_path)
-                                logger.info(f"Cleaned up local file: {result.video_path}")
-                        except Exception as cleanup_error:
-                            logger.warning(f"Failed to cleanup local file: {cleanup_error}")
-                        
-                        return VideoResponse(
-                            id=video_id,
-                            video_url=video_url,
-                            metadata={
-                                "duration": result.duration,
-                                "resolution": result.resolution,
-                                "prompt": request.prompt,
-                                "generation_time": round(generation_time, 2),
-                                "code_used": result.code_used[:500] if result.code_used else None
-                            },
-                            status="completed",
-                            generation_time=round(generation_time, 2)
-                        )
-                    else:
-                        # Fallback to local storage if Supabase unavailable
-                        logger.warning("Supabase storage not available, using local storage")
-                        
-                        video_url = None
-                        if result.video_path:
-                            relative_path = os.path.relpath(result.video_path, "./media")
-                            video_url = f"/media/{relative_path}"
-                        
-                        # Generate video ID and store metadata in memory
-                        video_id = str(uuid.uuid4())
-                        video_metadata = {
-                            "id": video_id,
-                            "user_id": user_id,
-                            "video_url": video_url,
-                            "video_path": result.video_path,
-                            "status": "completed",
-                            "prompt": request.prompt,
-                            "duration": result.duration,
-                            "resolution": result.resolution,
-                            "generation_time": round(generation_time, 2),
-                            "code_used": result.code_used[:500] if result.code_used else None,
-                            "created_at": datetime.now().isoformat()
-                        }
-                        
-                        # Store in memory for status checking
-                        video_storage[video_id] = video_metadata
-                        
-                        return VideoResponse(
-                            id=video_id,
-                            video_url=video_url,
-                            metadata={
-                                "duration": result.duration,
-                                "resolution": result.resolution,
-                                "prompt": request.prompt,
-                                "generation_time": round(generation_time, 2),
-                                "code_used": result.code_used[:500] if result.code_used else None
-                            },
-                            status="completed",
-                            generation_time=round(generation_time, 2)
-                        )
-                        
-                except Exception as upload_error:
-                    logger.error(f"Failed to upload video to Supabase: {upload_error}")
-                    # Fallback to local storage
-                    video_url = None
-                    if result.video_path:
-                        relative_path = os.path.relpath(result.video_path, "./media")
-                        video_url = f"/media/{relative_path}"
-                    
-                    # Generate video ID and store metadata in memory
-                    video_id = str(uuid.uuid4())
-                    video_metadata = {
-                        "id": video_id,
-                        "user_id": user_id,
-                        "video_url": video_url,
-                        "video_path": result.video_path,
-                        "status": "completed",
-                        "prompt": request.prompt,
-                        "duration": result.duration,
-                        "resolution": result.resolution,
-                        "generation_time": round(generation_time, 2),
-                        "code_used": result.code_used[:500] if result.code_used else None,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    
-                    # Store in memory for status checking
-                    video_storage[video_id] = video_metadata
-                    
-                    return VideoResponse(
-                        id=video_id,
-                        video_url=video_url,
-                        metadata={
-                            "duration": result.duration,
-                            "resolution": result.resolution,
-                            "prompt": request.prompt,
-                            "generation_time": round(generation_time, 2),
-                            "code_used": result.code_used[:500] if result.code_used else None,
-                            "upload_error": "Failed to upload to cloud storage, using local storage"
-                        },
-                        status="completed",
-                        generation_time=round(generation_time, 2)
-                    )
-            else:
-                # Handle different error types with appropriate status codes
-                if "API key not found" in result.error or "GOOGLE_AI_API_KEY" in result.error:
-                    raise HTTPException(
-                        status_code=503, 
-                        detail="Video generation service unavailable: Google AI API key not configured"
-                    )
-                elif "initialization failed" in result.error or "network connection" in result.error:
-                    raise HTTPException(
-                        status_code=503,
-                        detail="Video generation service temporarily unavailable"
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=422, 
-                        detail=f"Video generation failed: {result.error}"
-                    )
+        # Test Supabase database connection
+        if supabase_db.enabled:
+            logger.info("Supabase database service is available and ready")
         else:
-            raise HTTPException(status_code=503, detail="Video generation service not available")
+            logger.warning("Supabase database service not available - some features may not work")
         
-    except HTTPException:
-        raise
+        _database_initialized = True
+        
     except Exception as e:
-        logger.error(f"Video generation failed: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Video generation failed: {str(e)}")
+        logger.error(f"Supabase database service initialization failed: {e}")
+        logger.warning("Continuing without database - some features may not work")
 
-@app.get("/api/status/{video_id}", response_model=StatusResponse)
-async def get_video_status(video_id: str, user_id: str = Depends(verify_user)):
-    """Get video generation status"""
+# Check if Supabase database service is available at startup
+DATABASE_AVAILABLE_AT_STARTUP = supabase_db.enabled
+if not DATABASE_AVAILABLE_AT_STARTUP:
+    logger.warning("Supabase database service not available at startup - some endpoints may not work")
+else:
+    logger.info("Supabase database service is available and ready")
+
+def is_database_available() -> bool:
+    """Check if Supabase database service is available at runtime"""
     try:
-        if not video_id or video_id == "undefined":
-            raise HTTPException(status_code=400, detail="Invalid video ID")
+        # Initialize database service if not already done
+        initialize_database_lazy()
+        return supabase_db.enabled
+    except Exception:
+        return False
+
+# Ensure generation_jobs table exists (for cross-instance job status)
+async def _ensure_generation_jobs_table() -> None:
+    """Ensure generation_jobs table exists - called only when needed"""
+    try:
+        # Initialize database service if not already done
+        initialize_database_lazy()
         
-        # Check in-memory storage first
-        if video_id in video_storage:
-            video = video_storage[video_id]
-            # Verify user owns this video
-            if video["user_id"] != user_id:
-                raise HTTPException(status_code=403, detail="Access denied")
+        if not supabase_db.enabled:
+            logger.warning("Cannot ensure generation_jobs table - Supabase database service not available")
+            return
             
-            return StatusResponse(
-                status=video["status"],
-                video_url=video["video_url"],
-                error=None
-            )
+        # Test if we can access the table
+        await supabase_db.ensure_tables_exist()
+        logger.info("Generation jobs table is accessible")
         
-        # Fallback to storage service if available
-        if storage_service:
-            try:
-                video = await storage_service.get_video(user_id, video_id)
-                return StatusResponse(
-                    status="completed",
-                    video_url=video["video_url"],
-                    error=None
-                )
-            except Exception:
-                pass  # Continue to 404
-        
-        raise HTTPException(status_code=404, detail="Video not found")
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Failed to get video status: {e}")
-        raise HTTPException(status_code=404, detail="Video not found")
+        logger.error(f"Failed to ensure generation_jobs table: {e}")
+        logger.warning("Continuing without table creation - some features may not work")
 
-@app.get("/api/videos/{video_id}", response_model=VideoResponse)
-async def get_video(video_id: str, user_id: str = Depends(verify_user)):
-    """Get specific video by ID"""
-    try:
-        # Check in-memory storage first
-        if video_id in video_storage:
-            video = video_storage[video_id]
-            # Verify user owns this video
-            if video["user_id"] != user_id:
-                raise HTTPException(status_code=403, detail="Access denied")
-            
-            return VideoResponse(
-                id=video_id,
-                video_url=video["video_url"],
-                metadata={
-                    "duration": video["duration"],
-                    "resolution": video["resolution"],
-                    "prompt": video["prompt"],
-                    "generation_time": video["generation_time"],
-                    "code_used": video["code_used"]
-                },
-                status=video["status"],
-                generation_time=video["generation_time"]
-            )
+# In-memory storage for generation jobs (in production, use Redis or database)
+generation_jobs = {}
+
+def get_ai_service():
+    """Get or create the AI service instance"""
+    global _ai_service
+    if _ai_service is None:
+        api_key = os.getenv("GOOGLE_AI_API_KEY")
+        if not api_key:
+            logger.error("GOOGLE_AI_API_KEY is not set")
+            raise RuntimeError("GOOGLE_AI_API_KEY is not set")
+        try:
+            _ai_service = AIService(api_key=api_key)
+            logger.info("AI service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize AI service: {e}")
+            raise
+    return _ai_service
+
+# Supabase public URL base (for public buckets)
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://cclnoqiorysuciutdera.supabase.co").rstrip("/")
+SUPABASE_PUBLIC_BASE = f"{SUPABASE_URL}/storage/v1/object/public"
+NEW_BUCKET = os.getenv("SUPABASE_NEW_BUCKET", "animathic-media")
+OLD_BUCKET = os.getenv("SUPABASE_OLD_BUCKET", "manim-videos")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+
+# Check if required environment variables are set
+def check_environment():
+    """Check if required environment variables are set"""
+    required_vars = {
+        "GOOGLE_AI_API_KEY": "Required for AI animation generation",
+        "SUPABASE_URL": "Required for database and storage operations",
+        "SUPABASE_SERVICE_KEY": "Required for database and storage operations",
+    }
+    
+    missing_vars = []
+    for var, description in required_vars.items():
+        if not os.getenv(var):
+            missing_vars.append(f"{var}: {description}")
+    
+    if missing_vars:
+        logger.warning("Missing environment variables:")
+        for var in missing_vars:
+            logger.warning(f"  - {var}")
+        logger.warning("Some features may not work properly")
+    else:
+        logger.info("All required environment variables are set")
+
+# Check environment on startup
+check_environment()
+
+
+async def resolve_public_video_url(file_path: str) -> Optional[str]:
+    """Return a working URL for the given file_path, trying new bucket then old.
+    Uses authenticated storage endpoint since buckets are private.
+    """
+    if not file_path:
+        return None
+    if not SUPABASE_SERVICE_KEY:
+        logger.warning("SUPABASE_SERVICE_KEY missing; cannot check storage")
+        return None
         
-        # Fallback to storage service if available
-        if storage_service:
+    path = file_path.lstrip("/")
+    candidates = [
+        f"{SUPABASE_URL}/storage/v1/object/{NEW_BUCKET}/{path}",
+        f"{SUPABASE_URL}/storage/v1/object/{OLD_BUCKET}/{path}",
+    ]
+    timeout = httpx.Timeout(2.0, connect=2.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for url in candidates:
             try:
-                video = await storage_service.get_video(user_id, video_id)
-                return VideoResponse(
-                    id=video_id,
-                    video_url=video["video_url"],
-                    metadata=video["metadata"],
-                    status="completed"
-                )
-            except Exception:
-                pass  # Continue to 404
-        
-        raise HTTPException(status_code=404, detail="Video not found")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get video: {e}")
-        raise HTTPException(status_code=404, detail="Video not found")
-
-@app.get("/api/service-status")
-async def service_status():
-    """Check service status and configuration"""
-    try:
-        # Check if AI service is available
-        from services.manim import get_manim_service
-        service = get_manim_service()
-        
-        ai_available = service.model is not None
-        api_key_configured = bool(os.getenv('GOOGLE_AI_API_KEY'))
-        
-        return {
-            "status": "healthy" if ai_available else "degraded",
-            "ai_service": {
-                "available": ai_available,
-                "api_key_configured": api_key_configured,
-                "message": "AI video generation ready" if ai_available else "API key required for AI features"
-            },
-            "storage_service": {
-                "available": storage_service is not None,
-                "message": "Storage service ready" if storage_service else "Storage service unavailable"
-            }
-        }
-    except Exception as e:
-        logger.error(f"Service status check failed: {e}")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
-@app.get("/api/videos")
-async def list_videos(user_id: str = Depends(verify_user)):
-    """List all videos for authenticated user"""
-    try:
-        # First check in-memory storage
-        user_videos = []
-        for video_id, video_data in video_storage.items():
-            if video_data["user_id"] == user_id:
-                user_videos.append({
-                    "id": video_id,
-                    "video_url": video_data["video_url"],
-                    "prompt": video_data["prompt"],
-                    "created_at": video_data["created_at"],
-                    "status": video_data["status"],
-                    "duration": video_data.get("duration"),
-                    "resolution": video_data.get("resolution")
-                })
-        
-        # If we have in-memory videos, return them
-        if user_videos:
-            return user_videos
-        
-        # Fallback to storage service if available and no videos in memory
-        if storage_service:
-            try:
-                videos = await storage_service.list_user_videos(user_id)
-                # Transform videos for frontend
-                transformed_videos = []
-                for video in videos:
-                    try:
-                        # Generate fresh signed URL
-                        signed_url_response = storage_service.supabase.storage.from_(
-                            storage_service.bucket_name
-                        ).create_signed_url(video["file_path"], 3600)
-                        
-                        signed_url = signed_url_response.get('signedURL', '')
-                        if signed_url:
-                            transformed_videos.append({
-                                "id": video["id"],
-                                "video_url": signed_url,
-                                "prompt": video["prompt"],
-                                "created_at": video["created_at"],
-                                "status": video.get("status", "completed")
-                            })
-                    except Exception as e:
-                        logger.error(f"Error processing video {video.get('id')}: {e}")
-                        continue
-                return transformed_videos
+                headers = {
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                    "apikey": SUPABASE_SERVICE_KEY,
+                }
+                r = await client.head(url, headers=headers)
+                if r.status_code == 200:
+                    # Return the authenticated URL that can be used for streaming
+                    return url
             except Exception as e:
-                logger.error(f"Storage service error: {e}")
-        
-        # Return empty list if no videos found
-        return []
-        
-    except Exception as e:
-        logger.error(f"Failed to list videos: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve videos")
+                logger.debug(f"Failed to check {url}: {e}")
+                continue
+    return None
 
-@app.delete("/api/videos/{video_id}")
-async def delete_video(video_id: str, user_id: str = Depends(verify_user)):
-    """Delete video with proper authorization"""
+
+def build_https_base_url(request: Request) -> str:
+    """Build a public https base URL using proxy headers.
+    Ensures we never return http URLs to the browser (avoid mixed content).
+    """
     try:
-        success = await storage_service.delete_video(user_id, video_id)
-        if not success:
-            raise HTTPException(status_code=500, detail="Failed to delete video")
-        
-        return {"status": "success", "message": "Video deleted successfully"}
-        
+        xf_proto = request.headers.get("x-forwarded-proto") or request.headers.get("X-Forwarded-Proto")
+        xf_host = request.headers.get("x-forwarded-host") or request.headers.get("X-Forwarded-Host")
+        host = xf_host or request.headers.get("host") or urlparse(str(request.base_url)).netloc
+        scheme = "https"
+        return f"{scheme}://{host}"
+    except Exception:
+        # Fallback to request.base_url but force https scheme
+        parsed = urlparse(str(request.base_url))
+        netloc = parsed.netloc or ""
+        return f"https://{netloc}"
+
+
+async def supabase_copy_object(source_bucket: str, source_key: str, dest_bucket: str, dest_key: str) -> bool:
+    """Use Supabase Storage copy API to duplicate an object."""
+    if not SUPABASE_SERVICE_KEY:
+        return False
+    url = f"{SUPABASE_URL}/storage/v1/object/copy"
+    payload = {
+        "bucketId": source_bucket,
+        "sourceKey": source_key,
+        "destinationBucket": dest_bucket,
+        "destinationKey": dest_key,
+        "upsert": True,
+    }
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_SERVICE_KEY,
+    }
+    timeout = httpx.Timeout(10.0, connect=5.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.post(url, json=payload, headers=headers)
+        return r.status_code in (200, 201)
+
+
+async def ensure_placeholder_uploaded(db, dest_path: str) -> bool:
+    """Ensure there is a file at dest_path in NEW_BUCKET by copying an existing video as placeholder."""
+    try:
+        # Find a recent existing file_path to clone
+        row = None
+        if not row:
+            return False
+        source_key = (getattr(row, "file_path", None) or row[0]).lstrip("/")
+
+        # Detect which bucket has the source
+        # Try new bucket URL
+        source_new = f"{SUPABASE_PUBLIC_BASE}/{NEW_BUCKET}/{source_key}"
+        source_old = f"{SUPABASE_PUBLIC_BASE}/{OLD_BUCKET}/{source_key}"
+        timeout = httpx.Timeout(3.0, connect=2.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            src_bucket = None
+            try:
+                h = await client.head(source_new)
+                if h.status_code == 200:
+                    src_bucket = NEW_BUCKET
+            except Exception:
+                pass
+            if not src_bucket:
+                try:
+                    h2 = await client.head(source_old)
+                    if h2.status_code == 200:
+                        src_bucket = OLD_BUCKET
+                except Exception:
+                    pass
+        if not src_bucket:
+            return False
+
+        # Copy to destination in NEW_BUCKET
+        ok = await supabase_copy_object(src_bucket, source_key, NEW_BUCKET, dest_path)
+        return ok
     except Exception as e:
-        logger.error(f"Failed to delete video: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete video")
+        logger.error(f"ensure_placeholder_uploaded error: {e}")
+        return False
+
+
+async def supabase_delete_object(bucket: str, key: str) -> bool:
+    """Delete an object from Supabase Storage."""
+    if not SUPABASE_SERVICE_KEY:
+        return False
+    url = f"{SUPABASE_URL}/storage/v1/object/{bucket}/{key}"
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+        "apikey": SUPABASE_SERVICE_KEY,
+    }
+    timeout = httpx.Timeout(10.0, connect=5.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.delete(url, headers=headers)
+        return r.status_code in (200, 204)
+
+async def generate_video_from_manim(manim_code: str, job_id: str) -> Optional[str]:
+    """Generate video from Manim code"""
+    try:
+        # Create temporary directory for Manim execution
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            # Create Manim scene file
+            scene_file = temp_path / "animation_scene.py"
+            scene_file.write_text(manim_code)
+            
+            # Run Manim command in headless mode - FIXED 2025-08-21 for v0.19.0
+            cmd = [
+                "manim", "render", "-ql", str(scene_file), "GeneratedScene"
+            ]
+            
+            result = subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                cwd=temp_path,
+                timeout=300  # 5 minutes timeout
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"Manim execution failed: {result.stderr}")
+                return None
+            
+            # Add small delay to ensure file is fully written
+            import time
+            time.sleep(1)
+            
+            # Find generated video file - handle Manim v0.19.0 output structure
+            media_dir = temp_path / "media"
+            logger.info(f"Searching for video files in: {media_dir}")
+            
+            # Search recursively for MP4 files
+            video_files = list(media_dir.rglob("*.mp4"))
+            logger.info(f"Found {len(video_files)} video files: {[str(f) for f in video_files]}")
+            
+            if not video_files:
+                logger.error("No video files generated by Manim")
+                # List all files in media directory for debugging
+                all_files = list(media_dir.rglob("*"))
+                logger.error(f"All files in media directory: {[str(f) for f in all_files]}")
+                return None
+            
+            # Return path to the first video file
+            video_path = str(video_files[0])
+            logger.info(f"Selected video file: {video_path}")
+            
+            # Persist video to a stable temp path so it's available after context exits
+            stable_path = Path("/tmp") / f"animathic_{job_id}.mp4"
+            try:
+                shutil.copy(video_path, stable_path)
+                logger.info(f"Copied video to stable path: {stable_path}")
+                return str(stable_path)
+            except Exception as copy_err:
+                logger.warning(f"Failed to copy video to stable path, returning original: {copy_err}")
+                return video_path
+            
+    except Exception as e:
+        logger.error(f"Error generating video from Manim: {e}")
+        return None
+
+async def upload_video_to_supabase(video_path: str, job_id: str, user_id: str, prompt: str = "") -> Optional[Dict[str, str]]:
+    """Upload video to Supabase storage.
+    Returns {"url": public_url_or_none, "object_key": path_in_bucket}
+    """
+    try:
+        logger.info(f"Uploading video {video_path} to Supabase for job {job_id}")
+        
+        # Use Supabase storage service
+        upload_result = await supabase_storage.upload_video(video_path, job_id, user_id, prompt)
+        
+        if upload_result:
+            # upload_result is a dict with url and object_key
+            logger.info(f"Video uploaded successfully: {upload_result}")
+            return upload_result
+        else:
+            logger.error("Failed to upload video to Supabase")
+            return None
+                    
+    except Exception as e:
+        logger.error(f"Error uploading video to Supabase: {e}")
+        return None
+
+@app.get("/", response_model=Dict[str, Any])
+async def root():
+    """Root endpoint with API information"""
+    return {
+        "message": "Animathic API - AI Animation Generator",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/api/health",
+            "generate": "/api/generate",
+            "status": "/api/status/{job_id}",
+            "videos": "/api/videos",
+            "feedback": "/api/feedback/{video_id}"
+        },
+        "workflow": [
+            "1. Send prompt to /api/generate",
+            "2. Poll /api/status/{job_id} for progress",
+            "3. Download generated video",
+            "4. Provide feedback for improvement"
+        ]
+    }
 
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
-    """Comprehensive health check with performance metrics"""
+    """Health check endpoint"""
     try:
-        # Test database connection
-        await storage_service.list_user_videos("health_check")
+        # Check Supabase database connection
+        if not supabase_db.enabled:
+            return HealthResponse(
+                status="unhealthy",
+                timestamp=datetime.now(timezone.utc),
+                version="1.0.0",
+                database="unavailable",
+                details="Supabase database service not configured"
+            )
+        
+        # Test database connection with timeout
+        try:
+            db_healthy = await supabase_db.test_connection()
+            if not db_healthy:
+                return HealthResponse(
+                    status="unhealthy",
+                    timestamp=datetime.now(timezone.utc),
+                    version="1.0.0",
+                    database="connection_error",
+                    details="Supabase database connection failed"
+                )
+        except Exception as db_error:
+            logger.warning(f"Database health check failed: {db_error}")
+            # Return unhealthy but don't crash the service
+            return HealthResponse(
+                status="unhealthy",
+                timestamp=datetime.now(timezone.utc),
+                version="1.0.0",
+                database="connection_error",
+                details=f"Database connection failed: {str(db_error)[:100]}"
+            )
+        
+        # Check storage connectivity
+        storage_status = "unknown"
+        try:
+            if SUPABASE_SERVICE_KEY:
+                # Test storage access
+                test_url = f"{SUPABASE_URL}/storage/v1/bucket/{NEW_BUCKET}"
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    response = await client.get(
+                        test_url,
+                        headers={"Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
+                    )
+                    if response.status_code == 200:
+                        storage_status = "accessible"
+                    else:
+                        storage_status = f"error_{response.status_code}"
+            else:
+                storage_status = "no_key"
+        except Exception as e:
+            storage_status = f"error_{str(e)[:50]}"
         
         return HealthResponse(
             status="healthy",
-            timestamp=datetime.utcnow().isoformat(),
-            version="3.0.0",
-            performance=performance_monitor.get_metrics()
+            timestamp=datetime.now(timezone.utc),
+            version="1.0.0",
+            database="supabase",
+            details=f"Storage: {storage_status}"
         )
-        
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return HealthResponse(
             status="unhealthy",
-            timestamp=datetime.utcnow().isoformat(),
-            version="3.0.0",
-            performance=performance_monitor.get_metrics()
-        )
+            timestamp=datetime.now(timezone.utc),
+            version="1.0.0",
+            database="error",
+            details=str(e)
+    )
 
-@app.get("/api/metrics")
-async def get_metrics():
-    """Get detailed performance metrics"""
-    return {
-        "performance": performance_monitor.get_metrics(),
-        "system": {
-            "memory_usage": psutil.virtual_memory()._asdict(),
-            "cpu_usage": psutil.cpu_percent(interval=1),
-            "disk_usage": psutil.disk_usage('/')._asdict()
-        },
-        "features": {
-            "enhanced_database": enhanced_features,
-            "rate_limiting": True,
-            "performance_monitoring": True,
-            "security_headers": True,
-            "automated_cleanup": True
-        },
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-@app.get("/")
-async def root():
-    """Root endpoint with API information"""
-    return {
-        "message": "Animathic - AI Mathematical Animation Generator",
-        "version": "3.0.0",
-        "status": "operational",
-        "features": {
-            "enhanced_database": enhanced_features,
-            "security": "enterprise-grade",
-            "performance": "optimized"
-        },
-        "endpoints": {
-            "docs": "/docs",
-            "health": "/api/health",
-            "metrics": "/api/metrics"
+@app.post("/api/generate")
+async def generate_animation(
+    request: GenerateRequest,
+    auth: Dict[str, Any] = Depends(require_authentication)
+):
+    """Generate animation based on prompt"""
+    try:
+        # Validate request
+        if not request.prompt or not request.prompt.strip():
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+        
+        # Use authenticated user ID
+        user_id = auth.get("user_id")
+        if not user_id or user_id == "anonymous":
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        logger.info(f"Starting animation generation for user {user_id} with prompt: {request.prompt[:100]}...")
+        
+        # Create job record
+        job_id = str(uuid.uuid4())
+        
+        # Store job in memory for immediate access
+        generation_jobs[job_id] = {
+            'id': job_id,
+            'user_id': user_id,
+            'prompt': request.prompt,
+            'status': 'processing',
+            'current_step': 1,
+            'total_steps': 4,
+            'created_at': datetime.now(timezone.utc),
+            'ai_response': None,
+            'manim_code': None
         }
-    }
-
-# Cleanup background task
-async def cleanup_task():
-    """Background task to clean up old files"""
-    while True:
-        try:
-            # Clean up old media files (simple cleanup)
-            media_dir = Path("./media")
-            if media_dir.exists():
-                # Remove files older than 24 hours
-                cutoff_time = time.time() - (24 * 3600)
-                for file_path in media_dir.glob("**/*"):
-                    if file_path.is_file() and file_path.stat().st_mtime < cutoff_time:
-                        try:
-                            file_path.unlink()
-                            logger.debug(f"Cleaned up old file: {file_path}")
-                        except Exception as e:
-                            logger.warning(f"Failed to remove old file {file_path}: {e}")
+        
+        # Try to insert job record in Supabase (optional)
+        if is_database_available() and getattr(supabase_db, "client", None):
+            try:
+                pass
+                # await _ensure_generation_jobs_table()
+                supabase_db.client.table("generation_jobs").insert({
+                    "id": job_id,
+                    "user_id": user_id,
+                    "prompt": request.prompt,
+                    "status": "processing",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "ai_response": None,
+                    "manim_code": None,
+                }).execute()
+                logger.info(f"Job {job_id} recorded in Supabase")
+            except Exception as db_error:
+                logger.warning(f"Failed to record job in Supabase: {db_error}")
+        else:
+            logger.info(f"Database not available - job {job_id} stored in memory only")
+        
+        # Process animation request asynchronously
+        asyncio.create_task(process_generation_job_async(job_id, request.prompt, user_id))
+        
+        # Return immediate response with job ID
+        return {
+            "id": job_id,
+            "status": "processing",
+            "message": "Animation generation started",
+            "current_step": 1,
+            "total_steps": 4
+        }
             
-            await asyncio.sleep(3600)  # Run every hour
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in generate endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+async def process_generation_job_async(job_id: str, prompt: str, user_id: str):
+    """Process animation generation asynchronously"""
+    try:
+        logger.info(f"Processing generation job {job_id}")
+        
+        # Update job status
+        generation_jobs[job_id]["status"] = "processing"
+        generation_jobs[job_id]["current_step"] = 1
+        
+        # Step 1: Generate animation specification using AI
+        try:
+            logger.info(f"Step 1: Generating animation spec for job {job_id}")
+            ai_service = get_ai_service()
+            result = await ai_service.process_animation_request(prompt)
+            
+            if 'error' in result:
+                raise Exception(f"AI generation failed: {result['error']}")
+            
+            # Extract results
+            animation_spec = result.get('animation_spec', {})
+            manim_code = result.get('manim_code', '')
+            
+            # Update job with AI response
+            generation_jobs[job_id]["current_step"] = 2
+            generation_jobs[job_id]["ai_response"] = animation_spec
+            generation_jobs[job_id]["manim_code"] = manim_code
+            
+            logger.info(f"Step 1 completed for job {job_id}")
+            
+        except Exception as ai_error:
+            logger.error(f"AI generation failed for job {job_id}: {ai_error}")
+            generation_jobs[job_id]["status"] = "failed"
+            generation_jobs[job_id]["error"] = str(ai_error)
+            return
+        
+        # Step 2: Generate video using Manim
+        try:
+            logger.info(f"Step 2: Generating video for job {job_id}")
+            video_path = await generate_video_from_manim(manim_code, job_id)
+            
+            if not video_path:
+                raise Exception("Failed to generate video from Manim code")
+            
+            generation_jobs[job_id]["current_step"] = 3
+            logger.info(f"Step 2 completed for job {job_id}")
+            
+        except Exception as manim_error:
+            logger.error(f"Manim generation failed for job {job_id}: {manim_error}")
+            generation_jobs[job_id]["status"] = "failed"
+            generation_jobs[job_id]["error"] = str(manim_error)
+            return
+        
+        # Step 3: Upload video to storage
+        try:
+            logger.info(f"Step 3: Uploading video for job {job_id}")
+            upload_result = await upload_video_to_supabase(video_path, job_id, user_id, prompt)
+            
+            if not upload_result:
+                raise Exception("Failed to upload video to storage")
+            
+            generation_jobs[job_id]["current_step"] = 4
+            generation_jobs[job_id]["file_path"] = upload_result.get("object_key")
+            # Immediately set a stream-by-path URL so frontend can play even if DB insert is delayed
+            try:
+                from urllib.parse import quote as _quote
+                key_q = _quote(str(generation_jobs[job_id]["file_path"]).lstrip("/"))
+                generation_jobs[job_id]["video_url"] = f"/api/stream?bucket={NEW_BUCKET}&key={key_q}"
+            except Exception:
+                pass
+
+            # Create video row in Supabase so it appears on the dashboard
+            try:
+                if supabase_db.enabled:
+                    import uuid as _uuid
+                    new_video_id = str(_uuid.uuid4())
+                    vid_payload = {
+                        "id": new_video_id,
+                        "user_id": user_id,
+                        "file_path": generation_jobs[job_id]["file_path"],
+                        "prompt": prompt,
+                        "status": "completed",
+                        "mime_type": "video/mp4",
+                        "generation_job_id": job_id,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    vid_id = await supabase_db.create_video(vid_payload)
+                    if not vid_id:
+                        logger.warning(f"Supabase create_video returned no id for job {job_id}")
+                    # Record result video id and stream URL for status endpoint
+                    generation_jobs[job_id]["result_video_id"] = new_video_id
+                    # Keep existing path URL; also set id-based URL as an alternative for clients that use it
+                    generation_jobs[job_id]["video_url_id_based"] = f"/api/videos/{new_video_id}/stream"
+            except Exception as _e:
+                logger.warning(f"Failed to create video row: {_e}")
+            logger.info(f"Step 3 completed for job {job_id}")
+            
+        except Exception as upload_error:
+            logger.error(f"Video upload failed for job {job_id}: {upload_error}")
+            generation_jobs[job_id]["status"] = "failed"
+            generation_jobs[job_id]["error"] = str(upload_error)
+            return
+        
+        # Step 4: Finalize job
+        try:
+            logger.info(f"Step 4: Finalizing job {job_id}")
+            generation_jobs[job_id]["status"] = "completed"
+            generation_jobs[job_id]["current_step"] = 4
+            
+            # Try to update database (Supabase client)
+            try:
+                if supabase_db.enabled and getattr(supabase_db, "client", None):
+                    update_payload = {
+                        "status": "completed",
+                        "current_step": 4,
+                        "ai_response": json.dumps(animation_spec),
+                        "manim_code": manim_code,
+                        "video_url": generation_jobs[job_id].get("video_url"),
+                    }
+                    # Include result_video_id if available
+                    if generation_jobs[job_id].get("result_video_id"):
+                        update_payload["result_video_id"] = generation_jobs[job_id]["result_video_id"]
+                    supabase_db.client.table("generation_jobs").update(update_payload).eq("id", job_id).execute()
+                else:
+                    logger.warning("Supabase DB not enabled; skipping job finalize DB update")
+            except Exception as db_error:
+                logger.warning(f"Failed to update database for completed job: {db_error}")
+            
+            logger.info(f"Job {job_id} completed successfully")
+            
+        except Exception as finalize_error:
+            logger.error(f"Job finalization failed for job {job_id}: {finalize_error}")
+            generation_jobs[job_id]["status"] = "failed"
+            generation_jobs[job_id]["error"] = str(finalize_error)
+            return
+            
+    except Exception as e:
+        logger.error(f"Unexpected error processing generation job {job_id}: {e}")
+        generation_jobs[job_id]["status"] = "failed"
+        generation_jobs[job_id]["error"] = str(e)
+
+
+@app.post("/api/generate_direct")
+async def generate_animation_direct(request: GenerateRequest):
+	"""Stateless generation that bypasses database operations entirely.
+	Returns video_url, ai_response, and manim_code directly.
+	"""
+	try:
+		job_id = str(uuid.uuid4())
+
+		# 1) Run AI workflow
+		result = await get_ai_service().process_animation_request(request.prompt)
+		if not result or (isinstance(result, dict) and result.get("status") == "failed"):
+			return {"error": (result or {}).get("error", "AI generation failed")}
+
+		animation_spec = result.get("animation_spec", {})
+		manim_code = result.get("manim_code", "")
+		workflow_type = result.get("workflow_type", "unknown")
+		complexity_analysis = result.get("complexity_analysis", {})
+		enhancements_applied = result.get("enhancements_applied", [])
+
+		# 2) Render Manim video
+		video_path = await generate_video_from_manim(manim_code, job_id)
+		if not video_path:
+			return {"error": "Failed to generate video (Manim)"}
+
+		# 3) Upload to Supabase storage (no DB rows)
+		# Use a placeholder user_id since this is a direct endpoint
+		placeholder_user_id = "direct_user"
+		upload_result = await upload_video_to_supabase(video_path, job_id, placeholder_user_id, request.prompt if hasattr(request, "prompt") else "")
+		if not upload_result:
+			return {"error": "Failed to upload video"}
+
+		return {
+			"job_id": job_id,
+			"status": "completed",
+			"video_url": upload_result.get("url"),
+			"workflow_type": workflow_type,
+			"complexity_level": complexity_analysis.get("level", "unknown"),
+			"enhancements_applied": len(enhancements_applied),
+			"ai_response": animation_spec,
+			"manim_code": manim_code,
+		}
+	except Exception as e:
+		logger.error(f"Error in generate_direct endpoint: {e}")
+		return {"error": str(e)}
+
+async def process_generation_job(job_id: str, prompt: str, user_id: str):
+    """Process animation generation asynchronously"""
+    try:
+        logger.info(f"Processing generation job {job_id}")
+        db = None
+        
+        # Update job status
+        generation_jobs[job_id]["status"] = "processing"
+        generation_jobs[job_id]["current_step"] = 1
+        try:
+            pass
+        except Exception as ue:
+            logger.warning(f"DB update failed (processing step 1): {ue}")
+        
+        # Steps 1-2 with retry: generate -> render -> upload
+        last_error_summary = ""
+        success = False
+        new_video_id = None
+        for attempt in range(1, 4):
+            try:
+                logger.info(f"Attempt {attempt}/3: Generating animation spec for job {job_id}")
+                augmented_prompt = prompt if attempt == 1 else (
+                    f"{prompt}\n\nConstraints: The previous attempt failed with error: {last_error_summary}. "
+                    "Regenerate a corrected JSON spec that avoids this issue and remains compatible with Manim v0.19, "
+                    "ensuring safe numeric types (no float steps in Python range) and robust axes numbering."
+                )
+                ai_result = await get_ai_service().process_animation_request(augmented_prompt)
+                if ai_result["status"] == "failed":
+                    raise Exception(f"AI generation failed: {ai_result.get('error', 'Unknown error')}")
+
+                # Update job with AI response
+                generation_jobs[job_id]["current_step"] = 2
+                generation_jobs[job_id]["ai_response"] = ai_result["animation_spec"]
+                generation_jobs[job_id]["manim_code"] = ai_result["manim_code"]
+                try:
+                    pass
+                except Exception as ue2:
+                    logger.warning(f"DB update failed (after AI result): {ue2}")
+
+                # Render and upload
+                logger.info(f"Attempt {attempt}/3: Rendering video for job {job_id}")
+                import uuid
+                new_video_id = str(uuid.uuid4())
+                ts = _dt.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                safe_prompt = slugify(prompt)[:80] or "animation"
+                file_path = f"{user_id}/{safe_prompt}_{ts}_{new_video_id[:8]}.mp4"
+                import tempfile, subprocess
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    scene_file = Path(tmpdir) / "generated_scene.py"
+                    scene_file.write_text(generation_jobs[job_id]["manim_code"], encoding="utf-8")
+                    cmd = [
+                        "manim", "render",
+                        str(scene_file),
+                        "GeneratedScene",
+                        "-ql",
+                        "--renderer=cairo",
+                        "--format=mp4",
+                        "--media_dir",
+                        tmpdir,
+                    ]
+                    logger.info(f"Running render: {' '.join(cmd)}")
+                    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=420)
+                    if proc.returncode != 0:
+                        logger.error(proc.stdout)
+                        logger.error(proc.stderr)
+                        err_out = (proc.stderr or proc.stdout or "Manim render failed").strip()
+                        raise Exception(err_out)
+                    out = next(Path(tmpdir).rglob("*.mp4"), None)
+                    if not out or not out.exists():
+                        raise Exception("Rendered MP4 not found")
+                    if not SUPABASE_SERVICE_KEY:
+                        raise Exception("Storage misconfigured")
+                    upload_url = f"{SUPABASE_URL}/storage/v1/object/{NEW_BUCKET}/{file_path}"
+                    headers = {"Authorization": f"Bearer {SUPABASE_SERVICE_KEY}", "apikey": SUPABASE_SERVICE_KEY, "Content-Type": "video/mp4"}
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=5.0)) as client:
+                        resp = await client.post(upload_url, headers=headers, content=out.read_bytes())
+                        if resp.status_code not in (200, 201):
+                            raise Exception(f"Upload failed: {resp.status_code} {resp.text}")
+
+                    # Create video DB row so it appears on the dashboard
+                    try:
+                        if supabase_db.enabled and getattr(supabase_db, "client", None):
+                            await supabase_db.create_video({
+                                "id": new_video_id,
+                                "user_id": user_id,
+                                "file_path": file_path,
+                                "prompt": prompt,
+                                "status": "completed",
+                                "mime_type": "video/mp4",
+                                "generation_job_id": job_id,
+                                "created_at": datetime.now(timezone.utc).isoformat(),
+                            })
+                    except Exception as _e:
+                        logger.warning(f"Failed to create video row (async path): {_e}")
+
+                success = True
+                break
+            except Exception as attempt_err:
+                last_error_summary = str(attempt_err)[:500]
+                logger.error(f"Attempt {attempt} failed: {last_error_summary}")
+                try:
+                    pass
+                except Exception:
+                    pass
+
+        if not success:
+            raise Exception(f"All attempts failed. Last error: {last_error_summary}")
+
+        # Insert DB row now that file exists
+        try:
+            pass
+        except Exception:
+            pass
+
+        # Finalize job and point to streaming endpoint
+        generation_jobs[job_id]["current_step"] = 4
+        generation_jobs[job_id]["status"] = "completed"
+        generation_jobs[job_id]["video_url"] = f"/api/videos/{new_video_id}/stream"
+        try:
+            pass
+        except Exception as ue3:
+            logger.warning(f"DB update failed (finalize job): {ue3}")
+        
+        logger.info(f"Generation job {job_id} completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Error processing generation job {job_id}: {e}")
+        generation_jobs[job_id]["status"] = "failed"
+        generation_jobs[job_id]["error"] = str(e)
+        try:
+            pass
+        except Exception:
+            pass
+    finally:
+        try:
+            if db:
+                db.close()
+        except Exception:
+            pass
+        
+        # No DB-side job/video updates needed on failure for minimal schema
+
+@app.get("/api/status/{job_id}", response_model=StatusResponse)
+async def get_generation_status(
+    job_id: str, 
+    request: Request, 
+    auth: Dict[str, Any] = Depends(require_authentication)
+):
+    """Get the status of a generation job"""
+    try:
+        # Get authenticated user ID
+        user_id = auth.get("user_id")
+        if not user_id or user_id == "anonymous":
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
+        # Initialize job variable
+        job = None
+        
+        # Check in-memory storage first
+        if job_id in generation_jobs:
+            job = generation_jobs[job_id]
+            # Verify job belongs to authenticated user
+            if job.get("user_id") != user_id:
+                raise HTTPException(status_code=403, detail="Access denied - job belongs to different user")
+            logger.info(f"Found job {job_id} in memory: {job['status']}")
+        else:
+            # Get job from Supabase
+            try:
+                initialize_database_lazy()
+                if not (supabase_db.enabled and getattr(supabase_db, "client", None)):
+                    raise HTTPException(status_code=503, detail="Database not available")
+
+                resp = supabase_db.client.table("generation_jobs").select(
+                    "user_id,status,current_step,total_steps,result_video_id,error_message,ai_response,manim_code"
+                ).eq("id", job_id).single().execute()
+
+                row = (resp.data or {})
+                if not row:
+                    raise HTTPException(status_code=404, detail="Generation job not found")
+
+                # Verify job belongs to authenticated user
+                db_user_id = row.get("user_id")
+                if db_user_id != user_id:
+                    raise HTTPException(status_code=403, detail="Access denied - job belongs to different user")
+
+                job = {
+                    "user_id": db_user_id,
+                    "status": row.get("status", "processing"),
+                    "current_step": row.get("current_step", 0),
+                    "total_steps": row.get("total_steps", 4),
+                    "result_video_id": row.get("result_video_id"),
+                    "error": row.get("error_message"),
+                    "ai_response": row.get("ai_response"),
+                    "manim_code": row.get("manim_code"),
+                }
+                logger.info(f"Found job {job_id} in Supabase: {job['status']}")
+
+            except HTTPException:
+                raise
+            except Exception as db_error:
+                logger.error(f"Supabase error when checking job {job_id}: {db_error}")
+                raise HTTPException(status_code=500, detail="Failed to retrieve job status")
+        
+        # Ensure job was found
+        if job is None:
+            raise HTTPException(status_code=404, detail="Generation job not found")
+        
+        # Ensure video_url is absolute for frontend playback
+        base = build_https_base_url(request)
+        job_video_url = job.get("video_url")
+        if not job_video_url and job.get("result_video_id"):
+            # Prefer id-based link if present, otherwise fall back to path-based
+            id_based = f"/api/videos/{job['result_video_id']}/stream"
+            job_video_url = job.get("video_url_id_based") or job.get("video_url") or id_based
+        if job_video_url:
+            if job_video_url.startswith("http://") or job_video_url.startswith("https://"):
+                absolute_url = job_video_url
+            else:
+                # Guarantee single slash between base and path
+                absolute_url = f"{base}{job_video_url if job_video_url.startswith('/') else '/' + job_video_url}"
+        else:
+            absolute_url = None
+
+        # Convert ai_response and manim_code to strings if they are JSON objects
+        ai_response = job.get("ai_response")
+        manim_code = job.get("manim_code")
+        
+        if ai_response and not isinstance(ai_response, str):
+            import json
+            ai_response = json.dumps(ai_response)
+        
+        if manim_code and not isinstance(manim_code, str):
+            import json
+            manim_code = json.dumps(manim_code)
+        
+        return StatusResponse(
+            id=job_id,
+            status=job["status"],
+            current_step=job["current_step"],
+            total_steps=job["total_steps"],
+            video_url=absolute_url,
+            error=job.get("error"),
+            ai_response=ai_response,
+            manim_code=manim_code
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting job status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/videos", response_model=List[VideoResponse])
+async def get_user_videos(
+    user_id: str = Header(..., alias="user-id"),
+    request: Request = None,
+):
+    """Get all videos for a user directly from storage buckets."""
+    try:
+        logger.info(f"Fetching videos for user {user_id}")
+
+        # Initialize database service if not already done
+        initialize_database_lazy()
+
+        # Check if Supabase database service is available
+        if not supabase_db.enabled:
+            raise HTTPException(status_code=503, detail="Database service not available")
+        
+        # Get all videos directly from both storage buckets
+        all_videos = []
+        
+        try:
+            new_bucket_items = await supabase_storage.list_user_videos_in_bucket(NEW_BUCKET, user_id)
+            logger.info(f"Found {len(new_bucket_items)} videos in {NEW_BUCKET} bucket for user {user_id}")
+            all_videos.extend(new_bucket_items)
         except Exception as e:
-            logger.error(f"Cleanup task failed: {e}")
-            await asyncio.sleep(3600)
+            logger.warning(f"Failed to list videos from {NEW_BUCKET}: {e}")
+        
+        try:
+            old_bucket_items = await supabase_storage.list_user_videos_in_bucket(OLD_BUCKET, user_id)
+            logger.info(f"Found {len(old_bucket_items)} videos in {OLD_BUCKET} bucket for user {user_id}")
+            all_videos.extend(old_bucket_items)
+        except Exception as e:
+            logger.warning(f"Failed to list videos from {OLD_BUCKET}: {e}")
+        
+        logger.info(f"Total videos found: {len(all_videos)}")
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize background tasks"""
-    logger.info("🚀 Starting Animathic API v3.0.0")
-    logger.info(f"📊 Enhanced features: {'enabled' if enhanced_features else 'disabled'}")
-    asyncio.create_task(cleanup_task())
+        # Convert storage items to VideoResponse objects
+        def build_video_response(item):
+            try:
+                # Extract filename and create a meaningful prompt
+                # Storage items have 'object_key' field with full path including user_id
+                object_key = item.get('object_key', '')
+                
+                # Better title extraction
+                prompt = "Video from storage"  # Default fallback
+                if object_key:
+                    try:
+                        # Remove user_id prefix and file extension to get clean filename
+                        # object_key format: "user_id/filename_timestamp_id.mp4"
+                        clean_name = object_key.replace(f"{user_id}/", "").rsplit(".", 1)[0]
+                        
+                        # Remove timestamp and short ID if present (pattern: _YYYYMMDD_HHMMSS_abcdef12)
+                        import re
+                        match = re.match(r"^(.*)_\d{8}_\d{6}_[a-f0-9]{8}$", clean_name)
+                        if match:
+                            prompt = match.group(1).replace("-", " ").replace("_", " ").strip()
+                        else:
+                            prompt = clean_name.replace("-", " ").replace("_", " ").strip()
+                        
+                        if not prompt:
+                            prompt = "Video from storage"
+                    except Exception as e:
+                        logger.warning(f"Error extracting title from {object_key}: {e}")
+                        prompt = "Video from storage"
+                
+                # Generate a unique ID for storage items
+                storage_id = f"storage_{hash(object_key) % 1000000}"
+                
+                # Create video URL with the FULL object key (including user_id prefix)
+                video_url = f"{build_https_base_url(request)}/api/stream?bucket={item.get('_bucket', NEW_BUCKET)}&key={object_key}"
+                
+                return VideoResponse(
+                    id=storage_id,
+                    prompt=prompt,
+                    video_url=video_url,
+                    status="completed",
+                    file_path=object_key,  # Store the full object key
+                    created_at=item.get('created_at', datetime.now(timezone.utc)),
+                    mime_type="video/mp4"
+                )
+            except Exception as e:
+                logger.error(f"Error building video response for item {item}: {e}")
+                # Return a fallback response
+                return VideoResponse(
+                    id=f"error_{hash(str(item)) % 1000000}",
+                    prompt="Error loading video",
+                    video_url="",
+                    status="error",
+                    file_path="",
+                    created_at=datetime.now(timezone.utc),
+                    mime_type="video/mp4"
+                )
+        
+        # Build all video responses
+        results = [build_video_response(item) for item in all_videos]
+        logger.info(f"Returning {len(results)} total videos for user {user_id}")
+        return results
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("⏹️  Shutting down Animathic API")
+    except Exception as e:
+        logger.error(f"Error fetching videos: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch videos")
 
-# Error handlers
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """Custom HTTP exception handler"""
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": exc.detail,
-            "status_code": exc.status_code,
-            "timestamp": datetime.utcnow().isoformat(),
-            "path": str(request.url)
-        }
-    )
+@app.get("/api/videos/{video_id}", response_model=VideoResponse)
+async def get_video(video_id: str, request: Request = None):
+    """Get a specific video by ID, compatible with existing Supabase schema."""
+    try:
+        # Initialize database service if not already done
+        initialize_database_lazy()
 
-@app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    """General exception handler"""
-    logger.error(f"Unhandled exception: {exc}")
-    logger.error(traceback.format_exc())
-    
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "status_code": 500,
-            "timestamp": datetime.utcnow().isoformat(),
-            "path": str(request.url)
-        }
-    )
+        # Check if Supabase database service is available
+        if not supabase_db.enabled:
+            raise HTTPException(status_code=503, detail="Database service not available")
+        
+        # Get video from Supabase
+        row_data = await supabase_db.get_video(video_id)
+        if not row_data:
+            raise HTTPException(status_code=404, detail="Video not found")
 
-if __name__ == "__main__":
-    import uvicorn
-    api_config = get_api_config()
-    uvicorn.run(
-        "main:app",
-        host=api_config["host"],
-        port=api_config["port"],
-        reload=False,
-        workers=1,
-        access_log=True
-    )
+        # Extract data from the row
+        rid = row_data.get('id')
+        rprompt = row_data.get('prompt')
+        rcreated = row_data.get('created_at') or datetime.now(timezone.utc)
+        rfile = row_data.get('file_path')
+        rstatus = row_data.get('status') or "completed"
+        rmime_type = row_data.get('mime_type')
+
+        # Check if the video file actually exists in storage
+        file_exists = await resolve_public_video_url(rfile or "")
+
+        # Serve via backend stream endpoint for reliability
+        base = build_https_base_url(request)
+        url = f"{base}/api/videos/{rid}/stream" if file_exists else None
+        
+        # Update status based on file existence
+        if file_exists:
+            final_status = "completed"
+            error_msg = None
+        else:
+            final_status = "file_missing"
+            error_msg = "Video file not found in storage"
+
+        return VideoResponse(
+            id=str(rid),
+            prompt=rprompt or "",
+            video_url=url,
+            thumbnail_url=None,
+            mime_type=rmime_type,
+            status=final_status,
+            error_message=error_msg,
+            created_at=rcreated,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching video: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch video")
+
+@app.get("/api/videos/{video_id}/stream")
+async def stream_video(video_id: str, request: Request):
+    """Proxy stream the video from Supabase storage (new bucket first, then old) with Range support.
+    Uses service key for private buckets.
+    """
+    try:
+        # Initialize database service if not already done
+        initialize_database_lazy()
+
+        # Check if Supabase database service is available
+        if not supabase_db.enabled:
+            raise HTTPException(status_code=503, detail="Database service not available")
+        
+        # Get video from Supabase
+        row_data = await supabase_db.get_video(video_id)
+        if not row_data:
+            # Fallback 1: job row holds result_video_id
+            try:
+                job = await supabase_db.get_generation_job(video_id)
+                if job and job.get("result_video_id"):
+                    row_data = await supabase_db.get_video(job["result_video_id"])
+            except Exception:
+                pass
+        if not row_data:
+            # Fallback 2: video row references generation_job_id directly
+            try:
+                row_data = await supabase_db.get_video_by_job(video_id)
+            except Exception:
+                pass
+        if not row_data:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        file_path = (row_data.get('file_path') or "").lstrip("/")
+        mime_type = row_data.get('mime_type') or "video/mp4"
+
+        if not SUPABASE_SERVICE_KEY:
+            logger.error("SUPABASE_SERVICE_KEY missing; cannot stream from private storage")
+            raise HTTPException(status_code=500, detail="Storage misconfigured")
+
+        # Private storage endpoints (authorized with service key)
+        candidates = [
+            f"{SUPABASE_URL}/storage/v1/object/{NEW_BUCKET}/{file_path}",
+            f"{SUPABASE_URL}/storage/v1/object/{OLD_BUCKET}/{file_path}",
+        ]
+
+        range_header = request.headers.get("range")
+        timeout = httpx.Timeout(10.0, connect=5.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            for url in candidates:
+                try:
+                    headers = {"Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
+                    if range_header:
+                        headers["Range"] = range_header
+                    resp = await client.get(url, headers=headers)
+                    if resp.status_code in (200, 206):
+                        stream = resp.aiter_bytes()
+                        forward_headers = {}
+                        for h in ("Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control"):
+                            if h in resp.headers:
+                                forward_headers[h] = resp.headers[h]
+                        return StreamingResponse(stream, status_code=resp.status_code, media_type=mime_type, headers=forward_headers)
+                except Exception:
+                    continue
+        
+        # If video file not found, return a 404 with a helpful message
+        logger.warning(f"Video file not found in buckets for video_id: {video_id}, file_path: {file_path}")
+        raise HTTPException(status_code=404, detail="Video file not found in storage. The video may have been deleted or the file path is incorrect.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error streaming video: {e}")
+        raise HTTPException(status_code=500, detail="Failed to stream video")
+
+@app.get("/api/stream")
+async def stream_by_path(bucket: str, key: str, request: Request):
+    """Stream a storage object directly by bucket and key (for storage-only items)."""
+    try:
+        if not SUPABASE_SERVICE_KEY:
+            raise HTTPException(status_code=500, detail="Storage misconfigured")
+        
+        # Clean up the key - remove any leading slashes and ensure proper format
+        file_path = key.lstrip("/")
+        logger.info(f"Streaming request for bucket: {bucket}, key: {file_path}")
+        
+        # Try different Supabase storage endpoint formats
+        # Format 1: Direct object access (for private buckets)
+        url1 = f"{SUPABASE_URL}/storage/v1/object/{bucket}/{file_path}"
+        # Format 2: Public object access (for public buckets)
+        url2 = f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{file_path}"
+        
+        logger.info(f"Trying URL 1: {url1}")
+        logger.info(f"Trying URL 2: {url2}")
+        
+        range_header = request.headers.get("range")
+        timeout = httpx.Timeout(30.0, connect=10.0)
+        
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            headers = {
+                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                "apikey": SUPABASE_SERVICE_KEY
+            }
+            if range_header:
+                headers["Range"] = range_header
+            
+            # Try the first URL (private bucket access)
+            try:
+                logger.info(f"Making request to Supabase with headers: {dict(headers)}")
+                resp = await client.get(url1, headers=headers)
+                logger.info(f"Supabase response status: {resp.status_code}")
+                
+                if resp.status_code in (200, 206):
+                    stream = resp.aiter_bytes()
+                    forward_headers = {}
+                    for h in ("Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control"):
+                        if h in resp.headers:
+                            forward_headers[h] = resp.headers[h]
+                    
+                    logger.info(f"Successfully streaming video from {bucket}/{file_path}")
+                    return StreamingResponse(
+                        stream, 
+                        status_code=resp.status_code, 
+                        media_type="video/mp4", 
+                        headers=forward_headers
+                    )
+            except Exception as e:
+                logger.warning(f"First URL failed: {e}")
+            
+            # Try the second URL (public bucket access)
+            try:
+                logger.info(f"Trying public URL: {url2}")
+                resp = await client.get(url2, headers=headers)
+                logger.info(f"Public URL response status: {resp.status_code}")
+                
+                if resp.status_code in (200, 206):
+                    stream = resp.aiter_bytes()
+                    forward_headers = {}
+                    for h in ("Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control"):
+                        if h in resp.headers:
+                            forward_headers[h] = resp.headers[h]
+                    
+                    logger.info(f"Successfully streaming video from public URL {bucket}/{file_path}")
+                    return StreamingResponse(
+                        stream, 
+                        status_code=resp.status_code, 
+                        media_type="video/mp4", 
+                        headers=forward_headers
+                    )
+            except Exception as e:
+                logger.warning(f"Public URL failed: {e}")
+            
+            # If both URLs fail, return detailed error
+            logger.error(f"Both Supabase storage URLs failed for {bucket}/{file_path}")
+            raise HTTPException(status_code=404, detail=f"Video file not found in storage: {bucket}/{file_path}")
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error streaming by path: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to stream video")
+
+@app.delete("/api/videos/{video_id}")
+async def delete_video(
+    video_id: str,
+    user_id: str = Header(..., alias="user-id"),
+    object_key: str = Query(None, description="Object key for storage videos (required for storage videos)")
+):
+    """Delete a video"""
+    try:
+        # Initialize database service if not already done
+        initialize_database_lazy()
+
+        # Check if Supabase database service is available
+        if not supabase_db.enabled:
+            raise HTTPException(status_code=503, detail="Database service not available")
+        
+        # Handle storage-only videos (those with IDs starting with "storage_")
+        if video_id.startswith("storage_"):
+            # For storage-only videos, we need the object key to delete from storage
+            # The frontend should provide this as a query parameter
+            if not object_key:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="For storage videos, please provide the object_key as a query parameter. Example: DELETE /api/videos/storage_123?object_key=user_id/filename.mp4"
+                )
+            
+            # Use the provided object key directly
+            file_path = object_key
+            logger.info(f"Deleting storage video with object key: {file_path}")
+            
+            # Delete from storage
+            try:
+                # Try both buckets
+                success = False
+                for bucket in [NEW_BUCKET, OLD_BUCKET]:
+                    try:
+                        if await supabase_delete_object(bucket, file_path):
+                            success = True
+                            logger.info(f"Successfully deleted video from bucket {bucket}: {file_path}")
+                            break
+                    except Exception as e:
+                        logger.warning(f"Failed to delete from bucket {bucket}: {e}")
+                        continue
+                
+                if not success:
+                    logger.error(f"Failed to delete video from any bucket: {file_path}")
+                    raise HTTPException(status_code=500, detail="Failed to delete video from storage")
+                
+            except Exception as e:
+                logger.error(f"Error deleting storage video: {e}")
+                raise HTTPException(status_code=500, detail="Failed to delete video from storage")
+            
+            return {"message": "Storage video deleted successfully"}
+        
+        # Handle database videos (existing logic)
+        else:
+            # Get video from Supabase to check ownership and get file path
+            row_data = await supabase_db.get_video(video_id)
+            if not row_data:
+                raise HTTPException(status_code=404, detail="Video not found")
+
+            # Check if user owns this video
+            if row_data.get('user_id') != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
+
+            file_path = (row_data.get('file_path') or "").lstrip("/")
+
+            # Delete from Supabase database
+            success = await supabase_db.update_video(video_id, {"deleted_at": datetime.now(timezone.utc).isoformat()})
+            if not success:
+                # If update fails, try to delete the record
+                try:
+                    # Note: Supabase client doesn't have a direct delete method in the current version
+                    # We'll mark it as deleted instead
+                    logger.warning(f"Could not mark video {video_id} as deleted")
+                except Exception as e:
+                    logger.error(f"Failed to delete video record: {e}")
+
+            # Best-effort delete from storage
+            if file_path:
+                try:
+                    await supabase_delete_object(NEW_BUCKET, file_path)
+                except Exception:
+                    pass
+
+            return {"message": "Database video deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting video: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/feedback/{video_id}")
+async def submit_feedback(
+    video_id: str,
+    feedback: FeedbackRequest,
+    user_id: str = Header(..., alias="user-id")
+):
+    """Submit feedback for a video (stub; persistence can be added via Supabase if desired)."""
+    try:
+        initialize_database_lazy()
+        if not supabase_db.enabled:
+            raise HTTPException(status_code=503, detail="Database not available")
+        video = await supabase_db.get_video(video_id)
+        if not video or video.get("user_id") != user_id:
+            raise HTTPException(status_code=404, detail="Video not found")
+        logger.info(f"Feedback received for video {video_id}: rating={feedback.rating}")
+        return {"message": "Feedback received"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/videos/{video_id}/download")
+async def download_video(video_id: str):
+    """Return basic metadata for download (placeholder)."""
+    try:
+        initialize_database_lazy()
+        if not supabase_db.enabled:
+            raise HTTPException(status_code=503, detail="Database not available")
+        video = await supabase_db.get_video(video_id)
+        if not video:
+            raise HTTPException(status_code=404, detail="Video not found")
+        return JSONResponse(content={"message": "OK", "video_id": video_id})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading video: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

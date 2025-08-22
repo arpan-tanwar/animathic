@@ -151,3 +151,4 @@ docker run -p 5173:5173 animathic-frontend
 ## 📄 License
 
 This project is licensed under the MIT License.
+# Force deployment - Tue Aug 19 00:14:55 EDT 2025

@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   SignedIn,
   SignedOut,
   SignInButton,
   UserButton,
+  useUser,
 } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -542,6 +543,8 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [typing, setTyping] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isSignedIn } = useUser();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -623,128 +626,140 @@ export default function ChatPage() {
     }, 280);
   }
 
+  function generateFromInput() {
+    if (!input.trim()) return;
+    if (!isSignedIn) {
+      // If not signed in, route to landing or show sign-in
+      navigate("/generate", { state: { prompt: input.trim() } });
+      return;
+    }
+    navigate("/generate", { state: { prompt: input.trim() } });
+  }
+
   return (
     <div
       className="min-h-screen"
       style={{ backgroundColor: "#0B0F14", color: "#E6EDF7" }}
     >
       <SidebarProvider>
-      {/* Top Bar */}
-      <div
-        className="sticky top-0 z-30 border-b backdrop-blur"
-        style={{
-          backgroundColor: "rgba(14,20,32,0.7)",
-          borderColor: "rgba(35,48,70,.28)",
-          height: 60,
-        }}
-      >
-        <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-3">
-          <div className="flex items-center gap-2">
-            <SidebarTrigger
-              className="hidden md:inline-flex"
-              aria-label="Toggle history"
-            />
-            <Link to="/" className="flex items-center gap-2">
-              <div
-                className="h-8 w-8 rounded-xl"
-                style={{
-                  background: "linear-gradient(135deg, #2563EB, #7C3AED)",
-                }}
+        {/* Top Bar */}
+        <div
+          className="sticky top-0 z-30 border-b backdrop-blur"
+          style={{
+            backgroundColor: "rgba(14,20,32,0.7)",
+            borderColor: "rgba(35,48,70,.28)",
+            height: 60,
+          }}
+        >
+          <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-3">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger
+                className="hidden md:inline-flex"
+                aria-label="Toggle history"
               />
-              <div className="font-semibold">Animathic</div>
-            </Link>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-sm text-secondary">
-            <span className="hidden sm:inline">Model</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-9 gap-2">
-                  <Sparkles className="h-4 w-4" /> {model}{" "}
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center">
-                <DropdownMenuItem onClick={() => setModel("GPT-4o mini")}>
-                  GPT-4o mini
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setModel("Claude 3.7 Sonnet")}>
-                  Claude 3.7 Sonnet
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setModel("Llama 3.1 70B")}>
-                  Llama 3.1 70B
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <div className="flex items-center gap-1">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="History"
-                    className="h-11 w-11"
-                  >
-                    <History className="h-5 w-5" />
+              <Link to="/" className="flex items-center gap-2">
+                <div
+                  className="h-8 w-8 rounded-xl"
+                  style={{
+                    background: "linear-gradient(135deg, #2563EB, #7C3AED)",
+                  }}
+                />
+                <div className="font-semibold">Animathic</div>
+              </Link>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-sm text-secondary">
+              <span className="hidden sm:inline">Model</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-9 gap-2">
+                    <Sparkles className="h-4 w-4" /> {model}{" "}
+                    <ChevronDown className="h-4 w-4" />
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent>History</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Settings"
-                    onClick={() => setSettingsOpen(true)}
-                    className="h-11 w-11"
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center">
+                  <DropdownMenuItem onClick={() => setModel("GPT-4o mini")}>
+                    GPT-4o mini
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setModel("Claude 3.7 Sonnet")}
                   >
-                    <Settings2 className="h-5 w-5" />
+                    Claude 3.7 Sonnet
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setModel("Llama 3.1 70B")}>
+                    Llama 3.1 70B
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <div className="flex items-center gap-1">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="History"
+                      className="h-11 w-11"
+                    >
+                      <History className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>History</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Settings"
+                      onClick={() => setSettingsOpen(true)}
+                      className="h-11 w-11"
+                    >
+                      <Settings2 className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Settings</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Utility panel"
+                      onClick={() => setShowRight((v) => !v)}
+                      className="h-11 w-11"
+                    >
+                      <Info className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Utility panel</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <ThemeToggle />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>Theme</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <Button variant="default" className="ml-1">
+                    Sign in
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent>Settings</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Utility panel"
-                    onClick={() => setShowRight((v) => !v)}
-                    className="h-11 w-11"
-                  >
-                    <Info className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Utility panel</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <ThemeToggle />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>Theme</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <SignedOut>
-              <SignInButton mode="modal">
-                <Button variant="default" className="ml-1">
-                  Sign in
-                </Button>
-              </SignInButton>
-            </SignedOut>
-            <SignedIn>
-              <div className="ml-1">
-                <UserButton afterSignOutUrl="/" />
-              </div>
-            </SignedIn>
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <div className="ml-1">
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+              </SignedIn>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Shell with Sidebar */}
+        {/* Shell with Sidebar */}
         <Sidebar
           variant="sidebar"
           collapsible="offcanvas"
@@ -919,6 +934,16 @@ export default function ChatPage() {
                     <TooltipContent>Voice</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+                {/* Generate button for workflow */}
+                <Button
+                  onClick={generateFromInput}
+                  disabled={!input.trim()}
+                  className="h-10"
+                  style={{ backgroundColor: "#7C3AED", color: "#fff" }}
+                  aria-label="Generate animation from prompt"
+                >
+                  <Sparkles className="mr-1 h-4 w-4" /> Generate
+                </Button>
                 <Button
                   onClick={sendMessage}
                   disabled={!input.trim()}
@@ -932,23 +957,23 @@ export default function ChatPage() {
             </div>
           </div>
         </SidebarInset>
-      {/* Right utility panel (toggleable) */}
-      <Sheet open={showRight} onOpenChange={setShowRight}>
-        <SheetTrigger asChild>
-          <span className="sr-only">Toggle utility</span>
-        </SheetTrigger>
-        <SheetContent
-          side="right"
-          className="w-[360px] surface-0 hairline-border"
-        >
-          <div className="text-sm text-secondary">
-            Citations, files and tools appear here.
-          </div>
-        </SheetContent>
-      </Sheet>
+        {/* Right utility panel (toggleable) */}
+        <Sheet open={showRight} onOpenChange={setShowRight}>
+          <SheetTrigger asChild>
+            <span className="sr-only">Toggle utility</span>
+          </SheetTrigger>
+          <SheetContent
+            side="right"
+            className="w-[360px] surface-0 hairline-border"
+          >
+            <div className="text-sm text-secondary">
+              Citations, files and tools appear here.
+            </div>
+          </SheetContent>
+        </Sheet>
 
-      {/* Settings */}
-      <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
+        {/* Settings */}
+        <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
       </SidebarProvider>
     </div>
   );
