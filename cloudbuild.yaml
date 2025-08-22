@@ -9,3 +9,5 @@ steps:
       - "backend"
 images:
   - "${_IMAGE}"
+substitutions:
+  _IMAGE: "gcr.io/animathic-backend/animathic-backend:latest"

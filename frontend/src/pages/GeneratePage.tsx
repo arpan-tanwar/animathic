@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useUser } from "@clerk/clerk-react";
+import { useUser, useAuth } from "@clerk/clerk-react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 import { Button } from "../components/ui/button";
@@ -38,6 +38,7 @@ interface StatusResponse {
 
 const GeneratePage = () => {
   const { user } = useUser();
+  const { getToken } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState<string>("");
@@ -137,21 +138,26 @@ const GeneratePage = () => {
       setIsGenerating(true);
 
       // Step 1: Send the prompt to generate the video
+      const token = await getToken();
       const response = await axios.post<GenerateResponse>(
         `${API_BASE_URL}/api/generate`,
         {
           prompt: promptText,
-          user_id: user.id,
         },
         {
           headers: {
-            "user-id": user.id,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
 
-      setJobId(response.data.id);
-      setCurrentStep(1);
+      // Check if the response has the expected format
+      if (response.data.id) {
+        setJobId(response.data.id);
+        setCurrentStep(1);
+      } else {
+        throw new Error("Invalid response format from server");
+      }
 
       // Start polling for status
       const interval = setInterval(async () => {
@@ -160,7 +166,7 @@ const GeneratePage = () => {
             `${API_BASE_URL}/api/status/${response.data.id}`,
             {
               headers: {
-                "user-id": user.id,
+                Authorization: `Bearer ${token}`,
               },
             }
           );

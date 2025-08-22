@@ -9,7 +9,6 @@ from datetime import datetime
 # Request schemas
 class GenerateRequest(BaseModel):
     prompt: str
-    user_id: str
 
 class FeedbackRequest(BaseModel):
     rating: int
@@ -28,6 +27,8 @@ class StatusResponse(BaseModel):
     total_steps: int
     video_url: Optional[str] = None
     error: Optional[str] = None
+    ai_response: Optional[str] = None
+    manim_code: Optional[str] = None
 
 class VideoResponse(BaseModel):
     id: str

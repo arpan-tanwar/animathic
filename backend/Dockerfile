@@ -23,4 +23,15 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"] 
+# Install gunicorn for production
+RUN pip install gunicorn
+
+# Create production directories
+RUN mkdir -p /var/log/animathic /tmp/animathic
+
+# Copy and make startup script executable
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Use production startup with dynamic port binding
+CMD ["/app/start.sh"] 
