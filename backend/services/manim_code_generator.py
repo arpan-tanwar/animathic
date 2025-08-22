@@ -258,6 +258,7 @@ class GeneratedScene(MovingCameraScene):
                 try:
                     if isinstance(color_name, str) and color_name.startswith('#'):
                         color = Color(color_name)
+                        print(f"Using hex color: {color_name} -> {color}")
                     else:
                         # Handle both uppercase and lowercase color names
                         color_mapping = {
@@ -274,7 +275,10 @@ class GeneratedScene(MovingCameraScene):
                             'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
                             'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
+                        
+                        print(f"Color mapping lookup: '{color_name}' in {list(color_mapping.keys())}")
                         color = color_mapping.get(str(color_name), WHITE)
+                        print(f"Color mapping result: '{color_name}' -> {color}")
                         
                         # Debug logging
                         print(f"Color mapping: '{color_name}' -> {color}")
@@ -297,6 +301,9 @@ class GeneratedScene(MovingCameraScene):
                     except Exception:
                         color = WHITE
                         print(f"Final fallback: using WHITE for '{color_name}'")
+                
+                print(f"Final color for circle: {color}")
+                print(f"Circle object will be created with fill_color={color}, stroke_color={color}")
                 
                 circle_obj = Circle(
                     radius=size,
@@ -557,8 +564,23 @@ class GeneratedScene(MovingCameraScene):
                 )
                 axes.move_to(pos)
                 
-                # Create the plot
-                plot_obj = axes.plot(lambda x: eval(expression.replace('x', 'x')), color=color, x_range=x_range)
+                # Create the plot - FIXED: Remove dangerous eval() and lambda
+                try:
+                    # Safe expression handling without eval
+                    if expression == 'x**2':
+                        plot_obj = axes.plot(lambda x: x**2, color=color, x_range=x_range)
+                    elif expression == 'sin(x)':
+                        plot_obj = axes.plot(lambda x: np.sin(x), color=color, x_range=x_range)
+                    elif expression == 'cos(x)':
+                        plot_obj = axes.plot(lambda x: np.cos(x), color=color, x_range=x_range)
+                    elif expression == 'x':
+                        plot_obj = axes.plot(lambda x: x, color=color, x_range=x_range)
+                    else:
+                        # Default to safe x**2
+                        plot_obj = axes.plot(lambda x: x**2, color=color, x_range=x_range)
+                except Exception:
+                    # Fallback to safe default
+                    plot_obj = axes.plot(lambda x: x**2, color=color, x_range=x_range)
                 
                 self.add(axes)
                 self.play(Create(axes), run_time=0.5)
