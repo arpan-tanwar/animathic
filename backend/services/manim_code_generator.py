@@ -283,10 +283,17 @@ class GeneratedScene(MovingCameraScene):
                     radius=size,
                     fill_color=color,
                     stroke_color=color,
-                    fill_opacity=0.8,
-                    stroke_width=2
+                    fill_opacity=1.0,  # Force full opacity
+                    stroke_width=3      # Make stroke more visible
                 )
                 circle_obj.move_to(pos)
+                
+                # Force color setting to ensure it's applied
+                try:
+                    circle_obj.set_fill(color, opacity=1.0)
+                    circle_obj.set_stroke(color, width=3)
+                except Exception:
+                    pass  # Fallback if set_fill/set_stroke fails
                 
                 # Handle animations from the spec
                 animations = obj.get('animations', [])
@@ -348,10 +355,17 @@ class GeneratedScene(MovingCameraScene):
                     side_length=size,
                     fill_color=color,
                     stroke_color=color,
-                    fill_opacity=0.8,
-                    stroke_width=2
+                    fill_opacity=1.0,  # Force full opacity
+                    stroke_width=3      # Make stroke more visible
                 )
                 square_obj.move_to(pos)
+                
+                # Force color setting to ensure it's applied
+                try:
+                    square_obj.set_fill(color, opacity=1.0)
+                    square_obj.set_stroke(color, width=3)
+                except Exception:
+                    pass  # Fallback if set_fill/set_stroke fails
                 
                 # Handle animations from the spec
                 animations = obj.get('animations', [])
