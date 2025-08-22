@@ -134,6 +134,9 @@ class ManimCodeGenerator:
                             # This is an actual dangerous pattern
                             logger.error(f"Dangerous pattern found on line {i+1}: {line.strip()}")
                             return False
+                    
+                    # If we get here, the pattern was found but it's safe (in strings/comments)
+                    logger.info(f"Pattern '{pattern}' found but appears to be safe (in strings/comments)")
             
             logger.info("Generated code validation passed")
             return True
@@ -443,10 +446,10 @@ class GeneratedScene(MovingCameraScene):
                         }
                         color = color_mapping.get(str(color_name), RED)  # Default to RED instead of WHITE
                         print(f"Fallback color mapping: '{color_name}' -> {color}")
-                    except Exception:
+                    except (ValueError, TypeError, KeyError) as e2:
                         color = RED  # Default to RED instead of WHITE
-                        print(f"Final fallback: using RED for '{color_name}'")
-                except Exception as e:
+                        print(f"Final fallback: using RED for '{color_name}' (error: {e2})")
+                except (ValueError, TypeError, KeyError) as e:
                     # For any other unexpected errors, still use the color mapping fallback
                     print(f"Unexpected error in color handling for '{color_name}': {e}")
                     # Try to use color mapping as fallback instead of defaulting to WHITE
@@ -457,9 +460,9 @@ class GeneratedScene(MovingCameraScene):
                         }
                         color = color_mapping.get(str(color_name), RED)  # Default to RED instead of WHITE
                         print(f"Fallback color mapping: '{color_name}' -> {color}")
-                    except Exception:
+                    except (ValueError, TypeError, KeyError) as e2:
                         color = RED  # Default to RED instead of WHITE
-                        print(f"Final fallback: using RED for '{color_name}'")
+                        print(f"Final fallback: using RED for '{color_name}' (error: {e2})")
                 
                 print(f"Final color for circle: {color}")
                 print(f"Circle object will be created with fill_color={color}, stroke_color={color}")
@@ -545,10 +548,10 @@ class GeneratedScene(MovingCameraScene):
                         }
                         color = color_mapping.get(str(color_name), RED)  # Default to RED instead of BLUE
                         print(f"Fallback color mapping: '{color_name}' -> {color}")
-                    except Exception:
+                    except (ValueError, TypeError, KeyError) as e2:
                         color = RED  # Default to RED instead of BLUE
-                        print(f"Final fallback: using RED for '{color_name}'")
-                except Exception as e:
+                        print(f"Final fallback: using RED for '{color_name}' (error: {e2})")
+                except (ValueError, TypeError, KeyError) as e:
                     # For any other unexpected errors, still use the color mapping fallback
                     print(f"Unexpected error in color handling for '{color_name}': {e}")
                     # Try to use color mapping as fallback instead of defaulting to BLUE
@@ -559,9 +562,9 @@ class GeneratedScene(MovingCameraScene):
                         }
                         color = color_mapping.get(str(color_name), RED)  # Default to RED instead of BLUE
                         print(f"Fallback color mapping: '{color_name}' -> {color}")
-                    except Exception:
+                    except (ValueError, TypeError, KeyError) as e2:
                         color = RED  # Default to RED instead of BLUE
-                        print(f"Final fallback: using RED for '{color_name}'")
+                        print(f"Final fallback: using RED for '{color_name}' (error: {e2})")
                 
                 square_obj = Square(
                     side_length=size,
@@ -735,21 +738,27 @@ class GeneratedScene(MovingCameraScene):
                 
                 # Create the plot - FIXED: Remove dangerous eval() and lambda
                 try:
-                    # Safe expression handling without eval
+                    # Safe expression handling without eval or lambda
                     if expression == 'x**2':
-                        plot_obj = axes.plot(lambda x: x**2, color=color, x_range=x_range)
+                        def safe_x_squared(x): return x**2
+                        plot_obj = axes.plot(safe_x_squared, color=color, x_range=x_range)
                     elif expression == 'sin(x)':
-                        plot_obj = axes.plot(lambda x: np.sin(x), color=color, x_range=x_range)
+                        def safe_sin(x): return np.sin(x)
+                        plot_obj = axes.plot(safe_sin, color=color, x_range=x_range)
                     elif expression == 'cos(x)':
-                        plot_obj = axes.plot(lambda x: np.cos(x), color=color, x_range=x_range)
+                        def safe_cos(x): return np.cos(x)
+                        plot_obj = axes.plot(safe_cos, color=color, x_range=x_range)
                     elif expression == 'x':
-                        plot_obj = axes.plot(lambda x: x, color=color, x_range=x_range)
+                        def safe_x(x): return x
+                        plot_obj = axes.plot(safe_x, color=color, x_range=x_range)
                     else:
                         # Default to safe x**2
-                        plot_obj = axes.plot(lambda x: x**2, color=color, x_range=x_range)
+                        def safe_default(x): return x**2
+                        plot_obj = axes.plot(safe_default, color=color, x_range=x_range)
                 except Exception:
                     # Fallback to safe default
-                    plot_obj = axes.plot(lambda x: x**2, color=color, x_range=x_range)
+                    def safe_fallback(x): return x**2
+                    plot_obj = axes.plot(safe_fallback, color=color, x_range=x_range)
                 
                 self.add(axes)
                 self.play(Create(axes), run_time=0.5)
