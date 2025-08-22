@@ -126,7 +126,23 @@ const VideoGallery = () => {
         throw new Error("No authentication token available");
       }
 
-      await axios.delete(`${API_BASE_URL}/api/videos/${videoId}`, {
+      // Check if this is a storage video (ID starts with "storage_")
+      let deleteUrl = `${API_BASE_URL}/api/videos/${videoId}`;
+      
+      if (videoId.startsWith('storage_')) {
+        // For storage videos, extract object_key from video_url
+        const video = videos.find(v => v.id === videoId);
+        if (video && video.video_url) {
+          // Extract object_key from video_url like: /api/stream?bucket=animathic-media&key=user_id/filename.mp4
+          const urlParams = new URLSearchParams(video.video_url.split('?')[1]);
+          const objectKey = urlParams.get('key');
+          if (objectKey) {
+            deleteUrl += `?object_key=${encodeURIComponent(objectKey)}`;
+          }
+        }
+      }
+
+      await axios.delete(deleteUrl, {
         headers: {
           "user-id": user.id,
           Authorization: `Bearer ${token}`,
