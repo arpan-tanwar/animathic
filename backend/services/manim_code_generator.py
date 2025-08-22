@@ -487,8 +487,8 @@ class GeneratedScene(MovingCameraScene):
                 animations = obj.get('animations', [])
                 if not animations:
                     # Default: just create the object
-                    self.add(circle_obj)
-                    self.play(Create(circle_obj), run_time=1.0)
+                self.add(circle_obj)
+                self.play(Create(circle_obj), run_time=1.0)
                 else:
                     # Process each animation
                     for anim in animations:
@@ -586,8 +586,8 @@ class GeneratedScene(MovingCameraScene):
                 animations = obj.get('animations', [])
                 if not animations:
                     # Default: just create the object
-                    self.add(square_obj)
-                    self.play(Create(square_obj), run_time=1.0)
+                self.add(square_obj)
+                self.play(Create(square_obj), run_time=1.0)
                 else:
                     # Process each animation
                     for anim in animations:
@@ -740,24 +740,30 @@ class GeneratedScene(MovingCameraScene):
                 try:
                     # Safe expression handling without eval or lambda
                     if expression == 'x**2':
-                        def safe_x_squared(x): return x**2
+                        def safe_x_squared(x):
+                            return x**2
                         plot_obj = axes.plot(safe_x_squared, color=color, x_range=x_range)
                     elif expression == 'sin(x)':
-                        def safe_sin(x): return np.sin(x)
+                        def safe_sin(x):
+                            return np.sin(x)
                         plot_obj = axes.plot(safe_sin, color=color, x_range=x_range)
                     elif expression == 'cos(x)':
-                        def safe_cos(x): return np.cos(x)
+                        def safe_cos(x):
+                            return np.cos(x)
                         plot_obj = axes.plot(safe_cos, color=color, x_range=x_range)
                     elif expression == 'x':
-                        def safe_x(x): return x
+                        def safe_x(x):
+                            return x
                         plot_obj = axes.plot(safe_x, color=color, x_range=x_range)
                     else:
                         # Default to safe x**2
-                        def safe_default(x): return x**2
+                        def safe_default(x):
+                            return x**2
                         plot_obj = axes.plot(safe_default, color=color, x_range=x_range)
                 except Exception:
                     # Fallback to safe default
-                    def safe_fallback(x): return x**2
+                    def safe_fallback(x):
+                        return x**2
                     plot_obj = axes.plot(safe_fallback, color=color, x_range=x_range)
                 
                 self.add(axes)
