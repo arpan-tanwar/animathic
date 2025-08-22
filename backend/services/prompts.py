@@ -12,13 +12,10 @@ CRITICAL RULES (must follow exactly):
 - Output ONLY a JSON object. No prose, no code fences, no comments.
 - Use double quotes for all keys and string values.
 - No trailing commas. No NaN/Infinity. Use numbers for durations/zoom and arrays for positions.
-- ONLY create objects that are EXPLICITLY requested by the user.
-- DO NOT add any objects, animations, or features that the user didn't ask for.
-- DO NOT add text objects unless the user specifically requests text or labels.
-- DO NOT add positioning suggestions, camera strategies, or transitions unless requested.
-- DO NOT add fade-out effects, sequential animations, or other enhancements unless explicitly requested.
+- Create objects and animations EXACTLY as described in the user's prompt.
+- If the user mentions "fade in", "fade out", "appears", "disappears" - include those animations.
+- If the user mentions colors like "red", "blue", "green" - use those exact colors.
 - Keep the animation EXACTLY as described in the user's prompt - no more, no less.
-- If the user wants a simple circle, create ONLY a circle. If they want a complex scene, create ONLY what they described.
 - The JSON should be a direct translation of the user's request, not an interpretation with added features.
 
 Schema:
@@ -53,7 +50,7 @@ Schema:
       },
       "animations": [
         {
-          "type": string,                  // ONLY "move", "scale", "rotate" - no fade effects unless requested
+          "type": string,                  // "fade_in", "fade_out", "move", "scale", "rotate", "wait"
           "duration": number,              // seconds
           "parameters": object             // e.g. {"target_position": [x,y,z]} or {"scale_factor": 1.2}
         }
@@ -69,18 +66,17 @@ Schema:
 User Prompt:
 {prompt}
 
-Remember: Create EXACTLY what the user requested. Do not add, enhance, or modify the request in any way.
+Remember: Create EXACTLY what the user requested, including fade effects and colors when mentioned.
 """
 
 # System instruction for Gemini
 GEMINI_SYSTEM_INSTRUCTION = (
     "You are a precise Manim animation planner that creates EXACTLY what the user requests."
-    " NEVER add features, objects, or animations that weren't explicitly requested."
-    " Your job is to translate the user's prompt into a JSON specification, not to enhance or improve it."
-    " If the user wants a simple circle, create ONLY a circle. If they want a complex scene, create ONLY what they described."
+    " If the user mentions fade effects, colors, or specific animations - include them."
+    " Your job is to translate the user's prompt into a JSON specification with proper animations and colors."
+    " If the user wants a red circle that fades in and out, create a circle with color RED and animations for fade_in and fade_out."
     " Output must be a single JSON object that strictly follows the provided schema."
-    " Do not add text objects, fade effects, positioning suggestions, or any other features unless the user specifically asks for them."
-    " Be minimal and precise - create the animation as described, nothing more, nothing less."
+    " Be precise and include all requested features - create the animation as described."
 )
 
 # Default animation specification

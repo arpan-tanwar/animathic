@@ -266,30 +266,41 @@ class AIService:
     
     def _analyze_prompt_complexity(self, prompt: str) -> Dict[str, Any]:
         """Analyze prompt complexity to determine workflow selection"""
+        prompt_lower = prompt.lower()
+        
         complexity_indicators = {
-            'mathematical_content': any(keyword in prompt.lower() for keyword in 
+            'mathematical_content': any(keyword in prompt_lower for keyword in 
                 ['function', 'plot', 'graph', 'equation', 'formula', 'sine', 'cosine', 'polynomial']),
-            'multiple_objects': any(keyword in prompt.lower() for keyword in 
+            'multiple_objects': any(keyword in prompt_lower for keyword in 
                 ['multiple', 'several', 'many', 'various', 'both', 'and', 'with']),
-            'sequence_requirements': any(keyword in prompt.lower() for keyword in 
+            'sequence_requirements': any(keyword in prompt_lower for keyword in 
                 ['sequence', 'step', 'progression', 'evolution', 'then', 'next', 'after']),
-            'interaction_requirements': any(keyword in prompt.lower() for keyword in 
+            'interaction_requirements': any(keyword in prompt_lower for keyword in 
                 ['interact', 'connect', 'relate', 'combine', 'between', 'among']),
-            'temporal_aspects': any(keyword in prompt.lower() for keyword in 
+            'temporal_aspects': any(keyword in prompt_lower for keyword in 
                 ['time', 'duration', 'speed', 'timing', 'slow', 'fast']),
-            'spatial_relationships': any(keyword in prompt.lower() for keyword in 
-                ['above', 'below', 'left', 'right', 'near', 'far', 'position'])
+            'spatial_relationships': any(keyword in prompt_lower for keyword in 
+                ['above', 'below', 'left', 'right', 'near', 'far', 'position']),
+            # NEW: Animation effects should trigger enhancement
+            'animation_effects': any(keyword in prompt_lower for keyword in 
+                ['fade', 'appear', 'disappear', 'animate', 'transition', 'effect']),
+            # NEW: Color specifications should trigger enhancement
+            'color_specifications': any(keyword in prompt_lower for keyword in 
+                ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'color', 'colored'])
         }
         
         complexity_score = sum(complexity_indicators.values())
         complexity_level = 'simple' if complexity_score <= 1 else 'moderate' if complexity_score <= 3 else 'complex'
         
+        # Ensure prompts with animation effects or colors get enhancement
+        requires_enhancement = complexity_score >= 2 or complexity_indicators['animation_effects'] or complexity_indicators['color_specifications']
+        
         return {
             'level': complexity_level,
             'score': complexity_score,
             'indicators': complexity_indicators,
-            'requires_enhancement': complexity_score >= 2,
-            'workflow_recommendation': 'enhanced' if complexity_score >= 2 else 'restrictive'
+            'requires_enhancement': requires_enhancement,
+            'workflow_recommendation': 'enhanced' if requires_enhancement else 'restrictive'
         }
     
     def _apply_basic_workflow(self, animation_spec: Dict[str, Any], prompt: str = "") -> Dict[str, Any]:

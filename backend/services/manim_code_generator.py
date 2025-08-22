@@ -275,8 +275,30 @@ class GeneratedScene(MovingCameraScene):
                 )
                 circle_obj.move_to(pos)
                 
-                self.add(circle_obj)
-                self.play(Create(circle_obj), run_time=1.0)
+                # Handle animations from the spec
+                animations = obj.get('animations', [])
+                if not animations:
+                    # Default: just create the object
+                    self.add(circle_obj)
+                    self.play(Create(circle_obj), run_time=1.0)
+                else:
+                    # Process each animation
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 1.0)
+                        
+                        if anim_type == 'fade_in':
+                            self.add(circle_obj)
+                            self.play(FadeIn(circle_obj), run_time=duration)
+                        elif anim_type == 'fade_out':
+                            self.play(FadeOut(circle_obj), run_time=duration)
+                        elif anim_type == 'wait':
+                            self.wait(duration)
+                        else:
+                            # Default fallback
+                            self.add(circle_obj)
+                            self.play(Create(circle_obj), run_time=duration)
+                
                 objects_created.append(circle_obj)
                 self.wait(0.5)
                 
@@ -309,8 +331,30 @@ class GeneratedScene(MovingCameraScene):
                 )
                 square_obj.move_to(pos)
                 
-                self.add(square_obj)
-                self.play(Create(square_obj), run_time=1.0)
+                # Handle animations from the spec
+                animations = obj.get('animations', [])
+                if not animations:
+                    # Default: just create the object
+                    self.add(square_obj)
+                    self.play(Create(square_obj), run_time=1.0)
+                else:
+                    # Process each animation
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 1.0)
+                        
+                        if anim_type == 'fade_in':
+                            self.add(square_obj)
+                            self.play(FadeIn(square_obj), run_time=duration)
+                        elif anim_type == 'fade_out':
+                            self.play(FadeOut(square_obj), run_time=duration)
+                        elif anim_type == 'wait':
+                            self.wait(duration)
+                        else:
+                            # Default fallback
+                            self.add(square_obj)
+                            self.play(Create(square_obj), run_time=duration)
+                
                 objects_created.append(square_obj)
                 self.wait(0.5)
                 
