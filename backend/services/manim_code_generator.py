@@ -256,16 +256,28 @@ class GeneratedScene(MovingCameraScene):
                     if isinstance(color_name, str) and color_name.startswith('#'):
                         color = Color(color_name)
                     else:
+                        # Handle both uppercase and lowercase color names
                         color_mapping = {
+                            # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
                             'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
-                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW
+                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
+                            # Uppercase mappings (for when AI generates RED, BLUE, etc.)
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
+                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
+                            'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
-                        color = color_mapping.get(str(color_name).lower(), WHITE)
+                        color = color_mapping.get(str(color_name), WHITE)
+                        
+                        # Debug logging
+                        print(f"Color mapping: '{color_name}' -> {color}")
                 except Exception:
                     color = WHITE
+                    print(f"Color mapping failed for '{color_name}', using WHITE")
                 
                 circle_obj = Circle(
                     radius=size,
@@ -312,14 +324,22 @@ class GeneratedScene(MovingCameraScene):
                     if isinstance(color_name, str) and color_name.startswith('#'):
                         color = Color(color_name)
                     else:
+                        # Handle both uppercase and lowercase color names
                         color_mapping = {
+                            # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
                             'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
-                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW
+                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
+                            # Uppercase mappings (for when AI generates RED, BLUE, etc.)
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
+                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
+                            'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
-                        color = color_mapping.get(str(color_name).lower(), BLUE)
+                        color = color_mapping.get(str(color_name), BLUE)
                 except Exception:
                     color = BLUE
                 
@@ -372,14 +392,22 @@ class GeneratedScene(MovingCameraScene):
                     if isinstance(color_name, str) and color_name.startswith('#'):
                         color = Color(color_name)
                     else:
+                        # Handle both uppercase and lowercase color names
                         color_mapping = {
+                            # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
                             'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
-                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW
+                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
+                            # Uppercase mappings (for when AI generates RED, BLUE, etc.)
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
+                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
+                            'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
-                        color = color_mapping.get(str(color_name).lower(), WHITE)
+                        color = color_mapping.get(str(color_name), WHITE)
                 except Exception:
                     color = WHITE
                 
@@ -406,14 +434,22 @@ class GeneratedScene(MovingCameraScene):
                     if isinstance(color_name, str) and color_name.startswith('#'):
                         color = Color(color_name)
                     else:
+                        # Handle both uppercase and lowercase color names
                         color_mapping = {
+                            # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
                             'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
-                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW
+                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
+                            # Uppercase mappings (for when AI generates RED, BLUE, etc.)
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
+                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
+                            'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
-                        color = color_mapping.get(str(color_name).lower(), WHITE)
+                        color = color_mapping.get(str(color_name), WHITE)
                 except Exception:
                     color = WHITE
                 
@@ -441,14 +477,22 @@ class GeneratedScene(MovingCameraScene):
                     if isinstance(color_name, str) and color_name.startswith('#'):
                         color = Color(color_name)
                     else:
+                        # Handle both uppercase and lowercase color names
                         color_mapping = {
+                            # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
                             'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
-                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW
+                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
+                            # Uppercase mappings (for when AI generates RED, BLUE, etc.)
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
+                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
+                            'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
-                        color = color_mapping.get(str(color_name).lower(), RED)
+                        color = color_mapping.get(str(color_name), RED)
                 except Exception:
                     color = RED
                 
@@ -481,14 +525,22 @@ class GeneratedScene(MovingCameraScene):
                     if isinstance(color_name, str) and color_name.startswith('#'):
                         color = Color(color_name)
                     else:
+                        # Handle both uppercase and lowercase color names
                         color_mapping = {
+                            # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
                             'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
-                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW
+                            'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
+                            # Uppercase mappings (for when AI generates RED, BLUE, etc.)
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
+                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
+                            'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
-                        color = color_mapping.get(str(color_name).lower(), WHITE)
+                        color = color_mapping.get(str(color_name), WHITE)
                 except Exception:
                     color = WHITE
                 
