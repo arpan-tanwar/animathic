@@ -84,10 +84,10 @@ class ManimCodeGenerator:
             return False
     
     def _validate_generated_code(self, code: str) -> bool:
-        """Validate generated Manim code"""
+        """Validate generated Manim code - IMPROVED VERSION"""
         try:
             if not code or not isinstance(code, str):
-                logger.error("Generated code is empty or not a string")
+                logger.error("Code is empty or not a string")
                 return False
             
             # Check for required components
@@ -104,19 +104,36 @@ class ManimCodeGenerator:
                     logger.error(f"Missing required component: {component}")
                     return False
             
-            # Check for dangerous patterns
+            # Check for dangerous patterns - IMPROVED: More intelligent detection
             dangerous_patterns = [
-                'eval(',
-                '__import__(',
-                'exec(',
-                'open(',
-                'file('
+                # Only catch actual function calls, not string literals or comments
+                'eval(',  # Actual eval function call
+                '__import__(',  # Actual import function call
+                'exec(',  # Actual exec function call
+                'open(',  # Actual open function call
+                'file('   # Actual file function call
             ]
             
+            # More intelligent pattern detection
             for pattern in dangerous_patterns:
+                # Look for actual function calls, not string literals or comments
                 if pattern in code:
-                    logger.error(f"Dangerous pattern found: {pattern}")
-                    return False
+                    # Check if it's in a string literal or comment
+                    lines = code.split('\n')
+                    for i, line in enumerate(lines):
+                        if pattern in line:
+                            # Skip if it's a comment
+                            stripped_line = line.strip()
+                            if stripped_line.startswith('#'):
+                                continue
+                            
+                            # Skip if it's in a string literal
+                            if f"'{pattern}" in line or f'"{pattern}' in line:
+                                continue
+                            
+                            # This is an actual dangerous pattern
+                            logger.error(f"Dangerous pattern found on line {i+1}: {line.strip()}")
+                            return False
             
             logger.info("Generated code validation passed")
             return True
@@ -409,7 +426,7 @@ class GeneratedScene(MovingCameraScene):
                         }
                         
                         print(f"Color mapping lookup: '{color_name}' in {list(color_mapping.keys())}")
-                        color = color_mapping.get(str(color_name), WHITE)
+                        color = color_mapping.get(str(color_name), RED)  # Default to RED instead of WHITE
                         print(f"Color mapping result: '{color_name}' -> {color}")
                         
                         # Debug logging
@@ -418,7 +435,17 @@ class GeneratedScene(MovingCameraScene):
                 except (ValueError, TypeError) as e:
                     # Only catch specific color-related errors, not all exceptions
                     print(f"Color parsing error for '{color_name}': {e}")
-                    color = WHITE
+                    # Try to use color mapping as fallback instead of defaulting to WHITE
+                    try:
+                        color_mapping = {
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }
+                        color = color_mapping.get(str(color_name), RED)  # Default to RED instead of WHITE
+                        print(f"Fallback color mapping: '{color_name}' -> {color}")
+                    except Exception:
+                        color = RED  # Default to RED instead of WHITE
+                        print(f"Final fallback: using RED for '{color_name}'")
                 except Exception as e:
                     # For any other unexpected errors, still use the color mapping fallback
                     print(f"Unexpected error in color handling for '{color_name}': {e}")
@@ -428,11 +455,11 @@ class GeneratedScene(MovingCameraScene):
                             'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
                             'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
                         }
-                        color = color_mapping.get(str(color_name), WHITE)
+                        color = color_mapping.get(str(color_name), RED)  # Default to RED instead of WHITE
                         print(f"Fallback color mapping: '{color_name}' -> {color}")
                     except Exception:
-                        color = WHITE
-                        print(f"Final fallback: using WHITE for '{color_name}'")
+                        color = RED  # Default to RED instead of WHITE
+                        print(f"Final fallback: using RED for '{color_name}'")
                 
                 print(f"Final color for circle: {color}")
                 print(f"Circle object will be created with fill_color={color}, stroke_color={color}")
@@ -510,7 +537,17 @@ class GeneratedScene(MovingCameraScene):
                 except (ValueError, TypeError) as e:
                     # Only catch specific color-related errors, not all exceptions
                     print(f"Color parsing error for '{color_name}': {e}")
-                    color = BLUE
+                    # Try to use color mapping as fallback instead of defaulting to BLUE
+                    try:
+                        color_mapping = {
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }
+                        color = color_mapping.get(str(color_name), RED)  # Default to RED instead of BLUE
+                        print(f"Fallback color mapping: '{color_name}' -> {color}")
+                    except Exception:
+                        color = RED  # Default to RED instead of BLUE
+                        print(f"Final fallback: using RED for '{color_name}'")
                 except Exception as e:
                     # For any other unexpected errors, still use the color mapping fallback
                     print(f"Unexpected error in color handling for '{color_name}': {e}")
@@ -520,11 +557,11 @@ class GeneratedScene(MovingCameraScene):
                             'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
                             'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
                         }
-                        color = color_mapping.get(str(color_name), BLUE)
+                        color = color_mapping.get(str(color_name), RED)  # Default to RED instead of BLUE
                         print(f"Fallback color mapping: '{color_name}' -> {color}")
                     except Exception:
-                        color = BLUE
-                        print(f"Final fallback: using BLUE for '{color_name}'")
+                        color = RED  # Default to RED instead of BLUE
+                        print(f"Final fallback: using RED for '{color_name}'")
                 
                 square_obj = Square(
                     side_length=size,
@@ -600,7 +637,7 @@ class GeneratedScene(MovingCameraScene):
                         }
                         color = color_mapping.get(str(color_name), WHITE)
                 except Exception:
-                    color = WHITE
+                    color = RED  # Default to RED instead of WHITE
                 
                 text_obj = Text(
                     text_content,
@@ -642,7 +679,7 @@ class GeneratedScene(MovingCameraScene):
                         }
                         color = color_mapping.get(str(color_name), WHITE)
                 except Exception:
-                    color = WHITE
+                    color = RED  # Default to RED instead of WHITE
                 
                 axes_obj = Axes(
                     x_range=[x_range[0], x_range[1], x_range[2]],
@@ -748,7 +785,7 @@ class GeneratedScene(MovingCameraScene):
                         }
                         color = color_mapping.get(str(color_name), WHITE)
                 except Exception:
-                    color = WHITE
+                    color = RED  # Default to RED instead of WHITE
                 
                 dot_obj = Dot(point=pos, radius=float(size), color=color)
                 self.add(dot_obj)

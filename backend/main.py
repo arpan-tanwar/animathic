@@ -355,8 +355,22 @@ async def generate_video_from_manim(manim_code: str, job_id: str) -> Optional[st
         dangerous_patterns = ['eval(', '__import__(', 'exec(', 'open(', 'file(']
         for pattern in dangerous_patterns:
             if pattern in manim_code:
-                logger.error(f"Dangerous pattern found in Manim code: {pattern}")
-                return None
+                # More intelligent detection - check if it's in a string literal or comment
+                lines = manim_code.split('\n')
+                for i, line in enumerate(lines):
+                    if pattern in line:
+                        # Skip if it's a comment
+                        stripped_line = line.strip()
+                        if stripped_line.startswith('#'):
+                            continue
+                        
+                        # Skip if it's in a string literal
+                        if f"'{pattern}" in line or f'"{pattern}' in line:
+                            continue
+                        
+                        # This is an actual dangerous pattern
+                        logger.error(f"Dangerous pattern found on line {i+1}: {line.strip()}")
+                        return None
         
         # Create temporary directory for Manim execution
         with tempfile.TemporaryDirectory() as temp_dir:

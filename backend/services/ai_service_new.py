@@ -666,17 +666,27 @@ class AIService:
             
             # Check for dangerous patterns
             dangerous_patterns = [
-                'eval(',
-                '__import__(',
-                'exec(',
-                'open(',
-                'file('
+                'eval(', 'exec(', '__import__(', 'open(', 'file('
             ]
             
             for pattern in dangerous_patterns:
                 if pattern in code:
-                    logger.error(f"Dangerous pattern found: {pattern}")
-                    return False
+                    # More intelligent detection - check if it's in a string literal or comment
+                    lines = code.split('\n')
+                    for i, line in enumerate(lines):
+                        if pattern in line:
+                            # Skip if it's a comment
+                            stripped_line = line.strip()
+                            if stripped_line.startswith('#'):
+                                continue
+                            
+                            # Skip if it's in a string literal
+                            if f"'{pattern}" in line or f'"{pattern}' in line:
+                                continue
+                            
+                            # This is an actual dangerous pattern
+                            logger.error(f"Dangerous pattern found on line {i+1}: {line.strip()}")
+                            return False
             
             logger.info("Manim code validation passed")
             return True
