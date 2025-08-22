@@ -4,7 +4,8 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # System deps for psycopg2 and Manim (cairo, pango, ffmpeg, latex minimal)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
     libpq5 build-essential \
     ffmpeg \
     libcairo2 \
@@ -13,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpangocairo-1.0-0 \
     libpango1.0-dev \
     pkg-config \
+    libexpat1 \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./

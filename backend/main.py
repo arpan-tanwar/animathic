@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, Depends, Header
+from fastapi import FastAPI, HTTPException, Request, Depends, Header, Query
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -79,7 +79,7 @@ except ImportError:
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -233,7 +233,10 @@ async def resolve_public_video_url(file_path: str) -> Optional[str]:
     async with httpx.AsyncClient(timeout=timeout) as client:
         for url in candidates:
             try:
-                headers = {"Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
+                headers = {
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                    "apikey": SUPABASE_SERVICE_KEY,
+                }
                 r = await client.head(url, headers=headers)
                 if r.status_code == 200:
                     # Return the authenticated URL that can be used for streaming
@@ -284,19 +287,11 @@ async def supabase_copy_object(source_bucket: str, source_key: str, dest_bucket:
         return r.status_code in (200, 201)
 
 
-async def ensure_placeholder_uploaded(db: Session, dest_path: str) -> bool:
+async def ensure_placeholder_uploaded(db, dest_path: str) -> bool:
     """Ensure there is a file at dest_path in NEW_BUCKET by copying an existing video as placeholder."""
     try:
         # Find a recent existing file_path to clone
-        row = db.execute(
-            text("""
-                SELECT file_path
-                FROM videos
-                WHERE file_path IS NOT NULL AND file_path <> ''
-                ORDER BY created_at DESC NULLS LAST
-                LIMIT 1
-            """),
-        ).fetchone()
+        row = None
         if not row:
             return False
         source_key = (getattr(row, "file_path", None) or row[0]).lstrip("/")
@@ -564,7 +559,8 @@ async def generate_animation(
         # Try to insert job record in Supabase (optional)
         if is_database_available() and getattr(supabase_db, "client", None):
             try:
-                await _ensure_generation_jobs_table()
+                pass
+                # await _ensure_generation_jobs_table()
                 supabase_db.client.table("generation_jobs").insert({
                     "id": job_id,
                     "user_id": user_id,
@@ -673,7 +669,7 @@ async def process_generation_job_async(job_id: str, prompt: str, user_id: str):
                 if supabase_db.enabled:
                     import uuid as _uuid
                     new_video_id = str(_uuid.uuid4())
-                    await supabase_db.create_video({
+                    vid_payload = {
                         "id": new_video_id,
                         "user_id": user_id,
                         "file_path": generation_jobs[job_id]["file_path"],
@@ -682,7 +678,10 @@ async def process_generation_job_async(job_id: str, prompt: str, user_id: str):
                         "mime_type": "video/mp4",
                         "generation_job_id": job_id,
                         "created_at": datetime.now(timezone.utc).isoformat(),
-                    })
+                    }
+                    vid_id = await supabase_db.create_video(vid_payload)
+                    if not vid_id:
+                        logger.warning(f"Supabase create_video returned no id for job {job_id}")
                     # Record result video id and stream URL for status endpoint
                     generation_jobs[job_id]["result_video_id"] = new_video_id
                     # Keep existing path URL; also set id-based URL as an alternative for clients that use it
@@ -791,11 +790,7 @@ async def process_generation_job(job_id: str, prompt: str, user_id: str):
         generation_jobs[job_id]["status"] = "processing"
         generation_jobs[job_id]["current_step"] = 1
         try:
-            db.execute(
-                text("UPDATE generation_jobs SET status='processing', current_step=1, updated_at=now() WHERE id=:id"),
-                {"id": job_id},
-            )
-            db.commit()
+            pass
         except Exception as ue:
             logger.warning(f"DB update failed (processing step 1): {ue}")
         
@@ -820,17 +815,7 @@ async def process_generation_job(job_id: str, prompt: str, user_id: str):
                 generation_jobs[job_id]["ai_response"] = ai_result["animation_spec"]
                 generation_jobs[job_id]["manim_code"] = ai_result["manim_code"]
                 try:
-                    db.execute(
-                        text(
-                            "UPDATE generation_jobs SET current_step=2, ai_response=:ar, manim_code=:mc, updated_at=now() WHERE id=:id"
-                        ),
-                        {
-                            "id": job_id,
-                            "ar": json.dumps(ai_result["animation_spec"])[:50000],
-                            "mc": ai_result["manim_code"][:50000],
-                        },
-                    )
-                    db.commit()
+                    pass
                 except Exception as ue2:
                     logger.warning(f"DB update failed (after AI result): {ue2}")
 
@@ -896,11 +881,7 @@ async def process_generation_job(job_id: str, prompt: str, user_id: str):
                 last_error_summary = str(attempt_err)[:500]
                 logger.error(f"Attempt {attempt} failed: {last_error_summary}")
                 try:
-                    db.execute(
-                        text("UPDATE generation_jobs SET error_message=:err, updated_at=now() WHERE id=:id"),
-                        {"id": job_id, "err": f"Attempt {attempt} failed: {last_error_summary}"[:1000]},
-                    )
-                    db.commit()
+                    pass
                 except Exception:
                     pass
 
@@ -1056,7 +1037,7 @@ async def get_user_videos(
     user_id: str = Header(..., alias="user-id"),
     request: Request = None,
 ):
-    """Get all videos for a user, merging DB rows and storage objects across both buckets."""
+    """Get all videos for a user directly from storage buckets."""
     try:
         logger.info(f"Fetching videos for user {user_id}")
 
@@ -1067,135 +1048,85 @@ async def get_user_videos(
         if not supabase_db.enabled:
             raise HTTPException(status_code=503, detail="Database service not available")
         
-        # Get DB rows (authoritative metadata)
-        rows_data = await supabase_db.get_videos(user_id, limit=200)
-        rows_data = rows_data or []
-
-        # Also list storage objects from both buckets to include legacy files without DB rows
-        storage_items = []
-        try:
-            storage_items += await supabase_storage.list_user_videos_in_bucket(NEW_BUCKET, user_id)
-        except Exception:
-            pass
-        try:
-            storage_items += await supabase_storage.list_user_videos_in_bucket(OLD_BUCKET, user_id)
-        except Exception:
-            pass
+        # Get all videos directly from both storage buckets
+        all_videos = []
         
-        # Convert DB rows to RowLike
-        rows = []
-        for row in rows_data:
-            # Create a row-like object that matches the expected structure
-            class RowLike:
-                def __init__(self, data):
-                    self.id = data.get('id')
-                    self.prompt = data.get('prompt')
-                    self.created_at = data.get('created_at')
-                    self.file_path = data.get('file_path')
-                    self.status = data.get('status')
-                    self.mime_type = data.get('mime_type')
-                    
-                def __getitem__(self, index):
-                    # Support tuple-like access
-                    if index == 0: return self.id
-                    if index == 1: return self.prompt
-                    if index == 2: return self.created_at
-                    if index == 3: return self.file_path
-                    if index == 4: return self.status
-                    if index == 5: return self.mime_type
-                    raise IndexError(f"Index {index} out of range")
-                    
-                def __len__(self):
-                    return 6
-                    
-            rows.append(RowLike(row))
-
-        # Add storage-only items that are not in DB
-        if storage_items:
-            existing_paths = set([(r.get('file_path') or '').lstrip('/') for r in rows_data])
-
-            for item in storage_items:
-                object_key = (item.get('object_key') or '').lstrip('/')
-                if not object_key or object_key in existing_paths:
-                    continue
-                # Synthesize a row-like entry
-                class RowLikeStorage:
-                    def __init__(self, key, created, bucket):
-                        import uuid as _uuid
-                        self.id = str(_uuid.uuid4())
-                        self.prompt = None
-                        self.created_at = created or datetime.now(timezone.utc)
-                        self.file_path = key
-                        self.status = 'completed'
-                        self.mime_type = 'video/mp4'
-                        self._bucket = bucket
-                    def __getitem__(self, index):
-                        mapping = [self.id, self.prompt, self.created_at, self.file_path, self.status, self.mime_type]
-                        return mapping[index]
-                    def __len__(self):
-                        return 6
-                rows.append(RowLikeStorage(object_key, item.get('created_at'), item.get('bucket')))
-
-        # Sort combined rows by created_at desc so newest (DB or storage) are first
-        def _as_dt(v):
-            try:
-                if isinstance(v, str):
-                    # Trim Z if present for fromisoformat
-                    s = v.rstrip('Z')
-                    return datetime.fromisoformat(s)
-                return v or datetime.fromtimestamp(0, tz=timezone.utc)
-            except Exception:
-                return datetime.fromtimestamp(0, tz=timezone.utc)
-
         try:
-            rows.sort(key=lambda r: _as_dt(getattr(r, 'created_at', None) or (len(r) > 2 and r[2])), reverse=True)
-        except Exception:
-            pass
+            new_bucket_items = await supabase_storage.list_user_videos_in_bucket(NEW_BUCKET, user_id)
+            logger.info(f"Found {len(new_bucket_items)} videos in {NEW_BUCKET} bucket for user {user_id}")
+            all_videos.extend(new_bucket_items)
+        except Exception as e:
+            logger.warning(f"Failed to list videos from {NEW_BUCKET}: {e}")
+        
+        try:
+            old_bucket_items = await supabase_storage.list_user_videos_in_bucket(OLD_BUCKET, user_id)
+            logger.info(f"Found {len(old_bucket_items)} videos in {OLD_BUCKET} bucket for user {user_id}")
+            all_videos.extend(old_bucket_items)
+        except Exception as e:
+            logger.warning(f"Failed to list videos from {OLD_BUCKET}: {e}")
+        
+        logger.info(f"Total videos found: {len(all_videos)}")
 
-        results: List[VideoResponse] = []
-        # Resolve URLs concurrently
-        async def build_response(r):
-            # Row may be a RowMapping or tuple depending on driver
-            rid = getattr(r, "id", None) or r[0]
-            rprompt = getattr(r, "prompt", None) or r[1]
-            rcreated = getattr(r, "created_at", None) or (len(r) > 2 and r[2]) or datetime.now(timezone.utc)
-            rfile = getattr(r, "file_path", None) or (len(r) > 3 and r[3]) or None
-            rstatus = getattr(r, "status", None) or (len(r) > 4 and r[4]) or "completed"
-            url = await resolve_public_video_url(rfile or "")
-            return VideoResponse(
-                id=str(rid),
-                prompt=rprompt or "",
-                video_url=url,
-                thumbnail_url=None,
-                mime_type=(getattr(r, "mime_type", None) or (len(r) > 5 and r[5]) or None),
-                status=rstatus or "completed",
-                error_message=None,
-                created_at=rcreated,
-            )
-
-        # For reliable playback (CORS/range), serve via backend stream endpoint
-        base = build_https_base_url(request)
-        async def build_with_stream(r):
-            vr = await build_response(r)
-            # Check if the video file actually exists in storage
-            if vr.video_url:
-                # If this is a storage-only row (has _bucket and file_path), stream by path
-                bucket = getattr(r, "_bucket", None)
-                file_path = getattr(r, "file_path", None)
-                if bucket and file_path:
-                    from urllib.parse import quote
-                    key_q = quote(str(file_path).lstrip("/"))
-                    vr.video_url = f"{base}/api/stream?bucket={bucket}&key={key_q}"
-                else:
-                    # DB-backed row: stream by video id
-                    vr.video_url = f"{base}/api/videos/{vr.id}/stream"
-                vr.status = "completed"
-            else:
-                vr.status = "file_missing"
-                vr.error_message = "Video file not found in storage"
-            return vr
-
-        results = await asyncio.gather(*(build_with_stream(r) for r in rows))
+        # Convert storage items to VideoResponse objects
+        def build_video_response(item):
+            try:
+                # Extract filename and create a meaningful prompt
+                # Storage items have 'object_key' field with full path including user_id
+                object_key = item.get('object_key', '')
+                
+                # Better title extraction
+                prompt = "Video from storage"  # Default fallback
+                if object_key:
+                    try:
+                        # Remove user_id prefix and file extension to get clean filename
+                        # object_key format: "user_id/filename_timestamp_id.mp4"
+                        clean_name = object_key.replace(f"{user_id}/", "").rsplit(".", 1)[0]
+                        
+                        # Remove timestamp and short ID if present (pattern: _YYYYMMDD_HHMMSS_abcdef12)
+                        import re
+                        match = re.match(r"^(.*)_\d{8}_\d{6}_[a-f0-9]{8}$", clean_name)
+                        if match:
+                            prompt = match.group(1).replace("-", " ").replace("_", " ").strip()
+                        else:
+                            prompt = clean_name.replace("-", " ").replace("_", " ").strip()
+                        
+                        if not prompt:
+                            prompt = "Video from storage"
+                    except Exception as e:
+                        logger.warning(f"Error extracting title from {object_key}: {e}")
+                        prompt = "Video from storage"
+                
+                # Generate a unique ID for storage items
+                storage_id = f"storage_{hash(object_key) % 1000000}"
+                
+                # Create video URL with the FULL object key (including user_id prefix)
+                video_url = f"{build_https_base_url(request)}/api/stream?bucket={item.get('_bucket', NEW_BUCKET)}&key={object_key}"
+                
+                return VideoResponse(
+                    id=storage_id,
+                    prompt=prompt,
+                    video_url=video_url,
+                    status="completed",
+                    file_path=object_key,  # Store the full object key
+                    created_at=item.get('created_at', datetime.now(timezone.utc)),
+                    mime_type="video/mp4"
+                )
+            except Exception as e:
+                logger.error(f"Error building video response for item {item}: {e}")
+                # Return a fallback response
+                return VideoResponse(
+                    id=f"error_{hash(str(item)) % 1000000}",
+                    prompt="Error loading video",
+                    video_url="",
+                    status="error",
+                    file_path="",
+                    created_at=datetime.now(timezone.utc),
+                    mime_type="video/mp4"
+                )
+        
+        # Build all video responses
+        results = [build_video_response(item) for item in all_videos]
+        logger.info(f"Returning {len(results)} total videos for user {user_id}")
         return results
 
     except Exception as e:
@@ -1336,33 +1267,92 @@ async def stream_by_path(bucket: str, key: str, request: Request):
     try:
         if not SUPABASE_SERVICE_KEY:
             raise HTTPException(status_code=500, detail="Storage misconfigured")
+        
+        # Clean up the key - remove any leading slashes and ensure proper format
         file_path = key.lstrip("/")
-        url = f"{SUPABASE_URL}/storage/v1/object/{bucket}/{file_path}"
+        logger.info(f"Streaming request for bucket: {bucket}, key: {file_path}")
+        
+        # Try different Supabase storage endpoint formats
+        # Format 1: Direct object access (for private buckets)
+        url1 = f"{SUPABASE_URL}/storage/v1/object/{bucket}/{file_path}"
+        # Format 2: Public object access (for public buckets)
+        url2 = f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{file_path}"
+        
+        logger.info(f"Trying URL 1: {url1}")
+        logger.info(f"Trying URL 2: {url2}")
+        
         range_header = request.headers.get("range")
-        timeout = httpx.Timeout(10.0, connect=5.0)
+        timeout = httpx.Timeout(30.0, connect=10.0)
+        
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            headers = {"Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
+            headers = {
+                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                "apikey": SUPABASE_SERVICE_KEY
+            }
             if range_header:
                 headers["Range"] = range_header
-            resp = await client.get(url, headers=headers)
-            if resp.status_code in (200, 206):
-                stream = resp.aiter_bytes()
-                forward_headers = {}
-                for h in ("Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control"):
-                    if h in resp.headers:
-                        forward_headers[h] = resp.headers[h]
-                return StreamingResponse(stream, status_code=resp.status_code, media_type="video/mp4", headers=forward_headers)
-        raise HTTPException(status_code=404, detail="Video file not found")
+            
+            # Try the first URL (private bucket access)
+            try:
+                logger.info(f"Making request to Supabase with headers: {dict(headers)}")
+                resp = await client.get(url1, headers=headers)
+                logger.info(f"Supabase response status: {resp.status_code}")
+                
+                if resp.status_code in (200, 206):
+                    stream = resp.aiter_bytes()
+                    forward_headers = {}
+                    for h in ("Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control"):
+                        if h in resp.headers:
+                            forward_headers[h] = resp.headers[h]
+                    
+                    logger.info(f"Successfully streaming video from {bucket}/{file_path}")
+                    return StreamingResponse(
+                        stream, 
+                        status_code=resp.status_code, 
+                        media_type="video/mp4", 
+                        headers=forward_headers
+                    )
+            except Exception as e:
+                logger.warning(f"First URL failed: {e}")
+            
+            # Try the second URL (public bucket access)
+            try:
+                logger.info(f"Trying public URL: {url2}")
+                resp = await client.get(url2, headers=headers)
+                logger.info(f"Public URL response status: {resp.status_code}")
+                
+                if resp.status_code in (200, 206):
+                    stream = resp.aiter_bytes()
+                    forward_headers = {}
+                    for h in ("Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control"):
+                        if h in resp.headers:
+                            forward_headers[h] = resp.headers[h]
+                    
+                    logger.info(f"Successfully streaming video from public URL {bucket}/{file_path}")
+                    return StreamingResponse(
+                        stream, 
+                        status_code=resp.status_code, 
+                        media_type="video/mp4", 
+                        headers=forward_headers
+                    )
+            except Exception as e:
+                logger.warning(f"Public URL failed: {e}")
+            
+            # If both URLs fail, return detailed error
+            logger.error(f"Both Supabase storage URLs failed for {bucket}/{file_path}")
+            raise HTTPException(status_code=404, detail=f"Video file not found in storage: {bucket}/{file_path}")
+                
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error streaming by path: {e}")
+        logger.error(f"Error streaming by path: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to stream video")
 
 @app.delete("/api/videos/{video_id}")
 async def delete_video(
     video_id: str,
-    user_id: str = Header(..., alias="user-id")
+    user_id: str = Header(..., alias="user-id"),
+    object_key: str = Query(None, description="Object key for storage videos (required for storage videos)")
 ):
     """Delete a video"""
     try:
@@ -1373,36 +1363,76 @@ async def delete_video(
         if not supabase_db.enabled:
             raise HTTPException(status_code=503, detail="Database service not available")
         
-        # Get video from Supabase to check ownership and get file path
-        row_data = await supabase_db.get_video(video_id)
-        if not row_data:
-            raise HTTPException(status_code=404, detail="Video not found")
-
-        # Check if user owns this video
-        if row_data.get('user_id') != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        file_path = (row_data.get('file_path') or "").lstrip("/")
-
-        # Delete from Supabase database
-        success = await supabase_db.update_video(video_id, {"deleted_at": datetime.now(timezone.utc).isoformat()})
-        if not success:
-            # If update fails, try to delete the record
+        # Handle storage-only videos (those with IDs starting with "storage_")
+        if video_id.startswith("storage_"):
+            # For storage-only videos, we need the object key to delete from storage
+            # The frontend should provide this as a query parameter
+            if not object_key:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="For storage videos, please provide the object_key as a query parameter. Example: DELETE /api/videos/storage_123?object_key=user_id/filename.mp4"
+                )
+            
+            # Use the provided object key directly
+            file_path = object_key
+            logger.info(f"Deleting storage video with object key: {file_path}")
+            
+            # Delete from storage
             try:
-                # Note: Supabase client doesn't have a direct delete method in the current version
-                # We'll mark it as deleted instead
-                logger.warning(f"Could not mark video {video_id} as deleted")
+                # Try both buckets
+                success = False
+                for bucket in [NEW_BUCKET, OLD_BUCKET]:
+                    try:
+                        if await supabase_delete_object(bucket, file_path):
+                            success = True
+                            logger.info(f"Successfully deleted video from bucket {bucket}: {file_path}")
+                            break
+                    except Exception as e:
+                        logger.warning(f"Failed to delete from bucket {bucket}: {e}")
+                        continue
+                
+                if not success:
+                    logger.error(f"Failed to delete video from any bucket: {file_path}")
+                    raise HTTPException(status_code=500, detail="Failed to delete video from storage")
+                
             except Exception as e:
-                logger.error(f"Failed to delete video record: {e}")
+                logger.error(f"Error deleting storage video: {e}")
+                raise HTTPException(status_code=500, detail="Failed to delete video from storage")
+            
+            return {"message": "Storage video deleted successfully"}
+        
+        # Handle database videos (existing logic)
+        else:
+            # Get video from Supabase to check ownership and get file path
+            row_data = await supabase_db.get_video(video_id)
+            if not row_data:
+                raise HTTPException(status_code=404, detail="Video not found")
 
-        # Best-effort delete from storage
-        if file_path:
-            try:
-                await supabase_delete_object(NEW_BUCKET, file_path)
-            except Exception:
-                pass
+            # Check if user owns this video
+            if row_data.get('user_id') != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
 
-        return {"message": "Video deleted successfully"}
+            file_path = (row_data.get('file_path') or "").lstrip("/")
+
+            # Delete from Supabase database
+            success = await supabase_db.update_video(video_id, {"deleted_at": datetime.now(timezone.utc).isoformat()})
+            if not success:
+                # If update fails, try to delete the record
+                try:
+                    # Note: Supabase client doesn't have a direct delete method in the current version
+                    # We'll mark it as deleted instead
+                    logger.warning(f"Could not mark video {video_id} as deleted")
+                except Exception as e:
+                    logger.error(f"Failed to delete video record: {e}")
+
+            # Best-effort delete from storage
+            if file_path:
+                try:
+                    await supabase_delete_object(NEW_BUCKET, file_path)
+                except Exception:
+                    pass
+
+            return {"message": "Database video deleted successfully"}
         
     except HTTPException:
         raise

@@ -172,25 +172,67 @@ class SupabaseStorageService:
         if not self.enabled:
             return []
         try:
-            headers = {"Authorization": f"Bearer {self.supabase_service_key}"}
+            headers = {
+                "Authorization": f"Bearer {self.supabase_service_key}",
+                "apikey": self.supabase_service_key,
+                "Content-Type": "application/json",
+            }
             list_url = f"{self.supabase_url}/storage/v1/object/list/{bucket}"
             prefix = f"{user_id}/"
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(list_url, headers=headers, json={"prefix": prefix})
                 if response.status_code != 200:
+                    logger.warning(f"Failed to list videos in bucket {bucket}: {response.status_code}")
                     return []
-                data = response.json()
+                
+                # Debug the response format
+                try:
+                    data = response.json()
+                    logger.info(f"Storage API response type: {type(data)}, content: {str(data)[:200]}...")
+                except Exception as parse_error:
+                    logger.error(f"Failed to parse storage response: {parse_error}")
+                    logger.error(f"Response text: {response.text[:200]}...")
+                    return []
+                
                 items = []
-                for item in data.get('data', []):
-                    object_key = f"{user_id}/{item['name']}"
-                    items.append({
-                        'bucket': bucket,
-                        'object_key': object_key,
-                        'size': item.get('metadata', {}).get('size', 0),
-                        'created_at': item.get('created_at'),
-                    })
+                
+                # Handle different response formats
+                if isinstance(data, dict):
+                    # Traditional format with 'data' key
+                    data_list = data.get('data', [])
+                elif isinstance(data, list):
+                    # Direct list format
+                    data_list = data
+                else:
+                    logger.error(f"Unexpected response format: {type(data)}")
+                    return []
+                
+                for item in data_list:
+                    try:
+                        # The API returns 'name' which is just the filename, not the full path
+                        # We need to prepend the user_id to get the full object key
+                        filename = item.get('name', '')
+                        if not filename:
+                            continue
+                        
+                        # Create the full object key with user_id prefix
+                        object_key = f"{user_id}/{filename}"
+                            
+                        items.append({
+                            'bucket': bucket,
+                            'object_key': object_key,
+                            '_bucket': bucket,  # Add this field for consistency
+                            'size': item.get('metadata', {}).get('size', 0) if isinstance(item.get('metadata'), dict) else 0,
+                            'created_at': item.get('created_at'),
+                        })
+                    except Exception as item_error:
+                        logger.warning(f"Failed to process storage item {item}: {item_error}")
+                        continue
+                
+                logger.info(f"Found {len(items)} videos in bucket {bucket} for user {user_id}")
                 return items
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error listing videos in bucket {bucket}: {e}")
             return []
 
 # Global instance
