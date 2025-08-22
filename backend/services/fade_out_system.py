@@ -403,6 +403,36 @@ class FadeOutSystem:
             logger.error(f"Error getting fade-out performance metrics: {e}")
             return {'error': str(e)}
     
+    def get_fade_out_system_status(self, object_registry):
+        """Get current status of the fade-out system"""
+        try:
+            fade_out_queue = object_registry.get('fade_out_queue', [])
+            visibility_states = object_registry.get('visibility_states', {})
+            
+            # Count objects in various fade-out states
+            objects_fading_out = 0
+            objects_faded_out = 0
+            
+            for obj_id, state in visibility_states.items():
+                if state.get('fade_out_in_progress', False):
+                    objects_fading_out += 1
+                elif not state.get('is_visible', True) and state.get('opacity', 1.0) == 0.0:
+                    objects_faded_out += 1
+            
+            return {
+                'fade_out_queue_length': len(fade_out_queue),
+                'objects_fading_out': objects_fading_out,
+                'objects_faded_out': objects_faded_out,
+                'total_objects': len(object_registry.get('active_objects', {})),
+                'system_status': 'operational'
+            }
+        except Exception as e:
+            logger.error(f"Error getting fade-out system status: {e}")
+            return {
+                'error': str(e),
+                'system_status': 'error'
+            }
+    
     # Legacy compatibility methods
     def exit_fade(self, ids, duration=0.4, stagger=0.05, id_to_mobject=None, scene=None):
         """Legacy fade-out function for backward compatibility"""
