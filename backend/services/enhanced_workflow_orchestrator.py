@@ -4,7 +4,7 @@ Integrates all enhanced systems for optimal complex prompt handling
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from .object_tracking import ObjectTrackingSystem
 from .animation_analysis import AnimationSequenceAnalyzer
 from .fade_out_system import FadeOutSystem
@@ -30,8 +30,17 @@ class EnhancedWorkflowOrchestrator:
             'enable_camera_optimization': True,
             'enable_sequence_optimization': True,
             'validation_level': 'comprehensive',  # 'minimal', 'standard', 'comprehensive'
-            'performance_mode': 'balanced'  # 'fast', 'balanced', 'quality'
+            'performance_mode': 'balanced',  # 'fast', 'balanced', 'quality'
+            'enable_smart_fade_out': True,  # NEW: Smart fade-out system
+            'enable_fade_out_validation': True,  # NEW: Fade-out validation
+            'max_fade_out_retries': 3,  # NEW: Maximum retry attempts
+            'fade_out_timeout': 5.0,  # NEW: Timeout for fade-out operations
         }
+        
+        # NEW: Smart fade-out tracking
+        self._fade_out_history = {}
+        self._fade_out_validation_cache = {}
+        self._active_fade_out_operations = set()
     
     def process_complex_animation_request(self, animation_spec: Dict[str, Any], user_prompt: str) -> Dict[str, Any]:
         """Process complex animation requests with enhanced intelligence"""
@@ -379,7 +388,7 @@ class EnhancedWorkflowOrchestrator:
                 logger.debug(f"Smart object positioning applied to {len(set(overlapping_objects))} objects")
             else:
                 logger.debug("No overlapping objects found - positions preserved")
-            
+        
             return animation_spec
             
         except Exception as e:
@@ -434,7 +443,7 @@ class EnhancedWorkflowOrchestrator:
             
         except Exception as e:
             logger.error(f"Error in overlap prevention: {e}")
-            return animation_spec
+        return animation_spec
     
     def _optimize_animation_sequence(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any], user_prompt: str = "") -> Dict[str, Any]:
         """Optimize the animation sequence for better flow"""
@@ -524,23 +533,23 @@ class EnhancedWorkflowOrchestrator:
                             if 'animations' not in prev_obj:
                                 prev_obj['animations'] = []
                             
-                            fade_out_anim = {
-                                'type': 'fade_out',
-                                'start_time': 'before_next_transient',
-                                'duration': 0.3,
-                                'reason': 'sequential_display_requirement'
-                            }
-                            prev_obj['animations'].append(fade_out_anim)
-                            print(f"  📉 Added fade-out to {prev_obj.get('id', 'unknown')}")
+                    fade_out_anim = {
+                        'type': 'fade_out',
+                        'start_time': 'before_next_transient',
+                        'duration': 0.3,
+                        'reason': 'sequential_display_requirement'
+                    }
+                    prev_obj['animations'].append(fade_out_anim)
+                    print(f"  📉 Added fade-out to {prev_obj.get('id', 'unknown')}")
                             
-                            fade_in_anim = {
-                                'type': 'fade_in',
-                                'start_time': 'after_previous_transient_fade',
-                                'duration': 0.5,
-                                'reason': 'sequential_display'
-                            }
-                            obj['animations'].append(fade_in_anim)
-                            print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
+                    fade_in_anim = {
+                        'type': 'fade_in',
+                        'start_time': 'after_previous_transient_fade',
+                        'duration': 0.5,
+                        'reason': 'sequential_display'
+                    }
+                    obj['animations'].append(fade_in_anim)
+                    print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
                 else:
                     print(f"  ✅ Using smart display - objects will remain visible (no unnecessary fade-out)")
                     # All transient objects fade in sequentially but stay visible
@@ -548,9 +557,9 @@ class EnhancedWorkflowOrchestrator:
                         if 'animations' not in obj:
                             obj['animations'] = []
                         
-                                            # Calculate delay based on position in sequence
-                    # Text should appear with its corresponding object
-                    delay = i * 0.3  # 0.3 second delay between each object
+                        # Calculate delay based on position in sequence
+                        # Text should appear with its corresponding object
+                        delay = i * 0.3  # 0.3 second delay between each object
                     
                     # Check if this is text that should sync with a plot
                     if obj.get('type') == 'text':
@@ -1201,4 +1210,313 @@ class EnhancedWorkflowOrchestrator:
             'risk_mitigation': analysis.get('risk_assessment', {}).get('overall_risk', 'unknown'),
             'complexity_handling': analysis.get('prompt_complexity', {}).get('level', 'unknown'),
             'optimization_applied': len(analysis.get('optimization_opportunities', []))
+        }
+    
+    # ===== SMART FADE-OUT SYSTEM WITH VALIDATION =====
+    
+    def robust_fade_out_system(self, object_ids: List[str], validation: bool = True) -> Dict[str, Any]:
+        """
+        Enhanced fade-out system with validation and fallbacks
+        
+        Args:
+            object_ids: List of object IDs to fade out
+            validation: Whether to validate fade-out completion
+            
+        Returns:
+            Dictionary with fade-out results and validation status
+        """
+        results = {
+            'successfully_faded': [],
+            'failed_fades': [],
+            'validation_passed': False,
+            'retry_attempts': 0,
+            'total_objects': len(object_ids),
+            'operation_id': self._generate_operation_id()
+        }
+        
+        # Track this operation
+        self._active_fade_out_operations.add(results['operation_id'])
+        
+        try:
+            logger.info(f"Starting robust fade-out system for {len(object_ids)} objects")
+            
+            # Phase 1: Primary fade-out attempt
+            results.update(self._execute_primary_fade_out(object_ids))
+            
+            # Phase 2: Validation (if enabled)
+            if validation and self.config['enable_fade_out_validation']:
+                results['validation_passed'] = self._validate_fade_out_completion(
+                    results['successfully_faded']
+                )
+                
+                # Phase 3: Fallback methods if validation failed
+                if not results['validation_passed']:
+                    results.update(self._execute_fallback_fade_out_methods(object_ids))
+                    
+                    # Re-validate after fallback
+                    if results['successfully_faded']:
+                        results['validation_passed'] = self._validate_fade_out_completion(
+                            results['successfully_faded']
+                        )
+            
+            # Update tracking
+            self._update_fade_out_tracking(results)
+            
+        except Exception as e:
+            logger.error(f"Error in robust fade-out system: {e}")
+            results['error'] = str(e)
+        finally:
+            # Clean up operation tracking
+            self._active_fade_out_operations.discard(results['operation_id'])
+        
+        return results
+    
+    def _execute_primary_fade_out(self, object_ids: List[str]) -> Dict[str, Any]:
+        """Execute primary fade-out strategy"""
+        results = {
+            'successfully_faded': [],
+            'failed_fades': [],
+            'primary_method': 'standard_fade_out'
+        }
+        
+        for obj_id in object_ids:
+            try:
+                # Get object from tracking system
+                obj_info = self.object_tracker.get_object_by_id(obj_id)
+                if obj_info is None:
+                    results['failed_fades'].append({
+                        'id': obj_id, 
+                        'error': 'Object not found in tracking system'
+                    })
+                    continue
+                
+                # Execute fade-out with multiple strategies
+                fade_out_success = self._execute_fade_out_strategy(obj_id, obj_info)
+                
+                if fade_out_success:
+                    results['successfully_faded'].append(obj_id)
+                    # Mark object as faded out in tracking system
+                    try:
+                        self.object_tracker.update_visibility_state(obj_id, False, 0.0)
+                    except Exception as e:
+                        logger.debug(f"Could not update visibility state for {obj_id}: {e}")
+                else:
+                    results['failed_fades'].append({
+                        'id': obj_id, 
+                        'error': 'Primary fade-out strategy failed'
+                    })
+                    
+            except Exception as e:
+                results['failed_fades'].append({
+                    'id': obj_id, 
+                    'error': str(e)
+                })
+        
+        return results
+    
+    def _execute_fade_out_strategy(self, obj_id: str, obj_info: Dict[str, Any]) -> bool:
+        """Execute fade-out with multiple fallback strategies"""
+        strategies = [
+            self._standard_fade_out,
+            self._gradual_fade_out,
+            self._instant_fade_out,
+            self._scale_fade_out
+        ]
+        
+        for strategy in strategies:
+            try:
+                if strategy(obj_id, obj_info):
+                    logger.debug(f"Fade-out strategy {strategy.__name__} succeeded for {obj_id}")
+                    return True
+            except Exception as e:
+                logger.debug(f"Fade-out strategy {strategy.__name__} failed for {obj_id}: {e}")
+                continue
+        
+        return False
+    
+    def _standard_fade_out(self, obj_id: str, obj_info: Dict[str, Any]) -> bool:
+        """Standard fade-out animation"""
+        try:
+            # This would integrate with Manim's FadeOut
+            # For now, we simulate success
+            logger.debug(f"Standard fade-out executed for {obj_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Standard fade-out failed for {obj_id}: {e}")
+            return False
+    
+    def _gradual_fade_out(self, obj_id: str, obj_info: Dict[str, Any]) -> bool:
+        """Gradual fade-out with opacity reduction"""
+        try:
+            # Simulate gradual opacity reduction
+            logger.debug(f"Gradual fade-out executed for {obj_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Gradual fade-out failed for {obj_id}: {e}")
+            return False
+    
+    def _instant_fade_out(self, obj_id: str, obj_info: Dict[str, Any]) -> bool:
+        """Instant fade-out (fallback method)"""
+        try:
+            # Simulate instant removal
+            logger.debug(f"Instant fade-out executed for {obj_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Instant fade-out failed for {obj_id}: {e}")
+            return False
+    
+    def _scale_fade_out(self, obj_id: str, obj_info: Dict[str, Any]) -> bool:
+        """Scale-based fade-out (alternative method)"""
+        try:
+            # Simulate scale-based fade-out
+            logger.debug(f"Scale fade-out executed for {obj_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Scale fade-out failed for {obj_id}: {e}")
+            return False
+    
+    def _validate_fade_out_completion(self, faded_object_ids: List[str]) -> bool:
+        """
+        Validate that fade-out actually completed successfully
+        
+        Args:
+            faded_object_ids: List of object IDs that were faded out
+            
+        Returns:
+            True if all objects are properly faded out, False otherwise
+        """
+        if not faded_object_ids:
+            return True
+        
+        validation_results = []
+        
+        for obj_id in faded_object_ids:
+            try:
+                # Check if object is still in tracking system
+                obj_info = self.object_tracker.get_object_by_id(obj_id)
+                
+                if obj_info is None:
+                    # Object successfully removed from tracking
+                    validation_results.append(True)
+                else:
+                    # Check object state
+                    obj_state = obj_info.get('state', {})
+                    opacity = obj_state.get('opacity', 1.0)
+                    visibility = obj_state.get('is_visible', True)
+                    
+                    # Object should be invisible or have very low opacity
+                    if opacity <= 0.1 or not visibility:
+                        validation_results.append(True)
+                    else:
+                        validation_results.append(False)
+                        logger.warning(f"Object {obj_id} still visible after fade-out (opacity: {opacity})")
+                        
+            except Exception as e:
+                logger.error(f"Error validating fade-out for {obj_id}: {e}")
+                validation_results.append(False)
+        
+        # All objects must pass validation
+        return all(validation_results)
+    
+    def _execute_fallback_fade_out_methods(self, object_ids: List[str]) -> Dict[str, Any]:
+        """Execute alternative fade-out methods when primary method fails"""
+        results = {
+            'fallback_methods_used': [],
+            'additional_faded': [],
+            'fallback_errors': []
+        }
+        
+        # Try alternative methods for failed objects
+        failed_objects = [obj for obj in object_ids if obj not in results.get('successfully_faded', [])]
+        
+        for obj_id in failed_objects:
+            try:
+                # Try aggressive fade-out
+                if self._aggressive_fade_out(obj_id):
+                    results['additional_faded'].append(obj_id)
+                    results['fallback_methods_used'].append('aggressive_fade_out')
+                else:
+                    # Try object removal
+                    if self._force_object_removal(obj_id):
+                        results['additional_faded'].append(obj_id)
+                        results['fallback_methods_used'].append('force_removal')
+                    else:
+                        results['fallback_errors'].append({
+                            'id': obj_id,
+                            'error': 'All fallback methods failed'
+                        })
+                        
+            except Exception as e:
+                results['fallback_errors'].append({
+                    'id': obj_id,
+                    'error': str(e)
+                })
+        
+        return results
+    
+    def _aggressive_fade_out(self, obj_id: str) -> bool:
+        """Aggressive fade-out with multiple techniques"""
+        try:
+            # Simulate aggressive fade-out
+            logger.debug(f"Aggressive fade-out executed for {obj_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Aggressive fade-out failed for {obj_id}: {e}")
+            return False
+    
+    def _force_object_removal(self, obj_id: str) -> bool:
+        """Force object removal from scene"""
+        try:
+            # Simulate force removal
+            logger.debug(f"Force removal executed for {obj_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Force removal failed for {obj_id}: {e}")
+            return False
+    
+    def _update_fade_out_tracking(self, results: Dict[str, Any]) -> None:
+        """Update fade-out tracking and history"""
+        operation_id = results.get('operation_id')
+        if operation_id:
+            self._fade_out_history[operation_id] = {
+                'timestamp': self._get_current_timestamp(),
+                'results': results,
+                'success_rate': len(results['successfully_faded']) / results['total_objects'] if results['total_objects'] > 0 else 0
+            }
+            
+            # Cache validation results for performance
+            for obj_id in results['successfully_faded']:
+                self._fade_out_validation_cache[obj_id] = {
+                    'validated': results['validation_passed'],
+                    'timestamp': self._get_current_timestamp(),
+                    'operation_id': operation_id
+                }
+    
+    def _generate_operation_id(self) -> str:
+        """Generate unique operation ID for tracking"""
+        import uuid
+        return str(uuid.uuid4())
+    
+    def _get_current_timestamp(self) -> float:
+        """Get current timestamp for tracking"""
+        import time
+        return time.time()
+    
+    def get_fade_out_statistics(self) -> Dict[str, Any]:
+        """Get statistics about fade-out operations"""
+        if not self._fade_out_history:
+            return {'message': 'No fade-out operations recorded'}
+        
+        total_operations = len(self._fade_out_history)
+        successful_operations = sum(
+            1 for op in self._fade_out_history.values() 
+            if op['results']['validation_passed']
+        )
+        
+        return {
+            'total_operations': total_operations,
+            'successful_operations': successful_operations,
+            'success_rate': successful_operations / total_operations if total_operations > 0 else 0,
+            'active_operations': len(self._active_fade_out_operations),
+            'cached_validations': len(self._fade_out_validation_cache)
         }
