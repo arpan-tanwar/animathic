@@ -143,7 +143,7 @@ class AIService:
             "objects": spec.get("objects") or [],
             "camera_settings": spec.get("camera_settings") or {"position": [0, 0, 0], "zoom": 8},
             "duration": spec.get("duration", 5),
-            "background_color": spec.get("background_color", "#1a1a1a"),
+            "background_color": spec.get("background_color", "#000000"),
             "style": spec.get("style", "modern"),
         }
         
@@ -705,7 +705,7 @@ class AIService:
             'objects': objects,
             'camera_settings': {'position': [0, 0, 0], 'zoom': 8},
             'duration': 8.0 if len(objects) > 3 else 5.0,
-            'background_color': '#1a1a1a',
+            'background_color': '#000000',
             'style': 'modern'
         }
     

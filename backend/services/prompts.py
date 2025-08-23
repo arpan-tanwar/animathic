@@ -87,7 +87,7 @@ Schema:
   ],
   "camera_settings": {"position": [number,number,number], "zoom": number},
   "duration": number,
-  "background_color": string,              // Default to #1a1a1a (dark gray)
+  "background_color": string,              // Default to #000000 (black)
   "style": string
 }
 
@@ -163,7 +163,7 @@ DEFAULT_ANIMATION_SPEC = {
     "objects": [],
     "camera_settings": {"position": [0, 0, 0], "zoom": 8},
     "duration": 5,
-    "background_color": "#1a1a1a",
+    "background_color": "#000000",
     "style": "modern"
 }
 

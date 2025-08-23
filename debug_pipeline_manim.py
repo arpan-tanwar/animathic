@@ -6,9 +6,9 @@ class GeneratedScene(MovingCameraScene):
         # Animation: A parabola plot with axes, a circle at (2,4), a square at (-2,4), and text labels for each point.
         
         # Set background color
-        bg_color = '#1a1a1a'
+        bg_color = '#000000'
         if bg_color.lower() in ['#ffffff', '#fff', 'white', 'ffffff']:
-            bg_color = "#1a1a1a"
+            bg_color = "#000000"
         # Ensure valid Manim color using inline validation
         try:
             if bg_color.startswith('#'):
