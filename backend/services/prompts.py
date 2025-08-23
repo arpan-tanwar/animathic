@@ -19,11 +19,23 @@ CRITICAL RULES (must follow exactly):
 - The JSON should be a direct translation of the user's request, not an interpretation with added features.
 
 COORDINATE POSITIONING RULES (CRITICAL):
-- When coordinates are specified like "at (2,4)", "at (-2,4)", etc., use those EXACT coordinates.
-- Do NOT change or approximate the coordinates - use them exactly as written.
-- For 2D coordinates like (x,y), use [x, y, 0] in the position array.
-- For 3D coordinates like (x,y,z), use [x, y, z] in the position array.
-- Position objects precisely at the specified coordinates.
+- ALWAYS use EXACT coordinates as specified in the user prompt
+- If user says "at (2,4)", place the object EXACTLY at [2, 4, 0]
+- If user says "at (-2,4)", place the object EXACTLY at [-2, 4, 0]
+- NEVER change or approximate coordinates unless explicitly requested
+- Use the [x, y, 0] format for all positions
+- Coordinate system should cover the requested coordinates with margin
+
+COORDINATE EXAMPLES:
+- "circle at (2,4)" → position: [2, 4, 0]
+- "square at (-2,4)" → position: [-2, 4, 0]
+- "point at (0,0)" → position: [0, 0, 0]
+- "text at (1,1)" → position: [1, 1, 0]
+
+COORDINATE SYSTEM SETUP:
+- Set x_range to cover requested x-coordinates ±2 (e.g., for x=2, use [-4, 4])
+- Set y_range to cover requested y-coordinates ±2 (e.g., for y=4, use [2, 6])
+- Ensure axes are centered and visible
 
 TEXT LABEL RULES (IMPORTANT):
 - If the user mentions "text labels", "labels", "annotations", "text", or "names" - you MUST create text objects.
@@ -77,11 +89,6 @@ Schema:
   "background_color": string,              // Default to #1a1a1a (dark gray)
   "style": string
 }
-
-COORDINATE EXAMPLES:
-- "circle at (2,4)" → position: [2, 4, 0]
-- "square at (-2,4)" → position: [-2, 4, 0]
-- "point at (0,0)" → position: [0, 0, 0]
 
 TEXT GENERATION EXAMPLES:
 - "text labels for each point" → Create text objects with "A", "B", "C", etc.

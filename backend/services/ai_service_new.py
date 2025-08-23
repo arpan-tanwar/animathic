@@ -349,10 +349,10 @@ class AIService:
         # More conservative enhancement triggering
         # Only enhance if truly complex or has specific advanced features
         requires_enhancement = (
-            weighted_score >= 5 or  # High complexity
-            (complexity_indicators['mathematical_content'] and complexity_indicators['multiple_objects']) or  # Math + multiple objects
-            (complexity_indicators['sequence_requirements'] and complexity_indicators['interaction_requirements']) or  # Complex sequences
-            (complexity_indicators['animation_effects'] and weighted_score >= 3)  # Animation effects + some complexity
+            weighted_score >= 7 or  # Increased threshold from 5 to 7
+            (complexity_indicators['mathematical_content'] and complexity_indicators['multiple_objects'] and weighted_score >= 4) or  # Math + multiple objects + high score
+            (complexity_indicators['sequence_requirements'] and complexity_indicators['interaction_requirements'] and weighted_score >= 5) or  # Complex sequences + high score
+            (complexity_indicators['animation_effects'] and weighted_score >= 5)  # Animation effects + high score
         )
         
         logger.info(f"Prompt complexity analysis: score={weighted_score}, level={complexity_level}, enhance={requires_enhancement}")

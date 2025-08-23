@@ -36,7 +36,7 @@ class EnhancedWorkflowOrchestrator:
     def process_complex_animation_request(self, animation_spec: Dict[str, Any], user_prompt: str) -> Dict[str, Any]:
         """Process complex animation requests with enhanced intelligence"""
         try:
-            logger.info("Starting enhanced workflow processing for complex animation")
+            logger.debug("Starting enhanced workflow processing for complex animation")
             
             # Phase 1: Pre-processing analysis
             pre_analysis = self._perform_pre_processing_analysis(animation_spec, user_prompt)
@@ -327,70 +327,17 @@ class EnhancedWorkflowOrchestrator:
         return opportunities
     
     def _optimize_object_positions(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Optimize object positions to prevent overlaps"""
-        objects = animation_spec.get('objects', [])
-        if len(objects) <= 1:
-            return animation_spec
-        
-        # Get screen bounds
-        screen_bounds = self.camera_manager.get_screen_bounds()
-        
-        # Apply smart positioning for each object
-        for i, obj in enumerate(objects):
-            existing_objects = objects[:i]
-            
-            # Get positioning strategy
-            positioning_strategy = self.camera_manager.advanced_object_positioning(
-                obj, existing_objects, screen_bounds, {}
-            )
-            
-            # Apply the strategy if it provides a position
-            if positioning_strategy.get('position'):
-                if 'properties' not in obj:
-                    obj['properties'] = {}
-                obj['properties']['position'] = positioning_strategy['position']
-        
+        """Optimize object positions to prevent overlaps - DISABLED to prevent blank videos"""
+        # DISABLED: This was causing objects to move outside camera view
+        # Return the original spec unchanged to preserve user-specified positions
+        logger.debug("Object position optimization DISABLED to prevent blank videos")
         return animation_spec
     
     def _prevent_object_overlaps(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Prevent object overlaps using intelligent positioning"""
-        objects = animation_spec.get('objects', [])
-        if len(objects) <= 1:
-            return animation_spec
-        
-        # Check for overlaps and resolve them
-        overlaps = analysis.get('overlap_risks', {}).get('overlaps', [])
-        
-        if overlaps:
-            # Apply overlap resolution strategies
-            for overlap in overlaps:
-                obj1_id = overlap['object1']['id']
-                obj2_id = overlap['object2']['id']
-                
-                # Find the objects in the spec
-                obj1 = next((obj for obj in objects if obj.get('id') == obj1_id), None)
-                obj2 = next((obj for obj in objects if obj.get('id') == obj2_id), None)
-                
-                if obj1 and obj2:
-                    # Calculate new positions to avoid overlap
-                    pos1 = obj1.get('properties', {}).get('position', [0, 0, 0])
-                    pos2 = obj2.get('properties', {}).get('position', [0, 0, 0])
-                    
-                    # Simple separation strategy
-                    separation = 2.0
-                    if len(pos1) >= 2 and len(pos2) >= 2:
-                        # Move objects apart
-                        new_pos1 = [pos1[0] - separation/2, pos1[1], pos1[2] if len(pos1) > 2 else 0]
-                        new_pos2 = [pos2[0] + separation/2, pos2[1], pos2[2] if len(pos2) > 2 else 0]
-                        
-                        if 'properties' not in obj1:
-                            obj1['properties'] = {}
-                        if 'properties' not in obj2:
-                            obj2['properties'] = {}
-                        
-                        obj1['properties']['position'] = new_pos1
-                        obj2['properties']['position'] = new_pos2
-        
+        """Prevent object overlaps using intelligent positioning - DISABLED to prevent blank videos"""
+        # DISABLED: This was interfering with object positioning and causing blank videos
+        # Return the original spec unchanged to preserve user-specified positions
+        logger.debug("Object overlap prevention DISABLED to prevent blank videos")
         return animation_spec
     
     def _optimize_animation_sequence(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
@@ -399,6 +346,8 @@ class EnhancedWorkflowOrchestrator:
         if len(objects) <= 1:
             return animation_spec
         
+        print(f"🔍 Optimizing animation sequence for {len(objects)} objects")
+        
         # Get sequence analysis
         sequence_analysis = analysis.get('sequence_analysis', {})
         sequential_objects = sequence_analysis.get('sequential_objects', [])
@@ -406,28 +355,53 @@ class EnhancedWorkflowOrchestrator:
         spatial_analysis = sequence_analysis.get('spatial_analysis', {})
         temporal_analysis = sequence_analysis.get('temporal_analysis', {})
         
-        # Add fade-out transitions for sequential objects
-        for seq_obj in sequential_objects:
-            current_id = seq_obj['current']['id']
-            previous_id = seq_obj['previous']['id']
+        # NEW: Always add fade-out transitions for better visual flow
+        # This ensures objects don't accumulate on screen
+        if len(objects) > 1:
+            print(f"✅ Adding fade-out transitions for {len(objects)} objects")
             
-            # Find the current object and add fade-out animation for previous
-            current_obj = next((obj for obj in objects if obj.get('id') == current_id), None)
-            previous_obj = next((obj for obj in objects if obj.get('id') == previous_id), None)
-            
-            if current_obj and previous_obj:
-                # Add fade-out animation to previous object
-                if 'animations' not in previous_obj:
-                    previous_obj['animations'] = []
+            for i, obj in enumerate(objects):
+                if 'animations' not in obj:
+                    obj['animations'] = []
                 
-                # Add fade-out before current object appears
-                fade_out_anim = {
-                    'type': 'fade_out',
-                    'start_time': 'before_next',
-                    'duration': 0.3,
-                    'reason': 'sequential_display_requirement'
-                }
-                previous_obj['animations'].append(fade_out_anim)
+                # First object just fades in
+                if i == 0:
+                    # Ensure first object has fade-in
+                    if not any(anim.get('type') == 'fade_in' for anim in obj['animations']):
+                        fade_in_anim = {
+                            'type': 'fade_in',
+                            'start_time': 'immediate',
+                            'duration': 0.5,
+                            'reason': 'first_object_display'
+                        }
+                        obj['animations'].append(fade_in_anim)
+                        print(f"  📈 Added fade-in to {obj.get('id', 'unknown')} (first object)")
+                else:
+                    # All other objects fade out the previous object and then fade in
+                    prev_obj = objects[i-1]
+                    
+                    # Add fade-out to previous object
+                    if 'animations' not in prev_obj:
+                        prev_obj['animations'] = []
+                    
+                    fade_out_anim = {
+                        'type': 'fade_out',
+                        'start_time': 'before_next',
+                        'duration': 0.3,
+                        'reason': 'visual_flow_improvement'
+                    }
+                    prev_obj['animations'].append(fade_out_anim)
+                    print(f"  📉 Added fade-out to {prev_obj.get('id', 'unknown')}")
+                    
+                    # Add fade-in to current object
+                    fade_in_anim = {
+                        'type': 'fade_in',
+                        'start_time': 'after_previous_fade',
+                        'duration': 0.5,
+                        'reason': 'sequential_display'
+                    }
+                    obj['animations'].append(fade_in_anim)
+                    print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
         
         # Apply cluster-based optimizations
         if object_clusters:
@@ -441,6 +415,7 @@ class EnhancedWorkflowOrchestrator:
         if temporal_analysis.get('status') == 'analyzed':
             animation_spec = self._apply_temporal_optimizations(animation_spec, temporal_analysis)
         
+        print(f"✅ Animation sequence optimization completed")
         return animation_spec
     
     def _apply_cluster_optimizations(self, animation_spec: Dict[str, Any], object_clusters: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -461,119 +436,140 @@ class EnhancedWorkflowOrchestrator:
                 # Position text elements to avoid overlap
                 self._position_text_elements(objects, cluster_objects)
         
+        # NEW: Apply intelligent text positioning for all text objects
+        self._apply_intelligent_text_positioning(objects)
+        
         return animation_spec
     
     def _group_coordinate_objects(self, objects: List[Dict[str, Any]], cluster_object_ids: List[str]):
-        """Group coordinate system objects together"""
-        cluster_objects = [obj for obj in objects if obj.get('id') in cluster_object_ids]
-        
-        if len(cluster_objects) <= 1:
-            return
-        
-        # Position all coordinate objects at the center
-        center_position = [0, 0, 0]
-        for obj in cluster_objects:
-            if 'properties' not in obj:
-                obj['properties'] = {}
-            obj['properties']['position'] = center_position.copy()
+        """Group coordinate system objects together - DISABLED to prevent blank videos"""
+        # DISABLED: This was modifying object positions and causing blank videos
+        # Return without modifying positions to preserve user-specified coordinates
+        logger.debug("Coordinate object grouping DISABLED to prevent blank videos")
+        return
     
     def _spread_geometric_shapes(self, objects: List[Dict[str, Any]], cluster_object_ids: List[str]):
-        """Spread geometric shapes to avoid overlap"""
-        cluster_objects = [obj for obj in objects if obj.get('id') in cluster_object_ids]
-        
-        if len(cluster_objects) <= 1:
-            return
-        
-        # Calculate spacing based on number of objects
-        spacing = 2.0
-        for i, obj in enumerate(cluster_objects):
-            if 'properties' not in obj:
-                obj['properties'] = {}
-            
-            # Position in a grid pattern
-            row = i // 2
-            col = i % 2
-            x = (col - 0.5) * spacing
-            y = (row - len(cluster_objects) / 4) * spacing
-            
-            obj['properties']['position'] = [x, y, 0]
+        """Spread geometric shapes to avoid overlap - DISABLED to prevent blank videos"""
+        # DISABLED: This was modifying object positions and causing blank videos
+        # Return without modifying positions to preserve user-specified coordinates
+        logger.debug("Geometric shape spreading DISABLED to prevent blank videos")
+        return
     
     def _position_text_elements(self, objects: List[Dict[str, Any]], cluster_object_ids: List[str]):
-        """Position text elements to avoid overlap"""
-        cluster_objects = [obj for obj in objects if obj.get('id') in cluster_object_ids]
+        """Position text elements to avoid overlap - DISABLED to prevent blank videos"""
+        # DISABLED: This was modifying object positions and causing blank videos
+        # Return without modifying positions to preserve user-specified coordinates
+        logger.debug("Text element positioning DISABLED to prevent blank videos")
+        return
+    
+    def _apply_intelligent_text_positioning(self, objects: List[Dict[str, Any]]):
+        """
+        Applies intelligent text positioning to text objects - DISABLED to prevent blank videos
+        """
+        # DISABLED: This was modifying object positions and causing blank videos
+        # Return without modifying positions to preserve user-specified coordinates
+        logger.debug("Intelligent text positioning DISABLED to prevent blank videos")
+        return
+    
+    def _is_text_for_object(self, text_id: str, geo_id: str) -> bool:
+        """Check if a text object is meant to label a specific geometric object"""
+        text_id_lower = text_id.lower()
+        geo_id_lower = geo_id.lower()
         
-        if len(cluster_objects) <= 1:
-            return
+        # Common patterns
+        patterns = [
+            (f"{geo_id_lower}_label", geo_id_lower),
+            (f"label_{geo_id_lower}", geo_id_lower),
+            (f"{geo_id_lower}_text", geo_id_lower),
+            (f"text_{geo_id_lower}", geo_id_lower),
+        ]
         
-        # Position text elements vertically stacked
-        for i, obj in enumerate(cluster_objects):
-            if 'properties' not in obj:
-                obj['properties'] = {}
-            
-            # Stack vertically with some horizontal offset
-            x = (i % 2) * 0.5 - 0.25
-            y = 2.0 - i * 0.8
-            
-            obj['properties']['position'] = [x, y, 0]
+        for text_pattern, geo_pattern in patterns:
+            if text_pattern in text_id_lower or geo_pattern in text_id_lower:
+                return True
+        
+        # Check if text ID contains the geometric object type
+        geo_types = ['circle', 'square', 'point', 'triangle', 'rectangle']
+        for geo_type in geo_types:
+            if geo_type in text_id_lower and geo_type in geo_id_lower:
+                return True
+        
+        return False
+    
+    def _position_text_near_object(self, text_obj: Dict[str, Any], geo_obj: Dict[str, Any]):
+        """
+        Positions a text object near its corresponding geometric object
+        with intelligent offset calculation to avoid overlaps.
+        """
+        geo_props = geo_obj.get('properties', {})
+        geo_pos = geo_props.get('position', [0, 0, 0])
+        geo_type = geo_obj.get('type', 'unknown')
+        
+        # Calculate smart offset based on object type and size
+        offset_x, offset_y = self._calculate_text_offset(geo_type, geo_props)
+        
+        # Position text with offset
+        text_pos = [
+            geo_pos[0] + offset_x,
+            geo_pos[1] + offset_y,
+            geo_pos[2]
+        ]
+        
+        # Ensure text is within reasonable bounds
+        text_pos[0] = max(-4.5, min(4.5, text_pos[0]))  # Keep within X bounds
+        text_pos[1] = max(-2.5, min(7.5, text_pos[1]))  # Keep within Y bounds
+        
+        # Update text object position
+        if 'properties' not in text_obj:
+            text_obj['properties'] = {}
+        text_obj['properties']['position'] = text_pos
+        
+        # Log the positioning for debugging
+        print(f"Positioned text '{text_obj.get('properties', {}).get('text', 'NO_TEXT')}' "
+              f"near {geo_type} at {geo_pos} -> text at {text_pos}")
+    
+    def _calculate_text_offset(self, geo_type: str, geo_props: Dict[str, Any]) -> tuple:
+        """
+        Calculates intelligent offset for text positioning based on object type and properties.
+        Returns (offset_x, offset_y) tuple.
+        """
+        # Base offsets for different object types - positioned closer to objects
+        base_offsets = {
+            'circle': (0.4, 0.4),      # Closer to object for better association
+            'square': (0.4, 0.4),      # Closer to object for better association
+            'point': (0.4, 0.4),       # Closer to object for better association
+            'triangle': (0.4, 0.4),    # Closer to object for better association
+            'rectangle': (0.4, 0.4),   # Closer to object for better association
+        }
+        
+        offset_x, offset_y = base_offsets.get(geo_type, (0.4, 0.4))
+        
+        # Adjust based on object size
+        size = geo_props.get('size', 0.2)
+        if size > 0.5:
+            # Larger objects need slightly more offset to avoid overlap
+            offset_x *= 1.2
+            offset_y *= 1.2
+        
+        # Add minimal randomness to avoid perfect alignment (reduces overlap risk)
+        import random
+        offset_x += random.uniform(-0.1, 0.1)
+        offset_y += random.uniform(-0.1, 0.1)
+        
+        return offset_x, offset_y
     
     def _apply_spatial_optimizations(self, animation_spec: Dict[str, Any], spatial_analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply optimizations based on spatial analysis"""
-        objects = animation_spec.get('objects', [])
-        
-        # Check if objects are too clustered
-        if spatial_analysis.get('spatial_distribution') == 'clustered':
-            # Spread objects out more
-            bounds = spatial_analysis.get('bounds', {})
-            if bounds:
-                min_x, max_x = bounds.get('min_x', -2), bounds.get('max_x', 2)
-                min_y, max_y = bounds.get('min_y', -1.5), bounds.get('max_y', 1.5)
-                
-                # Expand bounds
-                expansion_factor = 1.5
-                new_min_x = (min_x + max_x) / 2 - (max_x - min_x) * expansion_factor / 2
-                new_max_x = (min_x + max_x) / 2 + (max_x - min_x) * expansion_factor / 2
-                new_min_y = (min_y + max_y) / 2 - (max_y - min_y) * expansion_factor / 2
-                new_max_y = (min_y + max_y) / 2 + (max_y - min_y) * expansion_factor / 2
-                
-                # Redistribute objects
-                for i, obj in enumerate(objects):
-                    if 'properties' not in obj:
-                        obj['properties'] = {}
-                    
-                    # Calculate new position in expanded space
-                    if i == 0:
-                        obj['properties']['position'] = [new_min_x, new_min_y, 0]
-                    elif i == 1:
-                        obj['properties']['position'] = [new_max_x, new_min_y, 0]
-                    elif i == 2:
-                        obj['properties']['position'] = [new_min_x, new_max_y, 0]
-                    elif i == 3:
-                        obj['properties']['position'] = [new_max_x, new_max_y, 0]
-                    else:
-                        # For additional objects, use grid pattern
-                        row = (i - 4) // 2
-                        col = (i - 4) % 2
-                        x = new_min_x + (col + 0.5) * (new_max_x - new_min_x) / 2
-                        y = new_min_y + (row + 0.5) * (new_max_y - new_min_y) / 2
-                        obj['properties']['position'] = [x, y, 0]
-        
+        """Apply optimizations based on spatial analysis - DISABLED to prevent blank videos"""
+        # DISABLED: This was modifying object positions and causing blank videos
+        # Return the original spec unchanged to preserve user-specified positions
+        logger.debug("Spatial optimizations DISABLED to prevent blank videos")
         return animation_spec
     
     def _apply_temporal_optimizations(self, animation_spec: Dict[str, Any], temporal_analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply optimizations based on temporal analysis"""
-        objects = animation_spec.get('objects', [])
-        
-        # Check for timing issues
-        timing_issues = temporal_analysis.get('timing_issues', [])
-        
-        for issue in timing_issues:
-            if issue.get('type') == 'long_duration':
-                # Break long animations into shorter sequences
-                self._break_long_animations(objects)
-            elif issue.get('type') == 'many_sequential':
-                # Group some objects to appear simultaneously
-                self._group_sequential_objects(objects)
-        
+        """Apply optimizations based on temporal analysis - DISABLED to prevent blank videos"""
+        # DISABLED: This was interfering with object positioning and causing blank videos
+        # Return the original spec unchanged to preserve user-specified positions
+        logger.debug("Temporal optimizations DISABLED to prevent blank videos")
         return animation_spec
     
     def _break_long_animations(self, objects: List[Dict[str, Any]]):
@@ -599,6 +595,250 @@ class EnhancedWorkflowOrchestrator:
                     # These two objects can appear together
                     plot_objects[i]['group_with'] = plot_objects[i + 1]['id']
                     plot_objects[i + 1]['group_with'] = plot_objects[i]['id']
+    
+    def _apply_overlap_prevention(self, objects: List[Dict[str, Any]]):
+        """
+        Applies comprehensive overlap prevention to ensure objects don't appear on top of each other.
+        This involves intelligent positioning and smart fade-out management.
+        """
+        if len(objects) <= 1:
+            return
+        
+        # Group objects by type for better overlap management
+        geometric_objects = [obj for obj in objects if obj.get('type') in ['circle', 'square', 'point', 'triangle', 'rectangle']]
+        text_objects = [obj for obj in objects if obj.get('type') == 'text']
+        plot_objects = [obj for obj in objects if obj.get('type') == 'plot']
+        
+        # Apply smart positioning to prevent overlaps
+        self._prevent_geometric_overlaps(geometric_objects)
+        self._prevent_text_overlaps(text_objects)
+        self._prevent_plot_overlaps(plot_objects)
+        
+        # Apply smart fade-out management for sequential objects
+        self._apply_sequential_fade_out_management(objects)
+    
+    def _prevent_geometric_overlaps(self, geometric_objects: List[Dict[str, Any]]):
+        """Prevent overlaps between geometric objects"""
+        if len(geometric_objects) <= 1:
+            return
+        
+        print(f"🔍 Preventing overlaps between {len(geometric_objects)} geometric objects")
+        
+        # Calculate minimum spacing based on object sizes
+        min_spacing = 1.5  # Minimum distance between object centers
+        
+        for i, obj in enumerate(geometric_objects):
+            if 'properties' not in obj:
+                obj['properties'] = {}
+            
+            current_pos = obj['properties'].get('position', [0, 0, 0])
+            obj_size = obj['properties'].get('size', 0.2)
+            
+            print(f"  Processing {obj.get('id', 'unknown')} at {current_pos} with size {obj_size}")
+            
+            # Check distance from previous objects
+            for j in range(i):
+                prev_obj = geometric_objects[j]
+                prev_pos = prev_obj['properties'].get('position', [0, 0, 0])
+                prev_size = prev_obj['properties'].get('size', 0.2)
+                
+                # Calculate current distance
+                distance = ((current_pos[0] - prev_pos[0])**2 + (current_pos[1] - prev_pos[1])**2)**0.5
+                required_distance = (obj_size + prev_size) / 2 + min_spacing
+                
+                print(f"    Distance to {prev_obj.get('id', 'unknown')}: {distance:.2f} (required: {required_distance:.2f})")
+                
+                if distance < required_distance:
+                    print(f"    ⚠️  Overlap detected! Moving {obj.get('id', 'unknown')}")
+                    
+                    # Move current object to prevent overlap
+                    # Use a more aggressive positioning strategy
+                    if i == 0:
+                        # First object stays in place
+                        continue
+                    
+                    # Calculate new position with better spacing
+                    angle_step = 360 / len(geometric_objects)
+                    angle = i * angle_step
+                    radius = required_distance * 1.2  # Slightly larger radius
+                    
+                    new_x = prev_pos[0] + radius * (angle / 360) * 2 - radius
+                    new_y = prev_pos[1] + radius * (angle / 360) * 2 - radius
+                    
+                    # Ensure within bounds
+                    new_x = max(-4.5, min(4.5, new_x))
+                    new_y = max(-2.5, min(7.5, new_y))
+                    
+                    old_pos = current_pos.copy()
+                    obj['properties']['position'] = [new_x, new_y, 0]
+                    current_pos = [new_x, new_y, 0]
+                    
+                    print(f"    Moved from {old_pos} to {current_pos}")
+                    
+                    # Recalculate distance after move
+                    new_distance = ((current_pos[0] - prev_pos[0])**2 + (current_pos[1] - prev_pos[1])**2)**0.5
+                    print(f"    New distance: {new_distance:.2f} (required: {required_distance:.2f})")
+                    
+                    if new_distance < required_distance:
+                        print(f"    ⚠️  Still too close, applying additional offset")
+                        # Apply additional offset
+                        offset_x = (required_distance - new_distance) * 1.5
+                        offset_y = (required_distance - new_distance) * 1.5
+                        
+                        final_x = current_pos[0] + offset_x
+                        final_y = current_pos[1] + offset_y
+                        
+                        # Ensure within bounds
+                        final_x = max(-4.5, min(4.5, final_x))
+                        final_y = max(-2.5, min(7.5, final_y))
+                        
+                        obj['properties']['position'] = [final_x, final_y, 0]
+                        current_pos = [final_x, final_y, 0]
+                        
+                        print(f"    Final position: {current_pos}")
+        
+        print(f"✅ Overlap prevention completed for {len(geometric_objects)} objects")
+    
+    def _prevent_text_overlaps(self, text_objects: List[Dict[str, Any]]):
+        """Prevent overlaps between text objects"""
+        if len(text_objects) <= 1:
+            return
+        
+        # Text objects should be positioned near their corresponding objects
+        # Overlap prevention is handled by the intelligent text positioning
+        pass
+    
+    def _prevent_plot_overlaps(self, plot_objects: List[Dict[str, Any]]):
+        """Prevent overlaps between plot objects"""
+        if len(plot_objects) <= 1:
+            return
+        
+        # Plots should be positioned to avoid overlaps
+        spacing = 2.0
+        for i, obj in enumerate(plot_objects):
+            if 'properties' not in obj:
+                obj['properties'] = {}
+            
+            # Position plots in a grid to avoid overlap
+            row = i // 2
+            col = i % 2
+            x = (col - 0.5) * spacing
+            y = (row - len(plot_objects) / 4) * spacing
+            
+            obj['properties']['position'] = [x, y, 0]
+    
+    def _apply_sequential_fade_out_management(self, objects: List[Dict[str, Any]]):
+        """Apply smart fade-out management for sequential objects"""
+        print(f"🔍 Applying sequential fade-out management to {len(objects)} objects")
+        
+        # Always apply fade-out management for better visual flow
+        # This ensures smooth transitions even when objects are well-separated
+        
+        if len(objects) > 1:
+            print(f"✅ Applying fade-out management for {len(objects)} objects")
+            
+            for i, obj in enumerate(objects):
+                if 'animations' not in obj:
+                    obj['animations'] = []
+                
+                # Check if this object should fade out the previous one
+                if i > 0:
+                    prev_obj = objects[i-1]
+                    
+                    # Always add fade-out for better visual flow
+                    print(f"  📉 Adding fade-out to {prev_obj.get('id', 'unknown')}")
+                    
+                    # Add fade-out animation to previous object
+                    if 'animations' not in prev_obj:
+                        prev_obj['animations'] = []
+                    
+                    fade_out_anim = {
+                        'type': 'fade_out',
+                        'start_time': 'before_next',
+                        'duration': 0.3,
+                        'reason': 'visual_flow_improvement'
+                    }
+                    prev_obj['animations'].append(fade_out_anim)
+                    
+                    # Add fade-in animation to current object
+                    fade_in_anim = {
+                        'type': 'fade_in',
+                        'start_time': 'after_previous_fade',
+                        'duration': 0.5,
+                        'reason': 'sequential_display'
+                    }
+                    obj['animations'].append(fade_in_anim)
+                    
+                    print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
+        else:
+            print(f"ℹ️  No fade-out management needed (only 1 object)")
+        
+        print(f"✅ Sequential fade-out management completed")
+    
+    def _analyze_object_sequence(self, objects: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze object sequence for overlap prevention"""
+        if len(objects) <= 1:
+            return {'should_fade_out_previous': False}
+        
+        print(f"🔍 Analyzing object sequence for {len(objects)} objects")
+        
+        # Check if objects are positioned close to each other
+        close_objects = []
+        for i, obj in enumerate(objects):
+            if i == 0:
+                continue
+            
+            current_pos = obj.get('properties', {}).get('position', [0, 0, 0])
+            prev_pos = objects[i-1].get('properties', {}).get('position', [0, 0, 0])
+            
+            distance = ((current_pos[0] - prev_pos[0])**2 + (current_pos[1] - prev_pos[1])**2)**0.5
+            
+            print(f"  Distance between {objects[i-1].get('id', 'unknown')} and {obj.get('id', 'unknown')}: {distance:.2f}")
+            
+            # Lower threshold to trigger fade-out more aggressively
+            if distance < 3.0:  # Objects are close, need fade-out
+                close_objects.append((i, distance))
+                print(f"    ⚠️  Objects are close (distance: {distance:.2f} < 3.0)")
+            else:
+                print(f"    ✅ Objects are well-separated (distance: {distance:.2f} >= 3.0)")
+        
+        should_fade_out = len(close_objects) > 0
+        print(f"🔍 Analysis result: should_fade_out_previous = {should_fade_out}")
+        
+        return {
+            'should_fade_out_previous': should_fade_out,
+            'close_objects': close_objects
+        }
+    
+    def _apply_smart_fade_out_management(self, objects: List[Dict[str, Any]]):
+        """
+        Applies smart fade-out management to ensure smooth transitions and
+        prevent objects from appearing on top of each other.
+        """
+        if len(objects) <= 1:
+            return
+        
+        # Get the first object as new object for camera management
+        new_object = objects[0]
+        existing_objects = objects[1:] if len(objects) > 1 else []
+        
+        # Get camera strategy
+        camera_strategy = self.camera_manager.intelligent_camera_management(
+            new_object, existing_objects, {}
+        )
+        
+        # NEW: Apply fade-out to the new object if it's a sequential object
+        if camera_strategy.get('action') == 'sequential_display':
+            if 'animations' not in new_object:
+                new_object['animations'] = []
+            
+                fade_out_anim = {
+                    'type': 'fade_out',
+                    'start_time': 'before_next',
+                    'duration': 0.3,
+                    'reason': 'sequential_display_requirement'
+                }
+            new_object['animations'].append(fade_out_anim)
     
     def _optimize_camera_strategy(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
         """Optimize camera strategy for the animation"""
