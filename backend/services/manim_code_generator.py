@@ -156,13 +156,13 @@ class ManimCodeGenerator:
 class GeneratedScene(MovingCameraScene):
     def construct(self):
         # Fallback scene due to generation error
-        self.camera.background_color = BLACK
+        self.camera.background_color = rgb_to_color([0, 0, 0])  # Black
         
         # Create a simple white circle as fallback
         circle = Circle(
             radius=1,
-            fill_color=WHITE,
-            stroke_color=WHITE,
+            fill_color=rgb_to_color([1, 1, 1]),  # White
+            stroke_color=rgb_to_color([1, 1, 1]),  # White
             fill_opacity=1.0,
             stroke_width=2
         )
@@ -338,12 +338,14 @@ class GeneratedScene(MovingCameraScene):
         """Generate the complete Manim code template - minimal and precise"""
         code_parts = []
         
-        # Scene class definition with explicit color imports
-        code_parts.append("""from manim import *
-import numpy as np
-
-# Explicitly import color constants to ensure they are available
-from manim import RED, GREEN, BLUE, WHITE, BLACK, YELLOW, PURPLE, ORANGE, PINK, BROWN, GRAY, CYAN, MAGENTA
+        # Scene class definition with explicit imports for compatibility
+        code_parts.append("""import numpy as np
+from manim import (
+    Circle, Square, Triangle, Text, Axes, Dot, MovingCameraScene,
+    FadeIn, FadeOut, Create, Write,
+    hex_to_rgb, rgb_to_color,
+    RED, GREEN, BLUE, WHITE, BLACK, YELLOW, PURPLE, ORANGE, PINK, GRAY, TEAL, MAROON
+)
 
 class GeneratedScene(MovingCameraScene):
     def construct(self):
@@ -356,19 +358,21 @@ class GeneratedScene(MovingCameraScene):
         # Ensure valid Manim color using inline validation
         try:
             if bg_color.startswith('#'):
-                self.camera.background_color = Color(bg_color)
+                # Convert hex to RGB then to Manim color
+                rgb_values = hex_to_rgb(bg_color)
+                self.camera.background_color = rgb_to_color(rgb_values)
             else:
                 # Map common color names to valid Manim colors
                 color_mapping = {
-                    'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
-                    'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
-                    'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
-                    'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
-                    'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW
+                    'white': rgb_to_color([1, 1, 1]), 'black': rgb_to_color([0, 0, 0]), 'red': rgb_to_color([1, 0, 0]), 'green': rgb_to_color([0, 1, 0]), 'blue': rgb_to_color([0, 0, 1]),
+                    'yellow': rgb_to_color([1, 1, 0]), 'purple': rgb_to_color([1, 0, 1]), 'orange': rgb_to_color([1, 0.5, 0]), 'pink': rgb_to_color([1, 0.75, 0.8]),
+                    'brown': rgb_to_color([0.5, 0.25, 0]), 'gray': rgb_to_color([0.5, 0.5, 0.5]), 'grey': rgb_to_color([0.5, 0.5, 0.5]), 'cyan': rgb_to_color([0, 1, 1]), 'magenta': rgb_to_color([1, 0, 1]),
+                    'lime': rgb_to_color([0.5, 1, 0]), 'navy': rgb_to_color([0, 0, 0.5]), 'teal': rgb_to_color([0, 0.5, 0.5]), 'maroon': rgb_to_color([0.5, 0, 0]), 'olive': rgb_to_color([0.5, 0.5, 0]),
+                    'fuchsia': rgb_to_color([1, 0, 1]), 'aqua': rgb_to_color([0, 1, 1]), 'silver': rgb_to_color([0.75, 0.75, 0.75]), 'gold': rgb_to_color([1, 0.84, 0])
                 }
-                self.camera.background_color = color_mapping.get(bg_color.lower(), BLACK)
+                self.camera.background_color = color_mapping.get(bg_color.lower(), rgb_to_color([0, 0, 0]))
         except Exception:
-            self.camera.background_color = BLACK""")
+            self.camera.background_color = rgb_to_color([0, 0, 0])""")
         
         # Bounds logging
         code_parts.append(f"""        
@@ -409,7 +413,9 @@ class GeneratedScene(MovingCameraScene):
                 # Inline color validation
                 try:
                     if isinstance(color_name, str) and color_name.startswith('#'):
-                        color = Color(color_name)
+                        # Convert hex to RGB then to Manim color
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
                         print(f"Using hex color: {color_name} -> {color}")
                     else:
                         # Handle both uppercase and lowercase color names
@@ -417,19 +423,19 @@ class GeneratedScene(MovingCameraScene):
                             # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
-                            'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
+                            'brown': GRAY, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
                             'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
                             # Uppercase mappings (for when AI generates RED, BLUE, etc.)
                             'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
                             'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
-                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'BROWN': GRAY, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
                             'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
                             'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
                         
                         print(f"Color mapping lookup: '{color_name}' in {list(color_mapping.keys())}")
-                        color = color_mapping.get(str(color_name), RED)  # Default to RED instead of WHITE
+                        color = color_mapping.get(str(color_name), rgb_to_color([1, 0, 0]))  # Default to RED instead of WHITE
                         print(f"Color mapping result: '{color_name}' -> {color}")
                         
                         # Debug logging
@@ -441,13 +447,13 @@ class GeneratedScene(MovingCameraScene):
                     # Try to use color mapping as fallback instead of defaulting to WHITE
                     try:
                         color_mapping = {
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                            'WHITE': rgb_to_color([1, 1, 1]), 'BLACK': rgb_to_color([0, 0, 0]), 'RED': rgb_to_color([1, 0, 0]), 'GREEN': rgb_to_color([0, 1, 0]), 'BLUE': rgb_to_color([0, 0, 1]),
+                            'YELLOW': rgb_to_color([1, 1, 0]), 'PURPLE': rgb_to_color([1, 0, 1]), 'ORANGE': rgb_to_color([1, 0.5, 0]), 'PINK': rgb_to_color([1, 0.75, 0.8])
                         }
-                        color = color_mapping.get(str(color_name), RED)  # Default to RED instead of WHITE
+                        color = color_mapping.get(str(color_name), rgb_to_color([1, 0, 0]))  # Default to RED instead of WHITE
                         print(f"Fallback color mapping: '{color_name}' -> {color}")
                     except (ValueError, TypeError, KeyError) as e2:
-                        color = RED  # Default to RED instead of WHITE
+                        color = rgb_to_color([1, 0, 0])  # Default to RED instead of WHITE
                         print(f"Final fallback: using RED for '{color_name}' (error: {e2})")
                 except (ValueError, TypeError, KeyError) as e:
                     # For any other unexpected errors, still use the color mapping fallback
@@ -455,13 +461,13 @@ class GeneratedScene(MovingCameraScene):
                     # Try to use color mapping as fallback instead of defaulting to WHITE
                     try:
                         color_mapping = {
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                            'WHITE': rgb_to_color([1, 1, 1]), 'BLACK': rgb_to_color([0, 0, 0]), 'RED': rgb_to_color([1, 0, 0]), 'GREEN': rgb_to_color([0, 1, 0]), 'BLUE': rgb_to_color([0, 0, 1]),
+                            'YELLOW': rgb_to_color([1, 1, 0]), 'PURPLE': rgb_to_color([1, 0, 1]), 'ORANGE': rgb_to_color([1, 0.5, 0]), 'PINK': rgb_to_color([1, 0.75, 0.8])
                         }
-                        color = color_mapping.get(str(color_name), RED)  # Default to RED instead of WHITE
+                        color = color_mapping.get(str(color_name), rgb_to_color([1, 0, 0]))  # Default to RED instead of WHITE
                         print(f"Fallback color mapping: '{color_name}' -> {color}")
                     except (ValueError, TypeError, KeyError) as e2:
-                        color = RED  # Default to RED instead of WHITE
+                        color = rgb_to_color([1, 0, 0])  # Default to RED instead of WHITE
                         print(f"Final fallback: using RED for '{color_name}' (error: {e2})")
                 
                 print(f"Final color for circle: {color}")
@@ -487,8 +493,8 @@ class GeneratedScene(MovingCameraScene):
                 animations = obj.get('animations', [])
                 if not animations:
                     # Default: just create the object
-                self.add(circle_obj)
-                self.play(Create(circle_obj), run_time=1.0)
+                    self.add(circle_obj)
+                    self.play(Create(circle_obj), run_time=1.0)
                 else:
                     # Process each animation
                     for anim in animations:
@@ -518,20 +524,22 @@ class GeneratedScene(MovingCameraScene):
                 # Inline color validation
                 try:
                     if isinstance(color_name, str) and color_name.startswith('#'):
-                        color = Color(color_name)
+                        # Convert hex to RGB then to Manim color
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
                     else:
                         # Handle both uppercase and lowercase color names
                         color_mapping = {
                             # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
-                            'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
+                            'brown': GRAY, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
                             'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
                             # Uppercase mappings (for when AI generates RED, BLUE, etc.)
                             'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
                             'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
-                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'BROWN': GRAY, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
                             'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
                             'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
@@ -586,8 +594,8 @@ class GeneratedScene(MovingCameraScene):
                 animations = obj.get('animations', [])
                 if not animations:
                     # Default: just create the object
-                self.add(square_obj)
-                self.play(Create(square_obj), run_time=1.0)
+                    self.add(square_obj)
+                    self.play(Create(square_obj), run_time=1.0)
                 else:
                     # Process each animation
                     for anim in animations:
@@ -609,6 +617,123 @@ class GeneratedScene(MovingCameraScene):
                 objects_created.append(square_obj)
                 self.wait(0.5)
                 
+            elif obj_type == 'triangle':
+                size = props.get('size', 1)
+                color_name = props.get('color', 'RED')
+                pos = props.get('position', [0, 0, 0])
+                
+                # Inline color validation
+                try:
+                    if isinstance(color_name, str) and color_name.startswith('#'):
+                        # Convert hex to RGB then to Manim color
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
+                        print(f"Using hex color: {color_name} -> {color}")
+                    else:
+                        # Handle both uppercase and lowercase color names
+                        color_mapping = {
+                            # Lowercase mappings
+                            'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
+                            'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
+                            'brown': GRAY, 'gray': GRAY, 'grey': GRAY, 'cyan': TEAL, 'magenta': MAROON,
+                            'lime': GREEN, 'navy': BLUE, 'teal': TEAL, 'maroon': MAROON, 'olive': GREEN,
+                            'fuchsia': MAROON, 'aqua': TEAL, 'silver': GRAY, 'gold': YELLOW,
+                            # Uppercase mappings (for when AI generates RED, BLUE, etc.)
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
+                            'BROWN': GRAY, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': TEAL, 'MAGENTA': MAROON,
+                            'LIME': GREEN, 'NAVY': BLUE, 'TEAL': TEAL, 'MAROON': MAROON, 'OLIVE': GREEN,
+                            'FUCHSIA': MAROON, 'AQUA': TEAL, 'SILVER': GRAY, 'GOLD': YELLOW
+                        }
+                        
+                        print(f"Color mapping lookup: '{color_name}' in {list(color_mapping.keys())}")
+                        color = color_mapping.get(str(color_name), RED)  # Default to RED instead of WHITE
+                        print(f"Color mapping result: '{color_name}' -> {color}")
+                        
+                        # Debug logging
+                        print(f"Color mapping: '{color_name}' -> {color}")
+                        
+                except (ValueError, TypeError) as e:
+                    # Only catch specific color-related errors, not all exceptions
+                    print(f"Color parsing error for '{color_name}': {e}")
+                    # Try to use color mapping as fallback instead of defaulting to WHITE
+                    try:
+                        color_mapping = {
+                            'WHITE': rgb_to_color([1, 1, 1]), 'BLACK': rgb_to_color([0, 0, 0]), 'RED': rgb_to_color([1, 0, 0]), 'GREEN': rgb_to_color([0, 1, 0]), 'BLUE': rgb_to_color([0, 0, 1]),
+                            'YELLOW': rgb_to_color([1, 1, 0]), 'PURPLE': rgb_to_color([1, 0, 1]), 'ORANGE': rgb_to_color([1, 0.5, 0]), 'PINK': rgb_to_color([1, 0.75, 0.8])
+                        }
+                        color = color_mapping.get(str(color_name), rgb_to_color([1, 0, 0]))  # Default to RED instead of WHITE
+                        print(f"Fallback color mapping: '{color_name}' -> {color}")
+                    except (ValueError, TypeError, KeyError) as e2:
+                        color = rgb_to_color([1, 0, 0])  # Default to RED instead of WHITE
+                        print(f"Final fallback: using RED for '{color_name}' (error: {e2})")
+                except (ValueError, TypeError, KeyError) as e:
+                    # For any other unexpected errors, still use the color mapping fallback
+                    print(f"Unexpected error in color handling for '{color_name}': {e}")
+                    # Try to use color mapping as fallback instead of defaulting to WHITE
+                    try:
+                        color_mapping = {
+                            'WHITE': rgb_to_color([1, 1, 1]), 'BLACK': rgb_to_color([0, 0, 0]), 'RED': rgb_to_color([1, 0, 0]), 'GREEN': rgb_to_color([0, 1, 0]), 'BLUE': rgb_to_color([0, 0, 1]),
+                            'YELLOW': rgb_to_color([1, 1, 0]), 'PURPLE': rgb_to_color([1, 0, 1]), 'ORANGE': rgb_to_color([1, 0.5, 0]), 'PINK': rgb_to_color([1, 0.75, 0.8])
+                        }
+                        color = color_mapping.get(str(color_name), rgb_to_color([1, 0, 0]))  # Default to RED instead of WHITE
+                        print(f"Fallback color mapping: '{color_name}' -> {color}")
+                    except (ValueError, TypeError, KeyError) as e2:
+                        color = rgb_to_color([1, 0, 0])  # Default to RED instead of WHITE
+                        print(f"Final fallback: using RED for '{color_name}' (error: {e2})")
+                
+                print(f"Final color for triangle: {color}")
+                print(f"Triangle object will be created with fill_color={color}, stroke_color={color}")
+                
+                triangle_obj = Triangle(
+                    fill_color=color,
+                    stroke_color=color,
+                    fill_opacity=1.0,  # Force full opacity
+                    stroke_width=3      # Make stroke more visible
+                )
+                
+                # Scale triangle to match the size parameter (similar to circle/square)
+                # Default triangle is ~1.73 wide, scale to match the size parameter
+                # Adjust scaling to make triangle more visible and proportional
+                scale_factor = size / 1.0  # Scale directly by size for better visibility
+                triangle_obj.scale(scale_factor)
+                
+                triangle_obj.move_to(pos)
+                
+                # Force color setting to ensure it's applied
+                try:
+                    triangle_obj.set_fill(color, opacity=1.0)
+                    triangle_obj.set_stroke(color, width=3)
+                except Exception:
+                    pass  # Fallback if set_fill/set_stroke fails
+                
+                # Handle animations from the spec
+                animations = obj.get('animations', [])
+                if not animations:
+                    # Default: just create the object
+                    self.add(triangle_obj)
+                    self.play(Create(triangle_obj), run_time=1.0)
+                else:
+                    # Process each animation
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 1.0)
+                        
+                        if anim_type == 'fade_in':
+                            self.add(triangle_obj)
+                            self.play(FadeIn(triangle_obj), run_time=duration)
+                        elif anim_type == 'fade_out':
+                            self.play(FadeOut(triangle_obj), run_time=duration)
+                        elif anim_type == 'wait':
+                            self.wait(duration)
+                        else:
+                            # Default fallback
+                            self.add(triangle_obj)
+                            self.play(Create(triangle_obj), run_time=duration)
+                
+                objects_created.append(triangle_obj)
+                self.wait(0.5)
+                
             elif obj_type == 'text':
                 text_content = props.get('text', '')
                 if not text_content:  # Skip text objects with no content
@@ -621,20 +746,22 @@ class GeneratedScene(MovingCameraScene):
                 # Inline color validation
                 try:
                     if isinstance(color_name, str) and color_name.startswith('#'):
-                        color = Color(color_name)
+                        # Convert hex to RGB then to Manim color
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
                     else:
                         # Handle both uppercase and lowercase color names
                         color_mapping = {
                             # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
-                            'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
+                            'brown': GRAY, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
                             'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
                             # Uppercase mappings (for when AI generates RED, BLUE, etc.)
                             'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
                             'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
-                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'BROWN': GRAY, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
                             'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
                             'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
@@ -663,20 +790,22 @@ class GeneratedScene(MovingCameraScene):
                 # Inline color validation
                 try:
                     if isinstance(color_name, str) and color_name.startswith('#'):
-                        color = Color(color_name)
+                        # Convert hex to RGB then to Manim color
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
                     else:
                         # Handle both uppercase and lowercase color names
                         color_mapping = {
                             # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
-                            'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
+                            'brown': GRAY, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
                             'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
                             # Uppercase mappings (for when AI generates RED, BLUE, etc.)
                             'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
                             'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
-                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'BROWN': GRAY, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
                             'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
                             'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
@@ -706,20 +835,22 @@ class GeneratedScene(MovingCameraScene):
                 # Inline color validation
                 try:
                     if isinstance(color_name, str) and color_name.startswith('#'):
-                        color = Color(color_name)
+                        # Convert hex to RGB then to Manim color
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
                     else:
                         # Handle both uppercase and lowercase color names
                         color_mapping = {
                             # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
-                            'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
+                            'brown': GRAY, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
                             'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
                             # Uppercase mappings (for when AI generates RED, BLUE, etc.)
                             'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
                             'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
-                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'BROWN': GRAY, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
                             'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
                             'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
@@ -781,20 +912,22 @@ class GeneratedScene(MovingCameraScene):
                 # Inline color validation
                 try:
                     if isinstance(color_name, str) and color_name.startswith('#'):
-                        color = Color(color_name)
+                        # Convert hex to RGB then to Manim color
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
                     else:
                         # Handle both uppercase and lowercase color names
                         color_mapping = {
                             # Lowercase mappings
                             'white': WHITE, 'black': BLACK, 'red': RED, 'green': GREEN, 'blue': BLUE,
                             'yellow': YELLOW, 'purple': PURPLE, 'orange': ORANGE, 'pink': PINK,
-                            'brown': BROWN, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
+                            'brown': GRAY, 'gray': GRAY, 'grey': GRAY, 'cyan': BLUE, 'magenta': PURPLE,
                             'lime': GREEN, 'navy': BLUE, 'teal': BLUE, 'maroon': RED, 'olive': GREEN,
                             'fuchsia': PURPLE, 'aqua': BLUE, 'silver': GRAY, 'gold': YELLOW,
                             # Uppercase mappings (for when AI generates RED, BLUE, etc.)
                             'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
                             'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK,
-                            'BROWN': BROWN, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
+                            'BROWN': GRAY, 'GRAY': GRAY, 'GREY': GRAY, 'CYAN': BLUE, 'MAGENTA': PURPLE,
                             'LIME': GREEN, 'NAVY': BLUE, 'TEAL': BLUE, 'MAROON': RED, 'OLIVE': GREEN,
                             'FUCHSIA': PURPLE, 'AQUA': BLUE, 'SILVER': GRAY, 'GOLD': YELLOW
                         }
