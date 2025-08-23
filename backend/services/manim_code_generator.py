@@ -380,9 +380,15 @@ class GeneratedScene(MovingCameraScene):
         print("Bounds: x=", {x_bounds}, " y=", {y_bounds})
         
         # Set camera position for better viewing of coordinate systems
-        self.camera.frame.set_width(12)
-        self.camera.frame.set_height(8)
-        self.camera.frame.move_to([0, 0, 0])""")
+        # Ensure proper centering and bounds for mathematical plots
+        self.camera.frame.set(width=14, height=10)
+        self.camera.frame.move_to([0, 0, 0])
+        
+        # Set scene bounds to match the camera frame
+        self.camera.frame.set(x_range=[-7, 7], y_range=[-5, 5])
+        
+        # Ensure camera is properly centered on the origin
+        self.camera.frame.shift([0, 0, 0])""")
         
         # Object creation - minimal, no enhancements
         objects = animation_spec.get('objects', [])
