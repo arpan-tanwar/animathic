@@ -381,14 +381,64 @@ class GeneratedScene(MovingCameraScene):
         
         # Set camera position for better viewing of coordinate systems
         # Ensure proper centering and bounds for mathematical plots
-        self.camera.frame.set(width=14, height=10)
-        self.camera.frame.move_to([0, 0, 0])
+        # Use multiple approaches for environment compatibility
         
-        # Set scene bounds to match the camera frame
-        self.camera.frame.set(x_range=[-7, 7], y_range=[-5, 5])
+        try:
+            # Modern Manim approach
+            self.camera.frame.set(width=14, height=10)
+            self.camera.frame.move_to([0, 0, 0])
+            self.camera.frame.set(x_range=[-7, 7], y_range=[-5, 5])
+            self.camera.frame.shift([0, 0, 0])
+            print("Camera positioning: Modern approach applied")
+        except Exception as e1:
+            print(f"Camera positioning: Modern approach failed: {{e1}}")
+            try:
+                # Fallback approach for different Manim versions
+                self.camera.frame.set_width(14)
+                self.camera.frame.set_height(10)
+                self.camera.frame.move_to([0, 0, 0])
+                print("Camera positioning: Fallback approach applied")
+            except Exception as e2:
+                print(f"Camera positioning: Fallback approach failed: {{e2}}")
+                try:
+                    # Basic approach for maximum compatibility
+                    self.camera.frame.move_to([0, 0, 0])
+                    print("Camera positioning: Basic approach applied")
+                except Exception as e3:
+                    print(f"Camera positioning: All approaches failed: {{e3}}")
+                    # Continue without camera positioning
         
-        # Ensure camera is properly centered on the origin
-        self.camera.frame.shift([0, 0, 0])""")
+        # Alternative: Use scene-level camera configuration for better compatibility
+        try:
+            # Set scene dimensions and center
+            self.camera.frame.set_width(14)
+            self.camera.frame.set_height(10)
+            # Force center positioning
+            self.camera.frame.move_to([0, 0, 0])
+            print("Camera positioning: Scene-level approach applied")
+        except Exception as e4:
+            print(f"Camera positioning: Scene-level approach failed: {{e4}}")
+        
+        # Final fallback: Use basic camera centering
+        try:
+            self.camera.frame.move_to([0, 0, 0])
+            print("Camera positioning: Final fallback applied")
+        except Exception as e5:
+            print(f"Camera positioning: Final fallback failed: {{e5}}")
+            print("Continuing without camera positioning - axes may not be perfectly centered")
+        
+        # Cloud Run specific approach: Use scene camera configuration
+        try:
+            # Set scene dimensions for better compatibility
+            self.camera.frame.set_width(14)
+            self.camera.frame.set_height(10)
+            # Force center positioning with multiple methods
+            self.camera.frame.move_to([0, 0, 0])
+            self.camera.frame.shift([0, 0, 0])
+            print("Camera positioning: Cloud Run specific approach applied")
+        except Exception as e6:
+            print(f"Camera positioning: Cloud Run specific approach failed: {{e6}}")
+            print("Continuing with basic positioning")""")
         
         # Object creation - minimal, no enhancements
         objects = animation_spec.get('objects', [])
