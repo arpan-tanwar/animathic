@@ -635,17 +635,17 @@ async def generate_animation(
             logger.warning(f"User {user_id} starting long operation with token expiring soon")
             # Don't block the request, but log the warning
         
+        logger.info(f"Starting animation generation for user {user_id} with prompt: {request.prompt[:100]}...")
+        
+        # Create job record
+        job_id = str(uuid.uuid4())
+        
         # Register this as a long-running operation for token lifetime extension
         token_exp = auth.get("expires_at")
         if token_exp:
             from services.clerk_auth import clerk_auth
             clerk_auth.register_long_running_operation(user_id, job_id, token_exp)
             logger.info(f"Registered long-running operation {job_id} for user {user_id} with token expiry {token_exp}")
-        
-        logger.info(f"Starting animation generation for user {user_id} with prompt: {request.prompt[:100]}...")
-        
-        # Create job record
-        job_id = str(uuid.uuid4())
         
         # Store job in memory for immediate access
         generation_jobs[job_id] = {

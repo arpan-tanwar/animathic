@@ -69,7 +69,14 @@ class EnhancedWorkflowOrchestrator:
                 'workflow_summary': workflow_summary,
                 'enhancements_applied': self._get_applied_enhancements(pre_analysis),
                 'risk_assessment': pre_analysis.get('risk_assessment', {}),
-                'performance_metrics': self._calculate_performance_metrics(pre_analysis)
+                'performance_metrics': self._calculate_performance_metrics(pre_analysis),
+                'processing_metadata': {
+                    'pre_analysis': pre_analysis,
+                    'processing_time': 'optimized',
+                    'enhancement_count': len(self._get_applied_enhancements(pre_analysis)),
+                    'complexity_score': pre_analysis.get('prompt_complexity', {}).get('score', 0)
+                },
+                'workflow_type': 'enhanced_complex_animation'
             }
             
         except Exception as e:
@@ -409,7 +416,7 @@ class EnhancedWorkflowOrchestrator:
                 logger.info(f"Smart overlap prevention: Adjusted {adjusted_count} text positions")
             else:
                 logger.debug("No overlap prevention needed")
-            
+        
             return animation_spec
             
         except Exception as e:
