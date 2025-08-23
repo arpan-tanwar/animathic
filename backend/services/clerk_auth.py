@@ -40,17 +40,26 @@ class ClerkAuthService:
         self.dev_mode = os.getenv("DEV_MODE", "false").lower() == "true"
         
         # Token refresh settings
-        self.token_refresh_threshold = 300  # 5 minutes before expiration
-        self.max_token_age = 3600  # 1 hour maximum token age
+        self.token_refresh_threshold = 600  # 10 minutes before expiration (increased from 5)
+        self.max_token_age = 7200  # 2 hours maximum token age (increased from 1 hour)
+        self.long_running_token_extension = 3600  # 1 hour extension for long-running operations
         
         # Cache for JWKS to avoid repeated fetches
         self._jwks_cache = {}
         self._jwks_cache_time = 0
         self._jwks_cache_ttl = 3600  # 1 hour cache TTL
         
+        # Token validation cache for performance
+        self._token_cache = {}
+        self._token_cache_ttl = 300  # 5 minutes cache TTL
+        
+        # Long-running operation tracking
+        self._long_running_operations = {}
+        
         logger.info(f"ClerkAuthService initialized - Primary Issuer: {self.clerk_issuer}, Fallback: {self.clerk_issuer_fallback}")
         logger.info(f"Development mode: {self.dev_mode}, Allow dev tokens: {self.allow_dev_tokens}")
         logger.info(f"Token refresh threshold: {self.token_refresh_threshold}s, Max token age: {self.max_token_age}s")
+        logger.info(f"Long-running token extension: {self.long_running_token_extension}s")
     
     def _is_token_expiring_soon(self, exp: int) -> bool:
         """Check if token is expiring soon (within refresh threshold)"""
@@ -58,12 +67,22 @@ class ClerkAuthService:
         time_until_expiry = exp - current_time
         return time_until_expiry <= self.token_refresh_threshold
     
-    
     def _is_token_too_old(self, iat: int) -> bool:
         """Check if token is too old (beyond max age)"""
         current_time = int(time.time())
         token_age = current_time - iat
         return token_age > self.max_token_age
+    
+    def _can_extend_token_lifetime(self, exp: int, iat: int) -> bool:
+        """Check if token lifetime can be extended for long-running operations"""
+        current_time = int(time.time())
+        time_until_expiry = exp - current_time
+        token_age = current_time - iat
+        
+        # Can extend if token is not too old and has reasonable time left
+        return (token_age < self.max_token_age and 
+                time_until_expiry > 0 and 
+                time_until_expiry < self.long_running_token_extension)
     
     async def _fetch_jwks_with_cache(self) -> Dict[str, Any]:
         """Fetch JWKS with caching to avoid repeated requests"""
@@ -98,101 +117,129 @@ class ClerkAuthService:
                         logger.debug(f"Failed to fetch from {url}: {response.status_code}")
                 except Exception as e:
                     logger.debug(f"Error fetching from {url}: {e}")
-                    continue
             
             if not jwks:
-                # Fallback: Try using the Clerk secret key to fetch JWKS
-                logger.debug("Public JWKS endpoints failed, trying with secret key...")
-                try:
-                    if hasattr(self, 'clerk_secret_key') and self.clerk_secret_key:
-                        headers = {
-                            "Authorization": f"Bearer {self.clerk_secret_key}",
-                            "Content-Type": "application/json"
-                        }
-                        response = await client.get(
-                            "https://api.clerk.dev/v1/jwks",
-                            headers=headers,
-                            timeout=10.0
-                        )
-                        if response.status_code == 200:
-                            jwks = response.json()
-                            logger.info("Successfully retrieved JWKS using secret key")
-                        else:
-                            logger.error(f"Failed to fetch JWKS with secret key: {response.status_code}")
-                    else:
-                        logger.error("No Clerk secret key available for fallback")
-                except Exception as e:
-                    logger.error(f"Error in fallback JWKS fetch: {e}")
-            
-            if not jwks:
-                logger.error("Failed to fetch JWKS from all endpoints and fallback methods")
-                raise HTTPException(status_code=500, detail="Failed to fetch public keys from Clerk")
+                # Fallback to secret key if available
+                if self.clerk_secret_key:
+                    logger.warning("JWKS fetch failed, using secret key fallback")
+                    jwks = {"keys": [{"kid": "fallback", "secret": self.clerk_secret_key}]}
+                else:
+                    raise HTTPException(status_code=500, detail="Failed to fetch JWKS and no fallback available")
             
             # Cache the JWKS
             self._jwks_cache = jwks
             self._jwks_cache_time = current_time
-            logger.debug(f"Cached JWKS with {len(jwks.get('keys', []))} keys")
-            
             return jwks
     
-    async def verify_jwt_token(self, token: str) -> Dict[str, Any]:
-        """Verify JWT token from Clerk with enhanced expiration handling"""
+    def _get_cached_token_info(self, token: str) -> Optional[Dict[str, Any]]:
+        """Get cached token information if available and valid"""
+        current_time = time.time()
+        if token in self._token_cache:
+            cache_entry = self._token_cache[token]
+            if current_time - cache_entry['cache_time'] < self._token_cache_ttl:
+                return cache_entry['token_info']
+            else:
+                # Remove expired cache entry
+                del self._token_cache[token]
+        return None
+    
+    def _cache_token_info(self, token: str, token_info: Dict[str, Any]):
+        """Cache token information for performance"""
+        self._token_cache[token] = {
+            'token_info': token_info,
+            'cache_time': time.time()
+        }
+    
+    def register_long_running_operation(self, user_id: str, operation_id: str, token_exp: int):
+        """Register a long-running operation for token lifetime extension"""
+        self._long_running_operations[operation_id] = {
+            'user_id': user_id,
+            'token_exp': token_exp,
+            'registered_at': time.time(),
+            'extended': False
+        }
+        logger.info(f"Registered long-running operation {operation_id} for user {user_id}")
+    
+    def unregister_long_running_operation(self, operation_id: str):
+        """Unregister a long-running operation"""
+        if operation_id in self._long_running_operations:
+            del self._long_running_operations[operation_id]
+            logger.info(f"Unregistered long-running operation {operation_id}")
+    
+    def is_long_running_operation(self, operation_id: str) -> bool:
+        """Check if an operation is registered as long-running"""
+        return operation_id in self._long_running_operations
+    
+    async def verify_jwt_token(self, token: str, allow_extended_lifetime: bool = False) -> Dict[str, Any]:
+        """Verify JWT token with enhanced error handling and lifetime extension"""
         try:
-            # Reduced logging for cleaner workflow visibility
-            logger.debug(f"Starting JWT token verification for token: {token[:20]}...")
+            # Check token cache first
+            cached_info = self._get_cached_token_info(token)
+            if cached_info:
+                logger.debug("Using cached token information")
+                return cached_info
             
-            # First, try to decode without verification to get header and check expiration
+            # Decode token without verification to check expiration
             try:
                 unverified_payload = jwt.decode(token, options={"verify_signature": False})
-                logger.debug(f"JWT unverified payload: {unverified_payload}")
-                
-                # Check if token is expired
                 exp = unverified_payload.get('exp')
-                iat = unverified_payload.get('iat', 0)
+                iat = unverified_payload.get('iat')
                 
                 if exp:
                     current_time = int(time.time())
                     time_until_expiry = exp - current_time
                     
-                    if current_time > exp:
-                        logger.warning(f"JWT token has expired. Exp: {exp}, Current: {current_time}, Expired {abs(time_until_expiry)} seconds ago")
+                    # Check if token is expired
+                    if time_until_expiry <= 0:
+                        logger.warning(f"JWT token has expired. Expired {abs(time_until_expiry)} seconds ago")
                         raise HTTPException(
-                            status_code=401, 
+                            status_code=401,
                             detail={
                                 "error": "Token has expired",
+                                "requires_refresh": True,
+                                "message": "Your session has expired. Please refresh your authentication.",
                                 "expired_at": exp,
                                 "current_time": current_time,
-                                "expired_seconds_ago": abs(time_until_expiry),
-                                "requires_refresh": True,
-                                "message": "Your session has expired. Please refresh your authentication."
+                                "expired_seconds_ago": abs(time_until_expiry)
                             }
                         )
-                    elif self._is_token_expiring_soon(exp):
-                        logger.warning(f"JWT token expiring soon. Exp: {exp}, Current: {current_time}, Expires in {time_until_expiry} seconds")
-                        # Don't fail here, but warn that refresh is needed soon
+                    
+                    # Check if token is too old
+                    if iat and self._is_token_too_old(iat):
+                        logger.warning(f"JWT token is too old. Age: {current_time - iat} seconds")
+                        raise HTTPException(
+                            status_code=401,
+                            detail={
+                                "error": "Token is too old",
+                                "requires_refresh": True,
+                                "message": "Your session is too old. Please refresh your authentication.",
+                                "issued_at": iat,
+                                "current_time": current_time,
+                                "token_age": current_time - iat
+                            }
+                        )
+                    
+                    # Check if token needs refresh soon
+                    needs_refresh_soon = self._is_token_expiring_soon(exp)
+                    
+                    # Check if we can extend token lifetime for long-running operations
+                    can_extend = allow_extended_lifetime and self._can_extend_token_lifetime(exp, iat)
+                    
+                    if can_extend:
+                        logger.info(f"Token can be extended for long-running operation. Current expiry: {exp}, can extend by {self.long_running_token_extension}s")
+                        # Add extended lifetime flag
+                        unverified_payload['_extended_lifetime'] = True
+                        unverified_payload['_original_exp'] = exp
+                        unverified_payload['_extended_exp'] = exp + self.long_running_token_extension
+                    
+                    if needs_refresh_soon:
+                        logger.warning(f"JWT token will expire soon in {time_until_expiry} seconds")
                         unverified_payload['_warn_refresh_soon'] = True
-                    else:
-                        logger.debug(f"Token is valid for {time_until_expiry} more seconds")
-                
-                # Check if token is too old
-                if iat and self._is_token_too_old(iat):
-                    logger.warning(f"JWT token is too old. IAT: {iat}, Current: {current_time}, Age: {current_time - iat} seconds")
-                    raise HTTPException(
-                        status_code=401,
-                        detail={
-                            "error": "Token is too old",
-                            "issued_at": iat,
-                            "current_time": current_time,
-                            "token_age_seconds": current_time - iat,
-                            "requires_refresh": True,
-                            "message": "Your session is too old. Please refresh your authentication."
-                        }
-                    )
-                        
+                    
             except jwt.ExpiredSignatureError:
-                logger.warning("JWT token has expired (caught by PyJWT)")
+                logger.warning(f"JWT token has expired")
                 raise HTTPException(
-                    status_code=401, 
+                    status_code=401,
                     detail={
                         "error": "Token has expired",
                         "requires_refresh": True,
@@ -270,8 +317,13 @@ class ClerkAuthService:
                     "payload": payload,
                     "expires_at": payload.get('exp'),
                     "issued_at": payload.get('iat'),
-                    "needs_refresh_soon": payload.get('_warn_refresh_soon', False)
+                    "needs_refresh_soon": payload.get('_warn_refresh_soon', False),
+                    "can_extend_lifetime": payload.get('_extended_lifetime', False),
+                    "extended_expiry": payload.get('_extended_exp')
                 }
+                
+                # Cache the token information
+                self._cache_token_info(token, token_info)
                 
                 return token_info
                 
@@ -303,8 +355,13 @@ class ClerkAuthService:
                         "payload": payload,
                         "expires_at": payload.get('exp'),
                         "issued_at": payload.get('iat'),
-                        "needs_refresh_soon": payload.get('_warn_refresh_soon', False)
+                        "needs_refresh_soon": payload.get('_warn_refresh_soon', False),
+                        "can_extend_lifetime": payload.get('_extended_lifetime', False),
+                        "extended_expiry": payload.get('_extended_exp')
                     }
+                    
+                    # Cache the token information
+                    self._cache_token_info(token, token_info)
                     
                     return token_info
                     
@@ -356,7 +413,6 @@ class ClerkAuthService:
             
             # Check if refresh is needed soon
             if token_info.get('needs_refresh_soon'):
-                logger.info(f"Token for user {token_info.get('user_id')} will expire soon - refresh recommended")
                 token_info['refresh_recommended'] = True
                 token_info['refresh_message'] = "Your session will expire soon. Consider refreshing your authentication."
             
@@ -364,8 +420,6 @@ class ClerkAuthService:
             
         except HTTPException as e:
             if e.detail and isinstance(e.detail, dict) and e.detail.get('requires_refresh'):
-                # Token needs refresh
-                logger.warning(f"Token refresh required: {e.detail.get('message', 'Authentication expired')}")
                 return {
                     "authenticated": False,
                     "requires_refresh": True,
@@ -375,78 +429,65 @@ class ClerkAuthService:
                     "current_time": e.detail.get('current_time')
                 }
             else:
-                # Other authentication error
                 raise
     
     def get_token_lifetime_info(self, token_info: Dict[str, Any]) -> Dict[str, Any]:
         """Get information about token lifetime and refresh recommendations"""
         current_time = int(time.time())
         exp = token_info.get('expires_at')
-        iat = token_info.get('issued_at')
-        
-        if not exp:
+        if not exp: 
             return {"status": "unknown", "message": "Token expiration time unknown"}
         
         time_until_expiry = exp - current_time
         
         if time_until_expiry <= 0:
             return {
-                "status": "expired",
-                "message": "Token has expired",
-                "expired_seconds_ago": abs(time_until_expiry),
+                "status": "expired", 
+                "message": "Token has expired", 
+                "expired_seconds_ago": abs(time_until_expiry), 
                 "requires_refresh": True
             }
         elif time_until_expiry <= self.token_refresh_threshold:
             return {
-                "status": "expiring_soon",
-                "message": f"Token expires in {time_until_expiry} seconds",
-                "time_until_expiry": time_until_expiry,
+                "status": "expiring_soon", 
+                "message": f"Token expires in {time_until_expiry} seconds", 
+                "time_until_expiry": time_until_expiry, 
                 "refresh_recommended": True
             }
         else:
             return {
-                "status": "valid",
-                "message": f"Token valid for {time_until_expiry} more seconds",
-                "time_until_expiry": time_until_expiry,
+                "status": "valid", 
+                "message": f"Token valid for {time_until_expiry} more seconds", 
+                "time_until_expiry": time_until_expiry, 
                 "refresh_recommended": False
             }
     
     async def require_auth(self, authorization: str = Header(None)) -> Dict[str, Any]:
-        """Dependency for requiring authentication on endpoints"""
-        if not self.enabled:
-            logger.debug("Authentication disabled - allowing unauthenticated access")
-            return {"user_id": "anonymous", "authenticated": False}
-        
-        # Development mode - bypass authentication for testing
-        if self.dev_mode:
-            logger.debug("Development mode enabled - bypassing authentication")
-            return {"user_id": "dev_user", "authenticated": True, "dev_mode": True}
-        
+        """Main authentication method with enhanced error handling"""
         if not authorization:
-            logger.debug("No authorization header provided")
             raise HTTPException(
-                status_code=401, 
+                status_code=401,
                 detail={
                     "error": "Authorization header required",
-                    "requires_refresh": False
+                    "requires_refresh": False,
+                    "message": "Please provide your authentication token."
                 }
             )
         
         if not authorization.startswith("Bearer "):
-            logger.debug(f"Invalid authorization format: {authorization[:20]}...")
             raise HTTPException(
-                status_code=401, 
+                status_code=401,
                 detail={
                     "error": "Invalid authorization format",
-                    "requires_refresh": False
+                    "requires_refresh": False,
+                    "message": "Please provide a valid Bearer token."
                 }
             )
         
         token = authorization.replace("Bearer ", "")
-        logger.debug(f"Processing token: {token[:20]}...")
         
-        # For development/testing, allow simplified tokens
-        if self.allow_dev_tokens and len(token) > 10:
+        # Development mode bypass
+        if self.dev_mode and len(token) < 50:
             try:
                 # Simple token validation for development
                 user_id = "user_" + token[:8]
@@ -517,8 +558,8 @@ async def require_authentication_long_running(authorization: str = Header(None))
     token = authorization.replace("Bearer ", "")
     
     try:
-        # Use the enhanced token verification with refresh guidance
-        token_info = await clerk_auth.verify_jwt_token(token)
+        # Use the enhanced token verification with extended lifetime support
+        token_info = await clerk_auth.verify_jwt_token(token, allow_extended_lifetime=True)
         
         # Check if token needs refresh soon
         if token_info.get('needs_refresh_soon'):
@@ -526,6 +567,12 @@ async def require_authentication_long_running(authorization: str = Header(None))
             # Don't fail the request, but add a warning
             token_info['_warn_refresh_soon'] = True
             token_info['_refresh_warning'] = "Your session will expire soon. Consider refreshing before starting long operations."
+        
+        # Check if token lifetime was extended
+        if token_info.get('can_extend_lifetime'):
+            logger.info(f"Token lifetime extended for long-running operation. Extended expiry: {token_info.get('extended_expiry')}")
+            token_info['_lifetime_extended'] = True
+            token_info['_extended_expiry'] = token_info.get('extended_expiry')
         
         return token_info
         

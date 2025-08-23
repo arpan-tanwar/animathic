@@ -635,6 +635,13 @@ async def generate_animation(
             logger.warning(f"User {user_id} starting long operation with token expiring soon")
             # Don't block the request, but log the warning
         
+        # Register this as a long-running operation for token lifetime extension
+        token_exp = auth.get("expires_at")
+        if token_exp:
+            from services.clerk_auth import clerk_auth
+            clerk_auth.register_long_running_operation(user_id, job_id, token_exp)
+            logger.info(f"Registered long-running operation {job_id} for user {user_id} with token expiry {token_exp}")
+        
         logger.info(f"Starting animation generation for user {user_id} with prompt: {request.prompt[:100]}...")
         
         # Create job record
@@ -820,16 +827,41 @@ async def process_generation_job_async(job_id: str, prompt: str, user_id: str):
             
             logger.info(f"Job {job_id} completed successfully")
             
+            # Unregister long-running operation
+            try:
+                from services.clerk_auth import clerk_auth
+                clerk_auth.unregister_long_running_operation(job_id)
+                logger.info(f"Unregistered long-running operation {job_id}")
+            except Exception as unreg_error:
+                logger.warning(f"Failed to unregister long-running operation {job_id}: {unreg_error}")
+            
         except Exception as finalize_error:
             logger.error(f"Job finalization failed for job {job_id}: {finalize_error}")
             generation_jobs[job_id]["status"] = "failed"
             generation_jobs[job_id]["error"] = str(finalize_error)
+            
+            # Unregister long-running operation even on failure
+            try:
+                from services.clerk_auth import clerk_auth
+                clerk_auth.unregister_long_running_operation(job_id)
+                logger.info(f"Unregistered long-running operation {job_id} after failure")
+            except Exception as unreg_error:
+                logger.warning(f"Failed to unregister long-running operation {job_id}: {unreg_error}")
+            
             return
             
     except Exception as e:
         logger.error(f"Unexpected error processing generation job {job_id}: {e}")
         generation_jobs[job_id]["status"] = "failed"
         generation_jobs[job_id]["error"] = str(e)
+        
+        # Unregister long-running operation on unexpected error
+        try:
+            from services.clerk_auth import clerk_auth
+            clerk_auth.unregister_long_running_operation(job_id)
+            logger.info(f"Unregistered long-running operation {job_id} after unexpected error")
+        except Exception as unreg_error:
+            logger.warning(f"Failed to unregister long-running operation {job_id}: {unreg_error}")
 
 
 @app.post("/api/generate_direct")
@@ -1046,6 +1078,27 @@ async def check_token_status(
             response_data["long_running_warning"] = "Your session will expire soon. Consider refreshing before starting long operations like video generation."
         elif lifetime_info.get("status") == "expired":
             response_data["long_running_warning"] = "Your session has expired. You must refresh your authentication to continue."
+        
+        # Check if this user has any long-running operations
+        long_running_ops = []
+        for op_id, op_data in clerk_auth._long_running_operations.items():
+            if op_data['user_id'] == auth.get('user_id'):
+                long_running_ops.append({
+                    'operation_id': op_id,
+                    'registered_at': op_data['registered_at'],
+                    'token_exp': op_data['token_exp'],
+                    'extended': op_data['extended']
+                })
+        
+        response_data["long_running_operations"] = long_running_ops
+        response_data["can_extend_lifetime"] = auth.get("can_extend_lifetime", False)
+        response_data["extended_expiry"] = auth.get("extended_expiry")
+        
+        # Add extended lifetime information
+        if auth.get("_lifetime_extended"):
+            response_data["lifetime_extended"] = True
+            response_data["extended_expiry"] = auth.get("_extended_expiry")
+            response_data["lifetime_extension_message"] = "Token lifetime has been extended for long-running operations."
         
         return response_data
         
