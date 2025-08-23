@@ -982,7 +982,7 @@ class GeneratedScene(MovingCameraScene):
                     fill_opacity=1.0,
                     stroke_width=3
                 )
-                diamond_obj.rotate(PI/4)  # Rotate 45 degrees to make it look like a diamond
+                diamond_obj.rotate(np.pi/4)  # Rotate 45 degrees to make it look like a diamond
                 diamond_obj.move_to(pos)
                 
                 # Handle animations
