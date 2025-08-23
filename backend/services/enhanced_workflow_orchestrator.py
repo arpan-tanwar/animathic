@@ -402,6 +402,9 @@ class EnhancedWorkflowOrchestrator:
         # Get sequence analysis
         sequence_analysis = analysis.get('sequence_analysis', {})
         sequential_objects = sequence_analysis.get('sequential_objects', [])
+        object_clusters = sequence_analysis.get('object_clusters', [])
+        spatial_analysis = sequence_analysis.get('spatial_analysis', {})
+        temporal_analysis = sequence_analysis.get('temporal_analysis', {})
         
         # Add fade-out transitions for sequential objects
         for seq_obj in sequential_objects:
@@ -426,7 +429,176 @@ class EnhancedWorkflowOrchestrator:
                 }
                 previous_obj['animations'].append(fade_out_anim)
         
+        # Apply cluster-based optimizations
+        if object_clusters:
+            animation_spec = self._apply_cluster_optimizations(animation_spec, object_clusters)
+        
+        # Apply spatial optimizations
+        if spatial_analysis.get('status') == 'analyzed':
+            animation_spec = self._apply_spatial_optimizations(animation_spec, spatial_analysis)
+        
+        # Apply temporal optimizations
+        if temporal_analysis.get('status') == 'analyzed':
+            animation_spec = self._apply_temporal_optimizations(animation_spec, temporal_analysis)
+        
         return animation_spec
+    
+    def _apply_cluster_optimizations(self, animation_spec: Dict[str, Any], object_clusters: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Apply optimizations based on object clusters"""
+        objects = animation_spec.get('objects', [])
+        
+        for cluster in object_clusters:
+            cluster_type = cluster.get('type', '')
+            cluster_objects = cluster.get('objects', [])
+            
+            if cluster_type == 'coordinate_system':
+                # Group coordinate system objects together
+                self._group_coordinate_objects(objects, cluster_objects)
+            elif cluster_type == 'geometric_shapes':
+                # Spread geometric shapes to avoid overlap
+                self._spread_geometric_shapes(objects, cluster_objects)
+            elif cluster_type == 'text_elements':
+                # Position text elements to avoid overlap
+                self._position_text_elements(objects, cluster_objects)
+        
+        return animation_spec
+    
+    def _group_coordinate_objects(self, objects: List[Dict[str, Any]], cluster_object_ids: List[str]):
+        """Group coordinate system objects together"""
+        cluster_objects = [obj for obj in objects if obj.get('id') in cluster_object_ids]
+        
+        if len(cluster_objects) <= 1:
+            return
+        
+        # Position all coordinate objects at the center
+        center_position = [0, 0, 0]
+        for obj in cluster_objects:
+            if 'properties' not in obj:
+                obj['properties'] = {}
+            obj['properties']['position'] = center_position.copy()
+    
+    def _spread_geometric_shapes(self, objects: List[Dict[str, Any]], cluster_object_ids: List[str]):
+        """Spread geometric shapes to avoid overlap"""
+        cluster_objects = [obj for obj in objects if obj.get('id') in cluster_object_ids]
+        
+        if len(cluster_objects) <= 1:
+            return
+        
+        # Calculate spacing based on number of objects
+        spacing = 2.0
+        for i, obj in enumerate(cluster_objects):
+            if 'properties' not in obj:
+                obj['properties'] = {}
+            
+            # Position in a grid pattern
+            row = i // 2
+            col = i % 2
+            x = (col - 0.5) * spacing
+            y = (row - len(cluster_objects) / 4) * spacing
+            
+            obj['properties']['position'] = [x, y, 0]
+    
+    def _position_text_elements(self, objects: List[Dict[str, Any]], cluster_object_ids: List[str]):
+        """Position text elements to avoid overlap"""
+        cluster_objects = [obj for obj in objects if obj.get('id') in cluster_object_ids]
+        
+        if len(cluster_objects) <= 1:
+            return
+        
+        # Position text elements vertically stacked
+        for i, obj in enumerate(cluster_objects):
+            if 'properties' not in obj:
+                obj['properties'] = {}
+            
+            # Stack vertically with some horizontal offset
+            x = (i % 2) * 0.5 - 0.25
+            y = 2.0 - i * 0.8
+            
+            obj['properties']['position'] = [x, y, 0]
+    
+    def _apply_spatial_optimizations(self, animation_spec: Dict[str, Any], spatial_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply optimizations based on spatial analysis"""
+        objects = animation_spec.get('objects', [])
+        
+        # Check if objects are too clustered
+        if spatial_analysis.get('spatial_distribution') == 'clustered':
+            # Spread objects out more
+            bounds = spatial_analysis.get('bounds', {})
+            if bounds:
+                min_x, max_x = bounds.get('min_x', -2), bounds.get('max_x', 2)
+                min_y, max_y = bounds.get('min_y', -1.5), bounds.get('max_y', 1.5)
+                
+                # Expand bounds
+                expansion_factor = 1.5
+                new_min_x = (min_x + max_x) / 2 - (max_x - min_x) * expansion_factor / 2
+                new_max_x = (min_x + max_x) / 2 + (max_x - min_x) * expansion_factor / 2
+                new_min_y = (min_y + max_y) / 2 - (max_y - min_y) * expansion_factor / 2
+                new_max_y = (min_y + max_y) / 2 + (max_y - min_y) * expansion_factor / 2
+                
+                # Redistribute objects
+                for i, obj in enumerate(objects):
+                    if 'properties' not in obj:
+                        obj['properties'] = {}
+                    
+                    # Calculate new position in expanded space
+                    if i == 0:
+                        obj['properties']['position'] = [new_min_x, new_min_y, 0]
+                    elif i == 1:
+                        obj['properties']['position'] = [new_max_x, new_min_y, 0]
+                    elif i == 2:
+                        obj['properties']['position'] = [new_min_x, new_max_y, 0]
+                    elif i == 3:
+                        obj['properties']['position'] = [new_max_x, new_max_y, 0]
+                    else:
+                        # For additional objects, use grid pattern
+                        row = (i - 4) // 2
+                        col = (i - 4) % 2
+                        x = new_min_x + (col + 0.5) * (new_max_x - new_min_x) / 2
+                        y = new_min_y + (row + 0.5) * (new_max_y - new_min_y) / 2
+                        obj['properties']['position'] = [x, y, 0]
+        
+        return animation_spec
+    
+    def _apply_temporal_optimizations(self, animation_spec: Dict[str, Any], temporal_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply optimizations based on temporal analysis"""
+        objects = animation_spec.get('objects', [])
+        
+        # Check for timing issues
+        timing_issues = temporal_analysis.get('timing_issues', [])
+        
+        for issue in timing_issues:
+            if issue.get('type') == 'long_duration':
+                # Break long animations into shorter sequences
+                self._break_long_animations(objects)
+            elif issue.get('type') == 'many_sequential':
+                # Group some objects to appear simultaneously
+                self._group_sequential_objects(objects)
+        
+        return animation_spec
+    
+    def _break_long_animations(self, objects: List[Dict[str, Any]]):
+        """Break long animations into shorter sequences"""
+        for obj in objects:
+            animations = obj.get('animations', [])
+            if animations:
+                # Reduce duration of long animations
+                for anim in animations:
+                    if anim.get('duration', 0) > 2.0:
+                        anim['duration'] = min(anim['duration'], 2.0)
+                        anim['note'] = 'duration_reduced_for_better_flow'
+    
+    def _group_sequential_objects(self, objects: List[Dict[str, Any]]):
+        """Group some sequential objects to appear simultaneously"""
+        # Find objects that can be grouped
+        plot_objects = [obj for obj in objects if obj.get('type') in ['plot', 'function', 'graph']]
+        
+        if len(plot_objects) > 2:
+            # Group every other plot object to appear simultaneously
+            for i in range(0, len(plot_objects), 2):
+                if i + 1 < len(plot_objects):
+                    # These two objects can appear together
+                    plot_objects[i]['group_with'] = plot_objects[i + 1]['id']
+                    plot_objects[i + 1]['group_with'] = plot_objects[i]['id']
     
     def _optimize_camera_strategy(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
         """Optimize camera strategy for the animation"""

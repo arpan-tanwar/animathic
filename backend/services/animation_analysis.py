@@ -5,6 +5,7 @@ Analyzes animation specs for overlaps, optimizations, and sequence management
 
 import logging
 from typing import Dict, Any, List, Optional
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +15,22 @@ class AnimationSequenceAnalyzer:
     
     def __init__(self):
         """Initialize the animation analyzer"""
-        pass
+        self.analysis_cache = {}  # Cache analysis results for performance
+        self.risk_thresholds = {
+            'overlap_distance': 1.0,  # Minimum distance between objects
+            'max_concurrent_plots': 2,  # Maximum plots that can be shown simultaneously
+            'max_objects_per_screen': 5,  # Maximum objects before camera adjustment needed
+            'performance_threshold': 8  # Maximum objects before performance degradation
+        }
     
     def analyze_animation_sequence(self, animation_spec):
         """Analyze animation spec to detect potential overlaps and optimize sequence"""
+        # Check cache first for performance
+        spec_hash = self._hash_spec(animation_spec)
+        if spec_hash in self.analysis_cache:
+            logger.debug("Using cached analysis result")
+            return self.analysis_cache[spec_hash]
+        
         analysis = {
             'sequential_objects': [],      # objects that should appear one after another
             'concurrent_objects': [],      # objects that can appear simultaneously
@@ -30,11 +43,18 @@ class AnimationSequenceAnalyzer:
                 'overlap_risk': 'low',
                 'sequence_risk': 'low',
                 'performance_risk': 'low'
-            }
+            },
+            'object_clusters': [],        # groups of related objects
+            'spatial_analysis': {},       # spatial distribution analysis
+            'temporal_analysis': {}       # timing and sequence analysis
         }
         
         try:
             objects = animation_spec.get('objects', [])
+            
+            if not objects:
+                analysis['risk_assessment']['overall_risk'] = 'none'
+                return analysis
             
             # Analyze each object in sequence
             for i, obj in enumerate(objects):
@@ -72,7 +92,8 @@ class AnimationSequenceAnalyzer:
                                 'object_id': prev_obj.get('id', f'obj_{i-1}'),
                                 'reason': 'sequential_plot_requirement',
                                 'timing': 'before_new_plot',
-                                'duration': 0.5
+                                'duration': 0.5,
+                                'priority': 'high'
                             })
                 
                 # Detect overlap risks for all object types
@@ -126,14 +147,200 @@ class AnimationSequenceAnalyzer:
             # Generate camera adjustment suggestions
             analysis['camera_adjustments'] = self._generate_camera_adjustments(analysis, objects)
             
+            # Perform spatial analysis
+            analysis['spatial_analysis'] = self._analyze_spatial_distribution(objects)
+            
+            # Perform temporal analysis
+            analysis['temporal_analysis'] = self._analyze_temporal_sequence(objects, analysis)
+            
+            # Identify object clusters
+            analysis['object_clusters'] = self._identify_object_clusters(objects, analysis)
+            
             # Assess overall risks
             analysis['risk_assessment'] = self._assess_overall_risks(analysis)
+            
+            # Cache the result
+            self.analysis_cache[spec_hash] = analysis
             
             return analysis
             
         except Exception as e:
             logger.error(f"Error in analyze_animation_sequence: {e}")
             return {'error': str(e)}
+
+    def _hash_spec(self, animation_spec):
+        """Create a hash of the animation spec for caching"""
+        try:
+            import hashlib
+            spec_str = str(sorted(str(animation_spec.items())))
+            return hashlib.md5(spec_str.encode()).hexdigest()
+        except Exception:
+            return str(id(animation_spec))
+
+    def _analyze_spatial_distribution(self, objects):
+        """Analyze the spatial distribution of objects"""
+        try:
+            if not objects:
+                return {'status': 'no_objects'}
+            
+            positions = []
+            bounds = {'min_x': float('inf'), 'max_x': float('-inf'), 
+                     'min_y': float('inf'), 'max_y': float('-inf')}
+            
+            for obj in objects:
+                props = obj.get('properties', {})
+                pos = props.get('position', [0, 0, 0])
+                if isinstance(pos, list) and len(pos) >= 2:
+                    x, y = pos[0], pos[1]
+                    positions.append((x, y))
+                    bounds['min_x'] = min(bounds['min_x'], x)
+                    bounds['max_x'] = max(bounds['max_x'], x)
+                    bounds['min_y'] = min(bounds['min_y'], y)
+                    bounds['max_y'] = max(bounds['max_y'], y)
+            
+            if not positions:
+                return {'status': 'no_valid_positions'}
+            
+            # Calculate spatial metrics
+            width = bounds['max_x'] - bounds['min_x']
+            height = bounds['max_y'] - bounds['min_y']
+            area = width * height
+            
+            # Check if objects are clustered or spread out
+            center_x = (bounds['min_x'] + bounds['max_x']) / 2
+            center_y = (bounds['min_y'] + bounds['max_y']) / 2
+            
+            # Calculate average distance from center
+            total_distance = 0
+            for x, y in positions:
+                total_distance += math.sqrt((x - center_x)**2 + (y - center_y)**2)
+            avg_distance = total_distance / len(positions)
+            
+            return {
+                'status': 'analyzed',
+                'bounds': bounds,
+                'dimensions': {'width': width, 'height': height, 'area': area},
+                'center': [center_x, center_y],
+                'average_distance_from_center': avg_distance,
+                'spatial_distribution': 'clustered' if avg_distance < 2 else 'spread',
+                'screen_coverage': 'high' if area > 20 else 'medium' if area > 10 else 'low'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in spatial analysis: {e}")
+            return {'status': 'error', 'message': str(e)}
+
+    def _analyze_temporal_sequence(self, objects, analysis):
+        """Analyze the temporal sequence and timing of objects"""
+        try:
+            if not objects:
+                return {'status': 'no_objects'}
+            
+            temporal_data = {
+                'total_objects': len(objects),
+                'sequential_objects': len(analysis.get('sequential_objects', [])),
+                'concurrent_objects': len(analysis.get('concurrent_objects', [])),
+                'estimated_duration': 0,
+                'timing_issues': [],
+                'sequence_complexity': 'simple'
+            }
+            
+            # Estimate total duration based on object types and animations
+            base_durations = {
+                'axes': 0.5,
+                'plot': 1.5,
+                'function': 1.5,
+                'graph': 1.5,
+                'circle': 0.3,
+                'square': 0.3,
+                'text': 0.2,
+                'line': 0.4
+            }
+            
+            total_duration = 0
+            for obj in objects:
+                obj_type = obj.get('type', '')
+                base_duration = base_durations.get(obj_type, 0.5)
+                
+                # Add duration for animations
+                animations = obj.get('animations', [])
+                if animations:
+                    total_duration += sum(anim.get('duration', base_duration) for anim in animations)
+                else:
+                    total_duration += base_duration
+            
+            temporal_data['estimated_duration'] = total_duration
+            
+            # Assess sequence complexity
+            if temporal_data['sequential_objects'] > 3:
+                temporal_data['sequence_complexity'] = 'complex'
+            elif temporal_data['sequential_objects'] > 1:
+                temporal_data['sequence_complexity'] = 'moderate'
+            
+            # Check for timing issues
+            if total_duration > 10:
+                temporal_data['timing_issues'].append({
+                    'type': 'long_duration',
+                    'message': 'Animation duration is very long',
+                    'suggestion': 'Consider breaking into shorter sequences'
+                })
+            
+            if temporal_data['sequential_objects'] > 5:
+                temporal_data['timing_issues'].append({
+                    'type': 'many_sequential',
+                    'message': 'Too many sequential objects',
+                    'suggestion': 'Consider grouping some objects to appear simultaneously'
+                })
+            
+            return temporal_data
+            
+        except Exception as e:
+            logger.error(f"Error in temporal analysis: {e}")
+            return {'status': 'error', 'message': str(e)}
+
+    def _identify_object_clusters(self, objects, analysis):
+        """Identify logical clusters of related objects"""
+        try:
+            if not objects:
+                return []
+            
+            clusters = []
+            
+            # Cluster 1: Coordinate system objects
+            coord_objects = [obj for obj in objects if obj.get('type') in ['axes', 'plot', 'function', 'graph']]
+            if coord_objects:
+                clusters.append({
+                    'type': 'coordinate_system',
+                    'objects': [obj.get('id') for obj in coord_objects],
+                    'priority': 'high',
+                    'suggested_action': 'group_together'
+                })
+            
+            # Cluster 2: Geometric shapes
+            shape_objects = [obj for obj in objects if obj.get('type') in ['circle', 'square', 'line']]
+            if shape_objects:
+                clusters.append({
+                    'type': 'geometric_shapes',
+                    'objects': [obj.get('id') for obj in shape_objects],
+                    'priority': 'medium',
+                    'suggested_action': 'position_spread'
+                })
+            
+            # Cluster 3: Text and labels
+            text_objects = [obj for obj in objects if obj.get('type') in ['text', 'label', 'mathtex', 'tex']]
+            if text_objects:
+                clusters.append({
+                    'type': 'text_elements',
+                    'objects': [obj.get('id') for obj in text_objects],
+                    'priority': 'low',
+                    'suggested_action': 'avoid_overlap'
+                })
+            
+            return clusters
+            
+        except Exception as e:
+            logger.error(f"Error in object clustering: {e}")
+            return []
 
     def resolve_label_overlaps(self, animation_spec, object_registry):
         """Resolve overlapping labels and text objects"""

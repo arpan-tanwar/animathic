@@ -1,353 +1,12 @@
-"""
-Manim Code Generator for Animathic
-Converts animation specifications to executable Manim code
-"""
-
-import logging
-from typing import Dict, Any, List, Optional
-
-logger = logging.getLogger(__name__)
-
-
-class ManimCodeGenerator:
-    """Generates Manim code from animation specifications"""
-    
-    def __init__(self):
-        """Initialize the code generator"""
-        pass
-    
-    def generate_manim_code(self, animation_spec: Dict[str, Any]) -> str:
-        """Convert animation specification to Manim Python code - IMPROVED VERSION"""
-        try:
-            logger.info("Converting animation spec to Manim code")
-            
-            # Validate input specification
-            if not self._validate_input_spec(animation_spec):
-                raise ValueError("Invalid animation specification provided")
-            
-            # Sanitize spec to avoid invalid shapes/values
-            sanitized_objects = self._sanitize_objects(animation_spec.get('objects', []) or [])
-            animation_spec = {**animation_spec, "objects": sanitized_objects}
-            
-            # Bounds defaults
-            x_bounds, y_bounds = self._get_bounds(animation_spec)
-            
-            # Generate the Manim code template
-            manim_code = self._generate_code_template(animation_spec, x_bounds, y_bounds)
-            
-            # Validate generated code
-            if not self._validate_generated_code(manim_code):
-                raise ValueError("Generated Manim code validation failed")
-            
-            logger.info("Successfully generated Manim code")
-            return manim_code
-            
-        except Exception as e:
-            logger.error(f"Error generating Manim code: {e}")
-            # Return a safe fallback code instead of raising
-            return self._generate_fallback_code(animation_spec)
-    
-    def _validate_input_spec(self, spec: Dict[str, Any]) -> bool:
-        """Validate input animation specification"""
-        try:
-            if not isinstance(spec, dict):
-                logger.error("Spec is not a dictionary")
-                return False
-            
-            if 'objects' not in spec:
-                logger.error("Spec missing objects array")
-                return False
-            
-            if not isinstance(spec['objects'], list):
-                logger.error("Objects is not a list")
-                return False
-            
-            # Validate each object
-            for i, obj in enumerate(spec['objects']):
-                if not isinstance(obj, dict):
-                    logger.error(f"Object {i} is not a dictionary")
-                    return False
-                
-                if 'type' not in obj:
-                    logger.error(f"Object {i} missing type")
-                    return False
-                
-                if 'properties' not in obj:
-                    logger.error(f"Object {i} missing properties")
-                    return False
-            
-            logger.info("Input spec validation passed")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error in input spec validation: {e}")
-            return False
-    
-    def _validate_generated_code(self, code: str) -> bool:
-        """Validate generated Manim code - IMPROVED VERSION"""
-        try:
-            if not code or not isinstance(code, str):
-                logger.error("Code is empty or not a string")
-                return False
-            
-            # Check for required components
-            required_components = [
-                'from manim import',
-                'class GeneratedScene',
-                'def construct(self)',
-                'self.add(',
-                'self.play('
-            ]
-            
-            for component in required_components:
-                if component not in code:
-                    logger.error(f"Missing required component: {component}")
-                    return False
-            
-            # Check for dangerous patterns - IMPROVED: More intelligent detection
-            dangerous_patterns = [
-                # Only catch actual function calls, not string literals or comments
-                'eval(',  # Actual eval function call
-                '__import__(',  # Actual import function call
-                'exec(',  # Actual exec function call
-                'open(',  # Actual open function call
-                'file('   # Actual file function call
-            ]
-            
-            # More intelligent pattern detection
-            for pattern in dangerous_patterns:
-                # Look for actual function calls, not string literals or comments
-                if pattern in code:
-                    # Check if it's in a string literal or comment
-                    lines = code.split('\n')
-                    for i, line in enumerate(lines):
-                        if pattern in line:
-                            # Skip if it's a comment
-                            stripped_line = line.strip()
-                            if stripped_line.startswith('#'):
-                                continue
-                            
-                            # Skip if it's in a string literal
-                            if f"'{pattern}" in line or f'"{pattern}' in line:
-                                continue
-                            
-                            # This is an actual dangerous pattern
-                            logger.error(f"Dangerous pattern found on line {i+1}: {line.strip()}")
-                            return False
-                    
-                    # If we get here, the pattern was found but it's safe (in strings/comments)
-                    logger.info(f"Pattern '{pattern}' found but appears to be safe (in strings/comments)")
-            
-            logger.info("Generated code validation passed")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error in generated code validation: {e}")
-            return False
-    
-    def _generate_fallback_code(self, spec: Dict[str, Any]) -> str:
-        """Generate safe fallback Manim code when main generation fails"""
-        try:
-            logger.info("Generating fallback Manim code")
-            
-            # Create a minimal, safe scene
-            fallback_code = '''from manim import *
-
-class GeneratedScene(MovingCameraScene):
-    def construct(self):
-        # Fallback scene due to generation error
-        self.camera.background_color = rgb_to_color([0, 0, 0])  # Black
-        
-        # Create a simple white circle as fallback
-        circle = Circle(
-            radius=1,
-            fill_color=rgb_to_color([1, 1, 1]),  # White
-            stroke_color=rgb_to_color([1, 1, 1]),  # White
-            fill_opacity=1.0,
-            stroke_width=2
-        )
-        
-        self.add(circle)
-        self.play(Create(circle), run_time=1.0)
-        self.wait(1)
-        self.play(FadeOut(circle), run_time=1.0)
-        self.wait(1)
-        
-        print("Fallback scene completed")
-'''
-            
-            logger.info("Fallback code generated successfully")
-            return fallback_code
-            
-        except Exception as e:
-            logger.error(f"Error generating fallback code: {e}")
-            # Return absolute minimal code
-            return '''from manim import *
-
-class GeneratedScene(MovingCameraScene):
-    def construct(self):
-        self.wait(2)
-        print("Minimal fallback scene")
-'''
-    
-    def _sanitize_objects(self, objects):
-        """Sanitize animation objects to ensure valid values"""
-        def _coerce_vec3(v):
-            try:
-                if not isinstance(v, (list, tuple)):
-                    return [0, 0, 0]
-                out = []
-                for i in range(3):
-                    out.append(float(v[i]) if i < len(v) and isinstance(v[i], (int, float)) else 0.0)
-                return out
-            except Exception:
-                return [0, 0, 0]
-        
-        allowed_types = {"circle", "square", "text", "line", "dot", "axes", "plot", "diamond", "star", "hexagon", "triangle", "rectangle", "ellipse"}
-        allowed_anims = {"move", "scale", "rotate", "fade_in", "fade_out", "transform", "fade_out_previous", "clear_previous_plots", "wait", "opacity_change", "opacity", "transparency"}
-        
-        sanitized_objects = []
-        for obj in objects:
-            otype = str(obj.get("type", "")).lower()
-            if otype not in allowed_types:
-                continue
-            
-            props = obj.get("properties", {}) or {}
-            props.setdefault("position", [0, 0, 0])
-            props["position"] = _coerce_vec3(props.get("position"))
-            
-            if otype == "circle":
-                try:
-                    props["size"] = float(props.get("size", 1)) or 1.0
-                except Exception:
-                    props["size"] = 1.0
-            elif otype == "square":
-                try:
-                    props["size"] = float(props.get("size", 2)) or 2.0
-                except Exception:
-                    props["size"] = 2.0
-            elif otype == "line":
-                props["start"] = _coerce_vec3(props.get("start", [-2, 0, 0]))
-                props["end"] = _coerce_vec3(props.get("end", [2, 0, 0]))
-            elif otype == "axes":
-                def _rng(r, d):
-                    try:
-                        r = list(r)
-                        xmin = float(r[0])
-                        xmax = float(r[1])
-                        step = float(r[2])
-                        # Sanitize step: must be positive and not too small
-                        if step <= 0:
-                            step = 1.0
-                        # Coerce to reasonable tick granularity
-                        if step < 0.5:
-                            step = 0.5
-                        return [xmin, xmax, step]
-                    except Exception:
-                        return d
-                
-                props["x_range"] = _rng(props.get("x_range", [-5, 5, 1]), [-5, 5, 1])
-                props["y_range"] = _rng(props.get("y_range", [-3, 3, 1]), [-3, 3, 1])
-                props["show_labels"] = bool(props.get("show_labels", True))
-            elif otype == "plot":
-                try:
-                    xr = props.get("x_range_plot", [-5, 5])
-                    props["x_range_plot"] = [float(xr[0]), float(xr[1])]
-                except Exception:
-                    props["x_range_plot"] = [-5, 5]
-                props["expression"] = str(props.get("expression", "sin(x)"))
-            elif otype == "diamond":
-                try:
-                    props["size"] = float(props.get("size", 1)) or 1.0
-                except Exception:
-                    props["size"] = 1.0
-            elif otype == "star":
-                try:
-                    props["size"] = float(props.get("size", 1)) or 1.0
-                except Exception:
-                    props["size"] = 1.0
-            elif otype == "hexagon":
-                try:
-                    props["size"] = float(props.get("size", 1)) or 1.0
-                except Exception:
-                    props["size"] = 1.0
-            elif otype == "triangle":
-                try:
-                    props["size"] = float(props.get("size", 1)) or 1.0
-                except Exception:
-                    props["size"] = 1.0
-            elif otype == "rectangle":
-                try:
-                    props["size"] = float(props.get("size", 1)) or 1.0
-                except Exception:
-                    props["size"] = 1.0
-            elif otype == "ellipse":
-                try:
-                    props["size"] = float(props.get("size", 1)) or 1.0
-                except Exception:
-                    props["size"] = 1.0
-            
-            # Sanitize animations
-            anims = []
-            for anim in obj.get("animations", []) or []:
-                a = dict(anim or {})
-                a_type_raw = str(a.get("type", "move")).lower()
-                
-                # Normalize/allow only known animations
-                if a_type_raw in {"fadein", "appear"}:
-                    a["type"] = "fade_in"
-                elif a_type_raw in {"fadeout", "disappear"}:
-                    a["type"] = "fade_out"
-                elif a_type_raw in {"transform_to", "morph", "transformto"}:
-                    a["type"] = "transform"
-                elif a_type_raw in {"fade_out_previous", "clear_previous_plots", "wait"}:
-                    a["type"] = a_type_raw
-                elif a_type_raw in allowed_anims:
-                    a["type"] = a_type_raw
-                else:
-                    # Skip unknown animation types
-                    continue
-                
-                try:
-                    a["duration"] = max(0.1, float(a.get("duration", 1)))
-                except Exception:
-                    a["duration"] = 1.0
-                
-                a.setdefault("parameters", {})
-                anims.append(a)
-            
-            sanitized_objects.append({"type": otype, "properties": props, "animations": anims})
-        
-        return sanitized_objects
-    
-    def _get_bounds(self, animation_spec):
-        """Get bounds from animation spec with defaults"""
-        try:
-            _b = animation_spec.get("bounds") or {}
-            _bx = _b.get("x", [-6, 6])
-            _by = _b.get("y", [-3.5, 3.5])
-            x_bounds = [float(_bx[0]), float(_bx[1])]
-            y_bounds = [float(_by[0]), float(_by[1])]
-        except Exception:
-            x_bounds = [-6.0, 6.0]
-            y_bounds = [-3.5, 3.5]
-        
-        return x_bounds, y_bounds
-    
-    def _generate_code_template(self, animation_spec, x_bounds, y_bounds):
-        """Generate the complete Manim code template - minimal and precise"""
-        code_parts = []
-        
-        # Scene class definition with explicit imports for compatibility
-        code_parts.append("""import numpy as np
+import numpy as np
 from manim import *
 
 class GeneratedScene(MovingCameraScene):
     def construct(self):
-        # Animation: """ + animation_spec.get('scene_description', 'Generated animation') + """
+        # Animation: A parabola plot with axes, a circle at (2,4), a square at (-2,4), and text labels for each point.
         
         # Set background color
-        bg_color = """ + repr(animation_spec.get('background_color', '#1a1a1a')) + """
+        bg_color = '#1a1a1a'
         if bg_color.lower() in ['#ffffff', '#fff', 'white', 'ffffff']:
             bg_color = "#1a1a1a"
         # Ensure valid Manim color using inline validation
@@ -367,12 +26,10 @@ class GeneratedScene(MovingCameraScene):
                 }
                 self.camera.background_color = color_mapping.get(bg_color.lower(), rgb_to_color([0, 0, 0]))
         except Exception:
-            self.camera.background_color = rgb_to_color([0, 0, 0])""")
+            self.camera.background_color = rgb_to_color([0, 0, 0])
         
-        # Bounds logging
-        code_parts.append(f"""        
         # Log bounds
-        print("Bounds: x=", {x_bounds}, " y=", {y_bounds})
+        print("Bounds: x=", [-6.0, 6.0], " y=", [-3.5, 3.5])
         
         # Set camera position for better viewing of coordinate systems
         # Ensure proper centering and bounds for mathematical plots
@@ -386,7 +43,7 @@ class GeneratedScene(MovingCameraScene):
             self.camera.frame.shift([0, 0, 0])
             print("Camera positioning: Modern approach applied")
         except Exception as e1:
-            print(f"Camera positioning: Modern approach failed: {{e1}}")
+            print(f"Camera positioning: Modern approach failed: {e1}")
             try:
                 # Fallback approach for different Manim versions
                 self.camera.frame.set_width(14)
@@ -394,13 +51,13 @@ class GeneratedScene(MovingCameraScene):
                 self.camera.frame.move_to([0, 0, 0])
                 print("Camera positioning: Fallback approach applied")
             except Exception as e2:
-                print(f"Camera positioning: Fallback approach failed: {{e2}}")
+                print(f"Camera positioning: Fallback approach failed: {e2}")
                 try:
                     # Basic approach for maximum compatibility
                     self.camera.frame.move_to([0, 0, 0])
                     print("Camera positioning: Basic approach applied")
                 except Exception as e3:
-                    print(f"Camera positioning: All approaches failed: {{e3}}")
+                    print(f"Camera positioning: All approaches failed: {e3}")
                     # Continue without camera positioning
         
         # Alternative: Use scene-level camera configuration for better compatibility
@@ -412,14 +69,14 @@ class GeneratedScene(MovingCameraScene):
             self.camera.frame.move_to([0, 0, 0])
             print("Camera positioning: Scene-level approach applied")
         except Exception as e4:
-            print(f"Camera positioning: Scene-level approach failed: {{e4}}")
+            print(f"Camera positioning: Scene-level approach failed: {e4}")
         
         # Final fallback: Use basic camera centering
         try:
             self.camera.frame.move_to([0, 0, 0])
             print("Camera positioning: Final fallback applied")
         except Exception as e5:
-            print(f"Camera positioning: Final fallback failed: {{e5}}")
+            print(f"Camera positioning: Final fallback failed: {e5}")
             print("Continuing without camera positioning - axes may not be perfectly centered")
         
         # Cloud Run specific approach: Use scene camera configuration
@@ -432,27 +89,19 @@ class GeneratedScene(MovingCameraScene):
             self.camera.frame.shift([0, 0, 0])
             print("Camera positioning: Cloud Run specific approach applied")
         except Exception as e6:
-            print(f"Camera positioning: Cloud Run specific approach failed: {{e6}}")
-            print("Continuing with basic positioning")""")
+            print(f"Camera positioning: Cloud Run specific approach failed: {e6}")
+            print("Continuing with basic positioning")
         
-        # Object creation - minimal, no enhancements
-        objects = animation_spec.get('objects', [])
-        
-        code_parts.append(f"""        
         # Create objects exactly as specified
         objects_created = []
         
         # Define objects list
-        objects = {objects}
+        objects = [{'type': 'axes', 'properties': {'position': [-1.5, -1.75, 0.0], 'color': 'WHITE', 'x_range': [-4.0, 4.0, 1.0], 'y_range': [0.0, 16.0, 2.0], 'show_labels': True}, 'animations': [{'type': 'fade_in', 'duration': 1.0, 'parameters': {}}]}, {'type': 'plot', 'properties': {'expression': 'x**2', 'x_range_plot': [-4.0, 4.0], 'color': 'BLUE', 'position': [1.5, -1.75, 0.0]}, 'animations': [{'type': 'fade_in', 'duration': 1.5, 'parameters': {}}]}, {'type': 'circle', 'properties': {'position': [-1.5, 2.75, 0.0], 'color': 'RED', 'size': 0.2}, 'animations': [{'type': 'fade_in', 'duration': 0.5, 'parameters': {}}]}, {'type': 'square', 'properties': {'position': [1.5, 2.75, 0.0], 'color': 'GREEN', 'size': 0.2}, 'animations': [{'type': 'fade_in', 'duration': 0.5, 'parameters': {}}]}, {'type': 'text', 'properties': {'text': 'P1', 'position': [-0.75, -0.625, 0.0], 'color': 'YELLOW', 'size': 0.5}, 'animations': [{'type': 'fade_in', 'duration': 0.5, 'parameters': {}}]}, {'type': 'text', 'properties': {'text': 'P2', 'position': [0.75, -0.625, 0.0], 'color': 'YELLOW', 'size': 0.5}, 'animations': [{'type': 'fade_in', 'duration': 0.5, 'parameters': {}}]}]
         
-        print(f"Creating {{len(objects)}} objects as requested...")""")
+        print(f"Creating {len(objects)} objects as requested...")
         
-        # Object loop - no positioning suggestions or camera strategies
-        code_parts.append("""        
-        for idx, obj in enumerate(objects):""")
-        
-        # Object processing - minimal, no enhancements
-        code_parts.append("""            obj_id = obj.get('id') or f"obj_{idx}"
+        for idx, obj in enumerate(objects):
+            obj_id = obj.get('id') or f"obj_{idx}"
             obj_type = obj.get('type', 'circle')
             props = obj.get('properties', {})
             
@@ -796,22 +445,8 @@ class GeneratedScene(MovingCameraScene):
                     continue
                     
                 color_name = props.get('color', 'WHITE')
-                raw_size = props.get('size', 36)
+                font_size = props.get('size', 36)
                 pos = props.get('position', [0, 0, 0])
-                
-                # Fix text size handling - convert small size values to reasonable font sizes
-                if isinstance(raw_size, (int, float)):
-                    if raw_size < 1.0:  # If size is very small (like 0.5)
-                        # Convert to reasonable font size: 0.5 -> 24, 0.2 -> 18, etc.
-                        font_size = max(18, int(raw_size * 48))
-                    elif raw_size < 10:  # If size is small but reasonable
-                        font_size = max(18, int(raw_size * 12))
-                    else:  # If size is already reasonable
-                        font_size = int(raw_size)
-                else:
-                    font_size = 36  # Default font size
-                
-                print(f"Text object size conversion: {raw_size} -> {font_size}")
                 
                 # Inline color validation
                 try:
@@ -1416,10 +1051,8 @@ class GeneratedScene(MovingCameraScene):
                     self.add(fallback_obj)
                     self.play(FadeIn(fallback_obj), run_time=0.5)
                     objects_created.append(fallback_obj)
-                    self.wait(0.3)""")
+                    self.wait(0.3)
         
-        # Final pause and validation
-        code_parts.append("""        
         # Final pause
         self.wait(2)
         
@@ -1429,6 +1062,4 @@ class GeneratedScene(MovingCameraScene):
         else:
             print("No objects were created - this may indicate an issue with the specification")
         
-        print("Animation completed")""")
-        
-        return '\n'.join(code_parts)
+        print("Animation completed")

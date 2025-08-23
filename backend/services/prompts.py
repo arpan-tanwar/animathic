@@ -18,6 +18,21 @@ CRITICAL RULES (must follow exactly):
 - Keep the animation EXACTLY as described in the user's prompt - no more, no less.
 - The JSON should be a direct translation of the user's request, not an interpretation with added features.
 
+COORDINATE POSITIONING RULES (CRITICAL):
+- When coordinates are specified like "at (2,4)", "at (-2,4)", etc., use those EXACT coordinates.
+- Do NOT change or approximate the coordinates - use them exactly as written.
+- For 2D coordinates like (x,y), use [x, y, 0] in the position array.
+- For 3D coordinates like (x,y,z), use [x, y, z] in the position array.
+- Position objects precisely at the specified coordinates.
+
+TEXT LABEL RULES (IMPORTANT):
+- If the user mentions "text labels", "labels", "annotations", "text", or "names" - you MUST create text objects.
+- For generic requests like "text labels for each point", create simple labels like "Point A", "Point B", etc.
+- For mathematical objects, use simple labels like "A", "B", "P1", "P2", etc.
+- Always include the "text" property with actual text content when creating text objects.
+- Position text labels near but not overlapping with the objects they describe.
+- Use simple, short text labels - avoid long descriptive text.
+
 Schema:
 {
   "animation_type": string,                // e.g. "geometric", "mathematical", "text"
@@ -63,18 +78,36 @@ Schema:
   "style": string
 }
 
+COORDINATE EXAMPLES:
+- "circle at (2,4)" → position: [2, 4, 0]
+- "square at (-2,4)" → position: [-2, 4, 0]
+- "point at (0,0)" → position: [0, 0, 0]
+
+TEXT GENERATION EXAMPLES:
+- "text labels for each point" → Create text objects with "A", "B", "C", etc.
+- "label the functions" → Create text objects with "f(x)", "g(x)", etc.
+- "add names" → Create text objects with simple names like "A", "B", "P1", "P2"
+- "annotate the plot" → Create text objects with simple labels like "A", "B", "C"
+
 User Prompt:
 {prompt}
 
-Remember: Create EXACTLY what the user requested, including fade effects and colors when mentioned.
+Remember: Create EXACTLY what the user requested, including fade effects, colors, text labels, and precise coordinates when mentioned.
 """
 
 # System instruction for Gemini
 GEMINI_SYSTEM_INSTRUCTION = (
     "You are a precise Manim animation planner that creates EXACTLY what the user requests."
     " If the user mentions fade effects, colors, or specific animations - include them."
-    " Your job is to translate the user's prompt into a JSON specification with proper animations and colors."
+    " If the user mentions text labels, labels, annotations, or names - you MUST create text objects with actual text content."
+    " For generic text requests like 'text labels for each point', create simple labels like 'A', 'B', 'C', etc."
+    " For mathematical objects, use simple labels like 'A', 'B', 'P1', 'P2', etc."
+    " When coordinates are specified like 'at (2,4)', use those EXACT coordinates - do not change or approximate them."
+    " Position objects precisely at the specified coordinates using [x, y, 0] format."
+    " Your job is to translate the user's prompt into a JSON specification with proper animations, colors, text labels, and precise coordinates."
     " If the user wants a red circle that fades in and out, create a circle with color RED and animations for fade_in and fade_out."
+    " If the user wants text labels, create text objects with the 'text' property containing simple, short text content."
+    " If the user specifies coordinates, use them exactly as written."
     " Output must be a single JSON object that strictly follows the provided schema."
     " Be precise and include all requested features - create the animation as described."
 )
