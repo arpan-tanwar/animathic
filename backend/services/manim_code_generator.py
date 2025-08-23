@@ -377,7 +377,12 @@ class GeneratedScene(MovingCameraScene):
         # Bounds logging
         code_parts.append(f"""        
         # Log bounds
-        print("Bounds: x=", {x_bounds}, " y=", {y_bounds})""")
+        print("Bounds: x=", {x_bounds}, " y=", {y_bounds})
+        
+        # Set camera position for better viewing of coordinate systems
+        self.camera.frame.set_width(12)
+        self.camera.frame.set_height(8)
+        self.camera.frame.move_to([0, 0, 0])""")
         
         # Object creation - minimal, no enhancements
         objects = animation_spec.get('objects', [])
@@ -827,8 +832,10 @@ class GeneratedScene(MovingCameraScene):
                 self.wait(0.5)
                 
             elif obj_type == 'plot':
-                expression = props.get('expression', 'x**2')
-                x_range = props.get('x_range_plot', [-5, 5])
+                # Support both 'function' and 'expression' for compatibility
+                expression = props.get('function', props.get('expression', 'x**2'))
+                x_range = props.get('x_range', [-5, 5])
+                y_range = props.get('y_range', [-3, 3])
                 color_name = props.get('color', 'RED')
                 pos = props.get('position', [0, 0, 0])
                 
@@ -858,14 +865,25 @@ class GeneratedScene(MovingCameraScene):
                 except Exception:
                     color = RED
                 
-                # Create axes for the plot
-                axes = Axes(
-                    x_range=[x_range[0], x_range[1], 1],
-                    y_range=[-5, 25, 5],
-                    axis_config={"color": WHITE},
-                    tips=True
-                )
-                axes.move_to(pos)
+                # Use existing axes if available, otherwise create new ones
+                axes = None
+                for obj in objects_created:
+                    if isinstance(obj, Axes):
+                        axes = obj
+                        break
+                
+                if axes is None:
+                    # Create axes only if none exist
+                    axes = Axes(
+                        x_range=[x_range[0], x_range[1], 1],
+                        y_range=[y_range[0], y_range[1], 1],
+                        axis_config={"color": WHITE},
+                        tips=True
+                    )
+                    axes.move_to(pos)
+                    self.add(axes)
+                    self.play(Create(axes), run_time=0.5)
+                    objects_created.append(axes)
                 
                 # Create the plot - FIXED: Remove dangerous eval() and lambda
                 try:
@@ -897,11 +915,9 @@ class GeneratedScene(MovingCameraScene):
                         return x**2
                     plot_obj = axes.plot(safe_fallback, color=color, x_range=x_range)
                 
-                self.add(axes)
-                self.play(Create(axes), run_time=0.5)
                 self.add(plot_obj)
                 self.play(Create(plot_obj), run_time=1.0)
-                objects_created.extend([axes, plot_obj])
+                objects_created.append(plot_obj)
                 self.wait(0.5)
                 
             elif obj_type == 'dot':
