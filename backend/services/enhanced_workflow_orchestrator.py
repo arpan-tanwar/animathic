@@ -525,47 +525,76 @@ class EnhancedWorkflowOrchestrator:
                     
                     if is_appear_then_fade_out:
                         print(f"  🎭 Using 'appear then fade out' sequence strategy")
-                        # First, make all objects appear one by one with simple timing
-                        for i, obj in enumerate(transient_objects):
+                        # Use a much simpler approach: create a single animation sequence
+                        # that handles the entire timing in one place
+                        
+                        # Ensure animations list exists for all objects
+                        for obj in transient_objects:
                             if 'animations' not in obj:
                                 obj['animations'] = []
-                            
-                            # Use simple sequential timing: immediate, then 0.5s, then 1.0s
-                            if i == 0:
-                                start_time = 'immediate'
-                            elif i == 1:
-                                start_time = 'after_persistent_display'
                             else:
-                                start_time = 'after_persistent_display + 0.5s'
-                            
-                            fade_in_anim = {
-                                'type': 'fade_in',
-                                'start_time': start_time,
-                                'duration': 0.5,
-                                'reason': 'sequential_appearance'
-                            }
-                            obj['animations'].append(fade_in_anim)
-                            print(f"  📈 Added sequential fade-in to {obj.get('id', 'unknown')} (timing: {start_time})")
+                                obj['animations'] = []  # Clear existing animations
                         
-                        # Then, add fade-out animations for all objects
-                        # Use simple timing: after all objects are visible
+                        # Create a single, clean animation sequence
                         for i, obj in enumerate(transient_objects):
-                            # Wait for all objects to appear, then fade out sequentially
+                            # Phase 1: Sequential appearance
                             if i == 0:
-                                fade_out_start = 'after_persistent_display + 2.0s'  # Wait 2s for all to appear
+                                # First object appears immediately
+                                fade_in_anim = {
+                                    'type': 'fade_in',
+                                    'start_time': 'immediate',
+                                    'duration': 0.5,
+                                    'reason': 'first_object_appearance'
+                                }
                             elif i == 1:
-                                fade_out_start = 'after_persistent_display + 2.3s'  # 0.3s later
+                                # Second object appears after first
+                                fade_in_anim = {
+                                    'type': 'fade_in',
+                                    'start_time': 'after_first_object',
+                                    'duration': 0.5,
+                                    'reason': 'second_object_appearance'
+                                }
                             else:
-                                fade_out_start = 'after_persistent_display + 2.6s'  # 0.3s later
+                                # Third object appears after second
+                                fade_in_anim = {
+                                    'type': 'fade_in',
+                                    'start_time': 'after_second_object',
+                                    'duration': 0.5,
+                                    'reason': 'third_object_appearance'
+                                }
                             
-                            fade_out_anim = {
-                                'type': 'fade_out',
-                                'start_time': fade_out_start,
-                                'duration': 0.3,
-                                'reason': 'sequential_fade_out'
-                            }
+                            obj['animations'].append(fade_in_anim)
+                            print(f"  📈 Added fade-in to {obj.get('id', 'unknown')} (phase 1)")
+                        
+                        # Phase 2: Sequential fade-out (after all objects are visible)
+                        for i, obj in enumerate(transient_objects):
+                            if i == 0:
+                                # First object fades out after all are visible
+                                fade_out_anim = {
+                                    'type': 'fade_out',
+                                    'start_time': 'after_all_visible',
+                                    'duration': 0.3,
+                                    'reason': 'first_object_fade_out'
+                                }
+                            elif i == 1:
+                                # Second object fades out 0.3s later
+                                fade_out_anim = {
+                                    'type': 'fade_out',
+                                    'start_time': 'after_first_fade_out',
+                                    'duration': 0.3,
+                                    'reason': 'second_object_fade_out'
+                                }
+                            else:
+                                # Third object fades out 0.3s later
+                                fade_out_anim = {
+                                    'type': 'fade_out',
+                                    'start_time': 'after_second_fade_out',
+                                    'duration': 0.3,
+                                    'reason': 'third_object_fade_out'
+                                }
+                            
                             obj['animations'].append(fade_out_anim)
-                            print(f"  📉 Added sequential fade-out to {obj.get('id', 'unknown')} (timing: {fade_out_start})")
+                            print(f"  📉 Added fade-out to {obj.get('id', 'unknown')} (phase 2)")
                     else:
                         print(f"  ⚠️  Many objects detected - using sequential fade-out to prevent clutter")
                         # Use the old sequential fade-out logic for very complex scenes

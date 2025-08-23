@@ -149,26 +149,38 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.5)
                             self.add(circle_obj)
                             self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time.startswith('after_persistent_display + '):
-                            # Object appears after persistent objects with specific delay
-                            try:
-                                # Extract delay from format: "after_persistent_display + Xs"
-                                delay_str = start_time.replace('after_persistent_display + ', '').replace('s', '')
-                                delay = float(delay_str)
-                                
-                                # Wait for persistent objects + specific delay
-                                self.wait(0.5 + delay)
-                                self.add(circle_obj)
-                                self.play(FadeIn(circle_obj), run_time=duration)
-                            except (ValueError, AttributeError):
-                                # Fallback to default behavior
-                                self.wait(0.5)
-                                self.add(circle_obj)
-                                self.play(FadeIn(circle_obj), run_time=duration)
                         elif start_time == 'immediate':
                             # Object appears immediately
                             self.add(circle_obj)
                             self.play(FadeIn(circle_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(circle_obj)
+                            self.play(FadeIn(circle_obj), run_time=duration)
+                        elif start_time == 'after_first_object':
+                            # Object appears after the first object
+                            self.wait(0.5)  # Wait for first object to complete
+                            self.add(circle_obj)
+                            self.play(FadeIn(circle_obj), run_time=duration)
+                        elif start_time == 'after_second_object':
+                            # Object appears after the second object
+                            self.wait(1.0)  # Wait for first two objects to complete
+                            self.add(circle_obj)
+                            self.play(FadeIn(circle_obj), run_time=duration)
+                        elif start_time == 'after_all_visible':
+                            # Object fades out after all objects are visible
+                            self.wait(1.5)  # Wait for all objects to be visible
+                            self.play(FadeOut(circle_obj), run_time=duration)
+                        elif start_time == 'after_first_fade_out':
+                            # Object fades out after first object fades out
+                            self.wait(1.8)  # Wait for first fade-out to complete
+                            self.play(FadeOut(circle_obj), run_time=duration)
+                        elif start_time == 'after_second_fade_out':
+                            # Object fades out after second object fades out
+                            self.wait(2.1)  # Wait for second fade-out to complete
+                            self.play(FadeOut(circle_obj), run_time=duration)
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(circle_obj)
@@ -267,26 +279,28 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.5)
                             self.add(square_obj)
                             self.play(FadeIn(square_obj), run_time=duration)
-                        elif start_time.startswith('after_persistent_display + '):
-                            # Object appears after persistent objects with specific delay
-                            try:
-                                # Extract delay from format: "after_persistent_display + Xs"
-                                delay_str = start_time.replace('after_persistent_display + ', '').replace('s', '')
-                                delay = float(delay_str)
-                                
-                                # Wait for persistent objects + specific delay
-                                self.wait(0.5 + delay)
-                                self.add(square_obj)
-                                self.play(FadeIn(square_obj), run_time=duration)
-                            except (ValueError, AttributeError):
-                                # Fallback to default behavior
-                                self.wait(0.5)
-                                self.add(square_obj)
-                                self.play(FadeIn(square_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'after_first_object':
+                            # Object appears after the first object
+                            self.wait(0.5)  # Wait for first object to complete
                             self.add(square_obj)
                             self.play(FadeIn(square_obj), run_time=duration)
+                        elif start_time == 'after_second_object':
+                            # Object appears after the second object
+                            self.wait(1.0)  # Wait for first two objects to complete
+                            self.add(square_obj)
+                            self.play(FadeIn(square_obj), run_time=duration)
+                        elif start_time == 'after_all_visible':
+                            # Object fades out after all objects are visible
+                            self.wait(1.5)  # Wait for all objects to be visible
+                            self.play(FadeOut(square_obj), run_time=duration)
+                        elif start_time == 'after_first_fade_out':
+                            # Object fades out after first object fades out
+                            self.wait(1.8)  # Wait for first fade-out to complete
+                            self.play(FadeOut(square_obj), run_time=duration)
+                        elif start_time == 'after_second_fade_out':
+                            # Object fades out after second object fades out
+                            self.wait(2.1)  # Wait for second fade-out to complete
+                            self.play(FadeOut(square_obj), run_time=duration)
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(square_obj)
@@ -386,26 +400,28 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.5)
                             self.add(axes_obj)
                             self.play(FadeIn(axes_obj), run_time=duration)
-                        elif start_time.startswith('after_persistent_display + '):
-                            # Object appears after persistent objects with specific delay
-                            try:
-                                # Extract delay from format: "after_persistent_display + Xs"
-                                delay_str = start_time.replace('after_persistent_display + ', '').replace('s', '')
-                                delay = float(delay_str)
-                                
-                                # Wait for persistent objects + specific delay
-                                self.wait(0.5 + delay)
-                                self.add(axes_obj)
-                                self.play(FadeIn(axes_obj), run_time=duration)
-                            except (ValueError, AttributeError):
-                                # Fallback to default behavior
-                                self.wait(0.5)
-                                self.add(axes_obj)
-                                self.play(FadeIn(axes_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'after_first_object':
+                            # Object appears after the first object
+                            self.wait(0.5)  # Wait for first object to complete
                             self.add(axes_obj)
                             self.play(FadeIn(axes_obj), run_time=duration)
+                        elif start_time == 'after_second_object':
+                            # Object appears after the second object
+                            self.wait(1.0)  # Wait for first two objects to complete
+                            self.add(axes_obj)
+                            self.play(FadeIn(axes_obj), run_time=duration)
+                        elif start_time == 'after_all_visible':
+                            # Object fades out after all objects are visible
+                            self.wait(1.5)  # Wait for all objects to be visible
+                            self.play(FadeOut(axes_obj), run_time=duration)
+                        elif start_time == 'after_first_fade_out':
+                            # Object fades out after first object fades out
+                            self.wait(1.8)  # Wait for first fade-out to complete
+                            self.play(FadeOut(axes_obj), run_time=duration)
+                        elif start_time == 'after_second_fade_out':
+                            # Object fades out after second object fades out
+                            self.wait(2.1)  # Wait for second fade-out to complete
+                            self.play(FadeOut(axes_obj), run_time=duration)
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(axes_obj)
@@ -631,26 +647,28 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.5)
                             self.add(dot_obj)
                             self.play(FadeIn(dot_obj), run_time=duration)
-                        elif start_time.startswith('after_persistent_display + '):
-                            # Object appears after persistent objects with specific delay
-                            try:
-                                # Extract delay from format: "after_persistent_display + Xs"
-                                delay_str = start_time.replace('after_persistent_display + ', '').replace('s', '')
-                                delay = float(delay_str)
-                                
-                                # Wait for persistent objects + specific delay
-                                self.wait(0.5 + delay)
-                                self.add(dot_obj)
-                                self.play(FadeIn(dot_obj), run_time=duration)
-                            except (ValueError, AttributeError):
-                                # Fallback to default behavior
-                                self.wait(0.5)
-                                self.add(dot_obj)
-                                self.play(FadeIn(dot_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'after_first_object':
+                            # Object appears after the first object
+                            self.wait(0.5)  # Wait for first object to complete
                             self.add(dot_obj)
                             self.play(FadeIn(dot_obj), run_time=duration)
+                        elif start_time == 'after_second_object':
+                            # Object appears after the second object
+                            self.wait(1.0)  # Wait for first two objects to complete
+                            self.add(dot_obj)
+                            self.play(FadeIn(dot_obj), run_time=duration)
+                        elif start_time == 'after_all_visible':
+                            # Object fades out after all objects are visible
+                            self.wait(1.5)  # Wait for all objects to be visible
+                            self.play(FadeOut(dot_obj), run_time=duration)
+                        elif start_time == 'after_first_fade_out':
+                            # Object fades out after first object fades out
+                            self.wait(1.8)  # Wait for first fade-out to complete
+                            self.play(FadeOut(dot_obj), run_time=duration)
+                        elif start_time == 'after_second_fade_out':
+                            # Object fades out after second object fades out
+                            self.wait(2.1)  # Wait for second fade-out to complete
+                            self.play(FadeOut(dot_obj), run_time=duration)
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(dot_obj)
@@ -751,26 +769,28 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.5)
                             self.add(text_obj)
                             self.play(FadeIn(text_obj), run_time=duration)
-                        elif start_time.startswith('after_persistent_display + '):
-                            # Object appears after persistent objects with specific delay
-                            try:
-                                # Extract delay from format: "after_persistent_display + Xs"
-                                delay_str = start_time.replace('after_persistent_display + ', '').replace('s', '')
-                                delay = float(delay_str)
-                                
-                                # Wait for persistent objects + specific delay
-                                self.wait(0.5 + delay)
-                                self.add(text_obj)
-                                self.play(FadeIn(text_obj), run_time=duration)
-                            except (ValueError, AttributeError):
-                                # Fallback to default behavior
-                                self.wait(0.5)
-                                self.add(text_obj)
-                                self.play(FadeIn(text_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'after_first_object':
+                            # Object appears after the first object
+                            self.wait(0.5)  # Wait for first object to complete
                             self.add(text_obj)
                             self.play(FadeIn(text_obj), run_time=duration)
+                        elif start_time == 'after_second_object':
+                            # Object appears after the second object
+                            self.wait(1.0)  # Wait for first two objects to complete
+                            self.add(text_obj)
+                            self.play(FadeIn(text_obj), run_time=duration)
+                        elif start_time == 'after_all_visible':
+                            # Object fades out after all objects are visible
+                            self.wait(1.5)  # Wait for all objects to be visible
+                            self.play(FadeOut(text_obj), run_time=duration)
+                        elif start_time == 'after_first_fade_out':
+                            # Object fades out after first object fades out
+                            self.wait(1.8)  # Wait for first fade-out to complete
+                            self.play(FadeOut(text_obj), run_time=duration)
+                        elif start_time == 'after_second_fade_out':
+                            # Object fades out after second object fades out
+                            self.wait(2.1)  # Wait for second fade-out to complete
+                            self.play(FadeOut(text_obj), run_time=duration)
                         elif start_time == 'after_previous_transient_fade':
                             # This transient object should fade out before the next transient object
                             self.add(text_obj)
@@ -856,26 +876,28 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.5)
                             self.add(triangle_obj)
                             self.play(FadeIn(triangle_obj), run_time=duration)
-                        elif start_time.startswith('after_persistent_display + '):
-                            # Object appears after persistent objects with specific delay
-                            try:
-                                # Extract delay from format: "after_persistent_display + Xs"
-                                delay_str = start_time.replace('after_persistent_display + ', '').replace('s', '')
-                                delay = float(delay_str)
-                                
-                                # Wait for persistent objects + specific delay
-                                self.wait(0.5 + delay)
-                                self.add(triangle_obj)
-                                self.play(FadeIn(triangle_obj), run_time=duration)
-                            except (ValueError, AttributeError):
-                                # Fallback to default behavior
-                                self.wait(0.5)
-                                self.add(triangle_obj)
-                                self.play(FadeIn(triangle_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'after_first_object':
+                            # Object appears after the first object
+                            self.wait(0.5)  # Wait for first object to complete
                             self.add(triangle_obj)
                             self.play(FadeIn(triangle_obj), run_time=duration)
+                        elif start_time == 'after_second_object':
+                            # Object appears after the second object
+                            self.wait(1.0)  # Wait for first two objects to complete
+                            self.add(triangle_obj)
+                            self.play(FadeIn(triangle_obj), run_time=duration)
+                        elif start_time == 'after_all_visible':
+                            # Object fades out after all objects are visible
+                            self.wait(1.5)  # Wait for all objects to be visible
+                            self.play(FadeOut(triangle_obj), run_time=duration)
+                        elif start_time == 'after_first_fade_out':
+                            # Object fades out after first object fades out
+                            self.wait(1.8)  # Wait for first fade-out to complete
+                            self.play(FadeOut(triangle_obj), run_time=duration)
+                        elif start_time == 'after_second_fade_out':
+                            # Object fades out after second object fades out
+                            self.wait(2.1)  # Wait for second fade-out to complete
+                            self.play(FadeOut(triangle_obj), run_time=duration)
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(triangle_obj)
@@ -975,26 +997,28 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.5)
                             self.add(diamond_obj)
                             self.play(FadeIn(diamond_obj), run_time=duration)
-                        elif start_time.startswith('after_persistent_display + '):
-                            # Object appears after persistent objects with specific delay
-                            try:
-                                # Extract delay from format: "after_persistent_display + Xs"
-                                delay_str = start_time.replace('after_persistent_display + ', '').replace('s', '')
-                                delay = float(delay_str)
-                                
-                                # Wait for persistent objects + specific delay
-                                self.wait(0.5 + delay)
-                                self.add(diamond_obj)
-                                self.play(FadeIn(diamond_obj), run_time=duration)
-                            except (ValueError, AttributeError):
-                                # Fallback to default behavior
-                                self.wait(0.5)
-                                self.add(diamond_obj)
-                                self.play(FadeIn(diamond_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'after_first_object':
+                            # Object appears after the first object
+                            self.wait(0.5)  # Wait for first object to complete
                             self.add(diamond_obj)
                             self.play(FadeIn(diamond_obj), run_time=duration)
+                        elif start_time == 'after_second_object':
+                            # Object appears after the second object
+                            self.wait(1.0)  # Wait for first two objects to complete
+                            self.add(diamond_obj)
+                            self.play(FadeIn(diamond_obj), run_time=duration)
+                        elif start_time == 'after_all_visible':
+                            # Object fades out after all objects are visible
+                            self.wait(1.5)  # Wait for all objects to be visible
+                            self.play(FadeOut(diamond_obj), run_time=duration)
+                        elif start_time == 'after_first_fade_out':
+                            # Object fades out after first object fades out
+                            self.wait(1.8)  # Wait for first fade-out to complete
+                            self.play(FadeOut(diamond_obj), run_time=duration)
+                        elif start_time == 'after_second_fade_out':
+                            # Object fades out after second object fades out
+                            self.wait(2.1)  # Wait for second fade-out to complete
+                            self.play(FadeOut(diamond_obj), run_time=duration)
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(diamond_obj)
