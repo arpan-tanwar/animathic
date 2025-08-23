@@ -208,6 +208,34 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(circle_obj)
                             self.play(FadeIn(circle_obj), run_time=duration)
+                        elif start_time == 'immediate':
+                            # Object appears immediately
+                            self.add(circle_obj)
+                            self.play(FadeIn(circle_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(circle_obj)
+                            self.play(FadeIn(circle_obj), run_time=duration)
+                        elif start_time == 'before_next_transient':
+                            # This transient object should fade out before the next transient object
+                            self.add(circle_obj)
+                            self.play(FadeIn(circle_obj), run_time=0.3)
+                            # Store for fade-out when next transient object appears
+                            if not hasattr(self, 'transient_objects_to_fade_out'):
+                                self.transient_objects_to_fade_out = []
+                            self.transient_objects_to_fade_out.append(circle_obj)
+                        elif start_time == 'after_previous_transient_fade':
+                            # This transient object should fade in after the previous transient object fades out
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            
+                            # Small delay for smooth transition
+                            self.wait(0.1)
+                            self.add(circle_obj)
+                            self.play(FadeIn(circle_obj), run_time=duration)
                         else:
                             # Immediate animation
                             if anim_type == 'fade_in':
@@ -334,6 +362,34 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(square_obj)
                             self.play(FadeIn(square_obj), run_time=duration)
+                        elif start_time == 'immediate':
+                            # Object appears immediately
+                            self.add(square_obj)
+                            self.play(FadeIn(square_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(square_obj)
+                            self.play(FadeIn(square_obj), run_time=duration)
+                        elif start_time == 'before_next_transient':
+                            # This transient object should fade out before the next transient object
+                            self.add(square_obj)
+                            self.play(FadeIn(square_obj), run_time=0.3)
+                            # Store for fade-out when next transient object appears
+                            if not hasattr(self, 'transient_objects_to_fade_out'):
+                                self.transient_objects_to_fade_out = []
+                            self.transient_objects_to_fade_out.append(square_obj)
+                        elif start_time == 'after_previous_transient_fade':
+                            # This transient object should fade in after the previous transient object fades out
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            
+                            # Small delay for smooth transition
+                            self.wait(0.1)
+                            self.add(square_obj)
+                            self.play(FadeIn(square_obj), run_time=duration)
                         else:
                             # Immediate animation
                             if anim_type == 'fade_in':
@@ -402,6 +458,34 @@ class GeneratedScene(MovingCameraScene):
                             if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
                                 prev_obj = self.objects_to_fade_out.pop(0)
                                 self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(axes_obj)
+                            self.play(FadeIn(axes_obj), run_time=duration)
+                        elif start_time == 'immediate':
+                            # Object appears immediately
+                            self.add(axes_obj)
+                            self.play(FadeIn(axes_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(axes_obj)
+                            self.play(FadeIn(axes_obj), run_time=duration)
+                        elif start_time == 'before_next_transient':
+                            # This transient object should fade out before the next transient object
+                            self.add(axes_obj)
+                            self.play(FadeIn(axes_obj), run_time=0.3)
+                            # Store for fade-out when next transient object appears
+                            if not hasattr(self, 'transient_objects_to_fade_out'):
+                                self.transient_objects_to_fade_out = []
+                            self.transient_objects_to_fade_out.append(axes_obj)
+                        elif start_time == 'after_previous_transient_fade':
+                            # This transient object should fade in after the previous transient object fades out
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            
+                            # Small delay for smooth transition
                             self.wait(0.1)
                             self.add(axes_obj)
                             self.play(FadeIn(axes_obj), run_time=duration)
@@ -505,6 +589,34 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(plot_obj)
                             self.play(FadeIn(plot_obj), run_time=duration)
+                        elif start_time == 'immediate':
+                            # Object appears immediately
+                            self.add(plot_obj)
+                            self.play(FadeIn(plot_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(plot_obj)
+                            self.play(FadeIn(plot_obj), run_time=duration)
+                        elif start_time == 'before_next_transient':
+                            # This transient object should fade out before the next transient object
+                            self.add(plot_obj)
+                            self.play(FadeIn(plot_obj), run_time=0.3)
+                            # Store for fade-out when next transient object appears
+                            if not hasattr(self, 'transient_objects_to_fade_out'):
+                                self.transient_objects_to_fade_out = []
+                            self.transient_objects_to_fade_out.append(plot_obj)
+                        elif start_time == 'after_previous_transient_fade':
+                            # This transient object should fade in after the previous transient object fades out
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            
+                            # Small delay for smooth transition
+                            self.wait(0.1)
+                            self.add(plot_obj)
+                            self.play(FadeIn(plot_obj), run_time=duration)
                         else:
                             if anim_type == 'fade_in':
                                 self.add(plot_obj)
@@ -569,6 +681,34 @@ class GeneratedScene(MovingCameraScene):
                             if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
                                 prev_obj = self.objects_to_fade_out.pop(0)
                                 self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(dot_obj)
+                            self.play(FadeIn(dot_obj), run_time=duration)
+                        elif start_time == 'immediate':
+                            # Object appears immediately
+                            self.add(dot_obj)
+                            self.play(FadeIn(dot_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(dot_obj)
+                            self.play(FadeIn(dot_obj), run_time=duration)
+                        elif start_time == 'before_next_transient':
+                            # This transient object should fade out before the next transient object
+                            self.add(dot_obj)
+                            self.play(FadeIn(dot_obj), run_time=0.3)
+                            # Store for fade-out when next transient object appears
+                            if not hasattr(self, 'transient_objects_to_fade_out'):
+                                self.transient_objects_to_fade_out = []
+                            self.transient_objects_to_fade_out.append(dot_obj)
+                        elif start_time == 'after_previous_transient_fade':
+                            # This transient object should fade in after the previous transient object fades out
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            
+                            # Small delay for smooth transition
                             self.wait(0.1)
                             self.add(dot_obj)
                             self.play(FadeIn(dot_obj), run_time=duration)
@@ -643,6 +783,34 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(text_obj)
                             self.play(FadeIn(text_obj), run_time=duration)
+                        elif start_time == 'immediate':
+                            # Object appears immediately
+                            self.add(text_obj)
+                            self.play(FadeIn(text_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(text_obj)
+                            self.play(FadeIn(text_obj), run_time=duration)
+                        elif start_time == 'before_next_transient':
+                            # This transient object should fade out before the next transient object
+                            self.add(text_obj)
+                            self.play(FadeIn(text_obj), run_time=0.3)
+                            # Store for fade-out when next transient object appears
+                            if not hasattr(self, 'transient_objects_to_fade_out'):
+                                self.transient_objects_to_fade_out = []
+                            self.transient_objects_to_fade_out.append(text_obj)
+                        elif start_time == 'after_previous_transient_fade':
+                            # This transient object should fade in after the previous transient object fades out
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            
+                            # Small delay for smooth transition
+                            self.wait(0.1)
+                            self.add(text_obj)
+                            self.play(FadeIn(text_obj), run_time=duration)
                         else:
                             if anim_type == 'fade_in':
                                 self.add(text_obj)
@@ -673,6 +841,12 @@ class GeneratedScene(MovingCameraScene):
                         if start_time == 'after_previous_fade':
                             if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
                                 prev_obj = self.objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.wait(anim_duration)
+                        elif start_time == 'after_previous_transient_fade':
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
                                 self.play(FadeOut(prev_obj), run_time=0.3)
                             self.wait(0.1)
                             self.wait(anim_duration)
@@ -735,6 +909,34 @@ class GeneratedScene(MovingCameraScene):
                             if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
                                 prev_obj = self.objects_to_fade_out.pop(0)
                                 self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(triangle_obj)
+                            self.play(FadeIn(triangle_obj), run_time=duration)
+                        elif start_time == 'immediate':
+                            # Object appears immediately
+                            self.add(triangle_obj)
+                            self.play(FadeIn(triangle_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(triangle_obj)
+                            self.play(FadeIn(triangle_obj), run_time=duration)
+                        elif start_time == 'before_next_transient':
+                            # This transient object should fade out before the next transient object
+                            self.add(triangle_obj)
+                            self.play(FadeIn(triangle_obj), run_time=0.3)
+                            # Store for fade-out when next transient object appears
+                            if not hasattr(self, 'transient_objects_to_fade_out'):
+                                self.transient_objects_to_fade_out = []
+                            self.transient_objects_to_fade_out.append(triangle_obj)
+                        elif start_time == 'after_previous_transient_fade':
+                            # This transient object should fade in after the previous transient object fades out
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            
+                            # Small delay for smooth transition
                             self.wait(0.1)
                             self.add(triangle_obj)
                             self.play(FadeIn(triangle_obj), run_time=duration)
@@ -808,6 +1010,34 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(diamond_obj)
                             self.play(FadeIn(diamond_obj), run_time=duration)
+                        elif start_time == 'immediate':
+                            # Object appears immediately
+                            self.add(diamond_obj)
+                            self.play(FadeIn(diamond_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(diamond_obj)
+                            self.play(FadeIn(diamond_obj), run_time=duration)
+                        elif start_time == 'before_next_transient':
+                            # This transient object should fade out before the next transient object
+                            self.add(diamond_obj)
+                            self.play(FadeIn(diamond_obj), run_time=0.3)
+                            # Store for fade-out when next transient object appears
+                            if not hasattr(self, 'transient_objects_to_fade_out'):
+                                self.transient_objects_to_fade_out = []
+                            self.transient_objects_to_fade_out.append(diamond_obj)
+                        elif start_time == 'after_previous_transient_fade':
+                            # This transient object should fade in after the previous transient object fades out
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            
+                            # Small delay for smooth transition
+                            self.wait(0.1)
+                            self.add(diamond_obj)
+                            self.play(FadeIn(diamond_obj), run_time=duration)
                         else:
                             if anim_type == 'fade_in':
                                 self.add(diamond_obj)
@@ -877,6 +1107,34 @@ class GeneratedScene(MovingCameraScene):
                             if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
                                 prev_obj = self.objects_to_fade_out.pop(0)
                                 self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(fallback_obj)
+                            self.play(FadeIn(fallback_obj), run_time=duration)
+                        elif start_time == 'immediate':
+                            # Object appears immediately
+                            self.add(fallback_obj)
+                            self.play(FadeIn(fallback_obj), run_time=duration)
+                        elif start_time == 'after_persistent_display':
+                            # Object appears after persistent objects (axes, plots) are visible
+                            # Wait a bit for persistent objects to be fully visible
+                            self.wait(0.5)
+                            self.add(fallback_obj)
+                            self.play(FadeIn(fallback_obj), run_time=duration)
+                        elif start_time == 'before_next_transient':
+                            # This transient object should fade out before the next transient object
+                            self.add(fallback_obj)
+                            self.play(FadeIn(fallback_obj), run_time=0.3)
+                            # Store for fade-out when next transient object appears
+                            if not hasattr(self, 'transient_objects_to_fade_out'):
+                                self.transient_objects_to_fade_out = []
+                            self.transient_objects_to_fade_out.append(fallback_obj)
+                        elif start_time == 'after_previous_transient_fade':
+                            # This transient object should fade in after the previous transient object fades out
+                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
+                                prev_obj = self.transient_objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            
+                            # Small delay for smooth transition
                             self.wait(0.1)
                             self.add(fallback_obj)
                             self.play(FadeIn(fallback_obj), run_time=duration)

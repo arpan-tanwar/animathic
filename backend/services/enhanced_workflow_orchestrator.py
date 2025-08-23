@@ -355,53 +355,122 @@ class EnhancedWorkflowOrchestrator:
         spatial_analysis = sequence_analysis.get('spatial_analysis', {})
         temporal_analysis = sequence_analysis.get('temporal_analysis', {})
         
-        # NEW: Always add fade-out transitions for better visual flow
-        # This ensures objects don't accumulate on screen
+        # NEW: Intelligent fade-out transitions based on object type and purpose
+        # Coordinate axes and function plots should remain visible, only overlapping elements fade out
         if len(objects) > 1:
-            print(f"✅ Adding fade-out transitions for {len(objects)} objects")
+            print(f"✅ Adding intelligent fade transitions for {len(objects)} objects")
             
-            for i, obj in enumerate(objects):
+            # Identify persistent objects that should remain visible
+            persistent_objects = []
+            transient_objects = []
+            
+            for obj in objects:
+                obj_type = obj.get('type', 'unknown')
+                obj_id = obj.get('id', 'unknown')
+                
+                # Objects that should remain visible throughout the animation
+                if obj_type in ['axes', 'plot']:
+                    persistent_objects.append(obj)
+                    print(f"  🔒 {obj_id} ({obj_type}) marked as persistent (will remain visible)")
+                else:
+                    transient_objects.append(obj)
+                    print(f"  🔄 {obj_id} ({obj_type}) marked as transient (can fade in/out)")
+            
+            # Handle persistent objects (axes, plots) - they just fade in once and stay
+            for obj in persistent_objects:
                 if 'animations' not in obj:
                     obj['animations'] = []
                 
-                # First object just fades in
-                if i == 0:
-                    # Ensure first object has fade-in
-                    if not any(anim.get('type') == 'fade_in' for anim in obj['animations']):
+                # Ensure persistent objects have fade-in
+                if not any(anim.get('type') == 'fade_in' for anim in obj['animations']):
+                    fade_in_anim = {
+                        'type': 'fade_in',
+                        'start_time': 'immediate',
+                        'duration': 0.8,
+                        'reason': 'persistent_object_display'
+                    }
+                    obj['animations'].append(fade_in_anim)
+                    print(f"  📈 Added persistent fade-in to {obj.get('id', 'unknown')}")
+            
+            # Handle transient objects (shapes, text, dots) - they can fade in/out sequentially
+            if transient_objects:
+                print(f"  🎬 Processing {len(transient_objects)} transient objects for sequential display")
+                
+                for i, obj in enumerate(transient_objects):
+                    if 'animations' not in obj:
+                        obj['animations'] = []
+                    
+                    # First transient object fades in after persistent objects
+                    if i == 0:
+                        fade_in_anim = {
+                            'type': 'fade_in',
+                            'start_time': 'after_persistent_display',
+                            'duration': 0.5,
+                            'reason': 'first_transient_object'
+                        }
+                        obj['animations'].append(fade_in_anim)
+                        print(f"  📈 Added fade-in to {obj.get('id', 'unknown')} (first transient)")
+                    else:
+                        # Subsequent transient objects fade out the previous one and fade in
+                        prev_obj = transient_objects[i-1]
+                        
+                        # Add fade-out to previous transient object
+                        if 'animations' not in prev_obj:
+                            prev_obj['animations'] = []
+                        
+                        fade_out_anim = {
+                            'type': 'fade_out',
+                            'start_time': 'before_next_transient',
+                            'duration': 0.3,
+                            'reason': 'sequential_transient_display'
+                        }
+                        prev_obj['animations'].append(fade_out_anim)
+                        print(f"  📉 Added fade-out to {prev_obj.get('id', 'unknown')}")
+                        
+                        # Add fade-in to current transient object
+                        fade_in_anim = {
+                            'type': 'fade_in',
+                            'start_time': 'after_previous_transient_fade',
+                            'duration': 0.5,
+                            'reason': 'sequential_transient_display'
+                        }
+                        obj['animations'].append(fade_in_anim)
+                        print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
+            
+            # If we have both persistent and transient objects, ensure proper timing
+            if persistent_objects and transient_objects:
+                print(f"  ⏱️ Coordinating timing between {len(persistent_objects)} persistent and {len(transient_objects)} transient objects")
+                
+                # First persistent object should appear immediately
+                if persistent_objects:
+                    first_persistent = persistent_objects[0]
+                    if 'animations' not in first_persistent:
+                        first_persistent['animations'] = []
+                    
+                    # Ensure first persistent object has immediate fade-in
+                    if not any(anim.get('type') == 'fade_in' for anim in first_persistent['animations']):
                         fade_in_anim = {
                             'type': 'fade_in',
                             'start_time': 'immediate',
-                            'duration': 0.5,
-                            'reason': 'first_object_display'
+                            'duration': 0.8,
+                            'reason': 'first_persistent_object'
                         }
-                        obj['animations'].append(fade_in_anim)
-                        print(f"  📈 Added fade-in to {obj.get('id', 'unknown')} (first object)")
-                else:
-                    # All other objects fade out the previous object and then fade in
-                    prev_obj = objects[i-1]
+                        first_persistent['animations'].append(fade_in_anim)
+                        print(f"  📈 First persistent object {first_persistent.get('id', 'unknown')} will appear immediately")
+                
+                # First transient object should appear after persistent objects are visible
+                if transient_objects:
+                    first_transient = transient_objects[0]
+                    if 'animations' not in first_transient:
+                        first_transient['animations'] = []
                     
-                    # Add fade-out to previous object
-                    if 'animations' not in prev_obj:
-                        prev_obj['animations'] = []
-                    
-                    fade_out_anim = {
-                        'type': 'fade_out',
-                        'start_time': 'before_next',
-                        'duration': 0.3,
-                        'reason': 'visual_flow_improvement'
-                    }
-                    prev_obj['animations'].append(fade_out_anim)
-                    print(f"  📉 Added fade-out to {prev_obj.get('id', 'unknown')}")
-                    
-                    # Add fade-in to current object
-                    fade_in_anim = {
-                        'type': 'fade_in',
-                        'start_time': 'after_previous_fade',
-                        'duration': 0.5,
-                        'reason': 'sequential_display'
-                    }
-                    obj['animations'].append(fade_in_anim)
-                    print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
+                    # Update timing to wait for persistent objects
+                    for anim in first_transient['animations']:
+                        if anim.get('type') == 'fade_in':
+                            anim['start_time'] = 'after_persistent_display'
+                            anim['reason'] = 'first_transient_after_persistent'
+                            print(f"  ⏱️ First transient object {first_transient.get('id', 'unknown')} will appear after persistent objects")
+                            break
         
         # Apply cluster-based optimizations
         if object_clusters:
