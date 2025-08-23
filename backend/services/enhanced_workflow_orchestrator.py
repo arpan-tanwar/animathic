@@ -51,7 +51,7 @@ class EnhancedWorkflowOrchestrator:
             
             # Phase 4: Sequence optimization
             if self.config['enable_sequence_optimization']:
-                animation_spec = self._optimize_animation_sequence(animation_spec, pre_analysis)
+                animation_spec = self._optimize_animation_sequence(animation_spec, pre_analysis, user_prompt)
             
             # Phase 5: Camera strategy optimization
             if self.config['enable_camera_optimization']:
@@ -341,15 +341,25 @@ class EnhancedWorkflowOrchestrator:
                 return animation_spec
         
             # Smart positioning: Only adjust if objects are truly overlapping
+            # For coordinate systems, be very conservative with position changes
+            # Allow function plots to overlap when appropriate (user intent)
             overlapping_objects = []
             for i, obj1 in enumerate(objects):
                 for j, obj2 in enumerate(objects[i+1:], i+1):
                     pos1 = obj1.get('properties', {}).get('position', [0, 0, 0])
                     pos2 = obj2.get('properties', {}).get('position', [0, 0, 0])
+                    type1 = obj1.get('type', 'unknown')
+                    type2 = obj2.get('type', 'unknown')
+                    
+                    # Function plots can overlap at origin - this is expected and desired
+                    if type1 == 'plot' and type2 == 'plot':
+                        # Allow function plots to overlap at origin for good visual layout
+                        continue
                     
                     # Only consider objects overlapping if they're at the EXACT same position
+                    # Use an extremely small threshold to avoid unnecessary adjustments
                     if (len(pos1) >= 2 and len(pos2) >= 2 and 
-                        abs(pos1[0] - pos2[0]) < 0.1 and abs(pos1[1] - pos2[1]) < 0.1):
+                        abs(pos1[0] - pos2[0]) < 0.01 and abs(pos1[1] - pos2[1]) < 0.01):
                         overlapping_objects.extend([i, j])
             
             # Only adjust truly overlapping objects with minimal changes
@@ -361,8 +371,8 @@ class EnhancedWorkflowOrchestrator:
                         props = obj.get('properties', {})
                         pos = props.get('position', [0, 0, 0])
                         
-                        # Minimal adjustment: just 0.3 unit offset
-                        offset = 0.3 * (idx % 4 - 1.5)  # Small spread pattern
+                        # Extremely minimal adjustment: just 0.05 unit offset to preserve user intent
+                        offset = 0.05 * (idx % 4 - 1.5)  # Minimal spread pattern
                         if len(pos) >= 2:
                             props['position'] = [pos[0] + offset, pos[1], pos[2] if len(pos) > 2 else 0]
                         
@@ -391,19 +401,22 @@ class EnhancedWorkflowOrchestrator:
             shape_objects = [obj for obj in objects if obj.get('type') in ['circle', 'square', 'triangle', 'diamond']]
             
             # Only adjust text positions if they're interfering with plots
+            # For coordinate systems, be very conservative with text positioning
             adjusted_count = 0
             for text_obj in text_objects:
                 text_pos = text_obj.get('properties', {}).get('position', [0, 0, 0])
                 
                 # Check if text is too close to a plot center
+                # Use a smaller threshold to avoid unnecessary adjustments
                 for plot_obj in plot_objects:
                     plot_pos = plot_obj.get('properties', {}).get('position', [0, 0, 0])
                     if (len(text_pos) >= 2 and len(plot_pos) >= 2 and 
-                        abs(text_pos[0] - plot_pos[0]) < 0.5 and abs(text_pos[1] - plot_pos[1]) < 0.5):
+                        abs(text_pos[0] - plot_pos[0]) < 0.3 and abs(text_pos[1] - plot_pos[1]) < 0.3):
                         
-                        # Move text slightly away from plot center
-                        offset_x = 0.8 if text_pos[0] >= plot_pos[0] else -0.8
-                        offset_y = 0.5 if text_pos[1] >= plot_pos[1] else -0.5
+                        # Move text very slightly away from plot center
+                        # Use smaller offsets to preserve user intent
+                        offset_x = 0.3 if text_pos[0] >= plot_pos[0] else -0.3
+                        offset_y = 0.2 if text_pos[1] >= plot_pos[1] else -0.2
                         text_obj['properties']['position'] = [
                             text_pos[0] + offset_x, 
                             text_pos[1] + offset_y, 
@@ -423,7 +436,7 @@ class EnhancedWorkflowOrchestrator:
             logger.error(f"Error in overlap prevention: {e}")
             return animation_spec
     
-    def _optimize_animation_sequence(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
+    def _optimize_animation_sequence(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any], user_prompt: str = "") -> Dict[str, Any]:
         """Optimize the animation sequence for better flow"""
         objects = animation_spec.get('objects', [])
         if len(objects) <= 1:
@@ -475,50 +488,85 @@ class EnhancedWorkflowOrchestrator:
                     obj['animations'].append(fade_in_anim)
                     print(f"  📈 Added persistent fade-in to {obj.get('id', 'unknown')}")
             
-            # Handle transient objects (shapes, text, dots) - they can fade in/out sequentially
+            # Handle transient objects (shapes, text, dots) - SMART STRATEGY for coordinate systems
             if transient_objects:
-                print(f"  🎬 Processing {len(transient_objects)} transient objects for sequential display")
+                print(f"  🎬 Processing {len(transient_objects)} transient objects with smart display strategy")
                 
-                for i, obj in enumerate(transient_objects):
-                    if 'animations' not in obj:
-                        obj['animations'] = []
+                # For coordinate systems, objects should remain visible once they appear
+                # Only use fade-out if there are too many objects that would overlap
+                # Be very conservative - only use fade-out for extremely complex scenes
+                # Also check if the prompt specifically requests fade-out behavior
+                should_use_fade_out = (
+                    len(transient_objects) > 15 or  # Very high threshold
+                    'fade out' in user_prompt.lower() or  # Only if explicitly requested
+                    'disappear' in user_prompt.lower() or  # Only if explicitly requested
+                    'sequential fade' in user_prompt.lower()  # Only if explicitly requested
+                )
+                
+                if should_use_fade_out:
+                    print(f"  ⚠️  Many objects detected - using sequential fade-out to prevent clutter")
+                    # Use the old sequential fade-out logic for very complex scenes
+                    for i, obj in enumerate(transient_objects):
+                        if 'animations' not in obj:
+                            obj['animations'] = []
+                        
+                        if i == 0:
+                            fade_in_anim = {
+                                'type': 'fade_in',
+                                'start_time': 'after_persistent_display',
+                                'duration': 0.5,
+                                'reason': 'first_transient_object'
+                            }
+                            obj['animations'].append(fade_in_anim)
+                            print(f"  📈 Added fade-in to {obj.get('id', 'unknown')} (first transient)")
+                        else:
+                            prev_obj = transient_objects[i-1]
+                            if 'animations' not in prev_obj:
+                                prev_obj['animations'] = []
+                            
+                            fade_out_anim = {
+                                'type': 'fade_out',
+                                'start_time': 'before_next_transient',
+                                'duration': 0.3,
+                                'reason': 'sequential_display_requirement'
+                            }
+                            prev_obj['animations'].append(fade_out_anim)
+                            print(f"  📉 Added fade-out to {prev_obj.get('id', 'unknown')}")
+                            
+                            fade_in_anim = {
+                                'type': 'fade_in',
+                                'start_time': 'after_previous_transient_fade',
+                                'duration': 0.5,
+                                'reason': 'sequential_display'
+                            }
+                            obj['animations'].append(fade_in_anim)
+                            print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
+                else:
+                    print(f"  ✅ Using smart display - objects will remain visible (no unnecessary fade-out)")
+                    # All transient objects fade in sequentially but stay visible
+                    for i, obj in enumerate(transient_objects):
+                        if 'animations' not in obj:
+                            obj['animations'] = []
+                        
+                                            # Calculate delay based on position in sequence
+                    # Text should appear with its corresponding object
+                    delay = i * 0.3  # 0.3 second delay between each object
                     
-                    # First transient object fades in after persistent objects
-                    if i == 0:
-                        fade_in_anim = {
-                            'type': 'fade_in',
-                            'start_time': 'after_persistent_display',
-                            'duration': 0.5,
-                            'reason': 'first_transient_object'
-                        }
-                        obj['animations'].append(fade_in_anim)
-                        print(f"  📈 Added fade-in to {obj.get('id', 'unknown')} (first transient)")
-                    else:
-                        # Subsequent transient objects fade out the previous one and fade in
-                        prev_obj = transient_objects[i-1]
-                        
-                        # Add fade-out to previous transient object
-                        if 'animations' not in prev_obj:
-                            prev_obj['animations'] = []
-                        
-                        fade_out_anim = {
-                            'type': 'fade_out',
-                            'start_time': 'before_next_transient',
-                            'duration': 0.3,
-                            'reason': 'sequential_transient_display'
-                        }
-                        prev_obj['animations'].append(fade_out_anim)
-                        print(f"  📉 Added fade-out to {prev_obj.get('id', 'unknown')}")
-                        
-                        # Add fade-in to current transient object
-                        fade_in_anim = {
-                            'type': 'fade_in',
-                            'start_time': 'after_previous_transient_fade',
-                            'duration': 0.5,
-                            'reason': 'sequential_transient_display'
-                        }
-                        obj['animations'].append(fade_in_anim)
-                        print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
+                    # Check if this is text that should sync with a plot
+                    if obj.get('type') == 'text':
+                        # Find corresponding plot and sync timing
+                        sync_delay = self._calculate_text_sync_delay(obj, persistent_objects, i)
+                        if sync_delay is not None:
+                            delay = sync_delay
+                    
+                    fade_in_anim = {
+                        'type': 'fade_in',
+                        'start_time': f'after_persistent_display + {delay}s',
+                        'duration': 0.5,
+                        'reason': 'sequential_display_no_fade_out'
+                    }
+                    obj['animations'].append(fade_in_anim)
+                    print(f"  📈 Added sequential fade-in to {obj.get('id', 'unknown')} (delay: {delay}s)")
             
             # If we have both persistent and transient objects, ensure proper timing
             if persistent_objects and transient_objects:
@@ -569,6 +617,37 @@ class EnhancedWorkflowOrchestrator:
         
         print(f"✅ Animation sequence optimization completed")
         return animation_spec
+    
+    def _calculate_text_sync_delay(self, text_obj: Dict[str, Any], persistent_objects: List[Dict[str, Any]], base_delay: float) -> float:
+        """Calculate optimal delay for text to sync with its corresponding plot"""
+        try:
+            text_pos = text_obj.get('properties', {}).get('position', [0, 0, 0])
+            text_content = text_obj.get('properties', {}).get('text', '')
+            
+            # Find the closest plot object
+            closest_plot = None
+            min_distance = float('inf')
+            
+            for plot_obj in persistent_objects:
+                if plot_obj.get('type') == 'plot':
+                    plot_pos = plot_obj.get('properties', {}).get('position', [0, 0, 0])
+                    if len(text_pos) >= 2 and len(plot_pos) >= 2:
+                        distance = ((text_pos[0] - plot_pos[0])**2 + (text_pos[1] - plot_pos[1])**2)**0.5
+                        if distance < min_distance:
+                            min_distance = distance
+                            closest_plot = plot_obj
+            
+            # If text is close to a plot, sync the timing
+            if closest_plot and min_distance < 3.0:  # Within 3 units
+                # Text should appear shortly after the plot
+                return 0.1  # Very short delay after plot
+            else:
+                # Use base delay for text not associated with plots
+                return base_delay
+                
+        except Exception as e:
+            logger.error(f"Error calculating text sync delay: {e}")
+            return base_delay
     
     def _apply_cluster_optimizations(self, animation_spec: Dict[str, Any], object_clusters: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Apply optimizations based on object clusters"""
@@ -634,6 +713,7 @@ class EnhancedWorkflowOrchestrator:
                 text_content = text_props.get('text', '')
                 
                 # Only adjust position if text seems to be auto-generated (short labels)
+                # For coordinate systems, be very conservative - only adjust if text is at exact same position as object
                 if len(text_content) <= 3:  # Only adjust single letters or short labels
                     # Find the closest reference object
                     closest_obj = None
@@ -647,20 +727,21 @@ class EnhancedWorkflowOrchestrator:
                                 min_distance = distance
                                 closest_obj = ref_obj
                     
-                    # Position text near the closest object but not overlapping
-                    if closest_obj and min_distance < 2.0:  # Only if close enough to be related
+                    # Only adjust if text is very close to an object (likely overlapping)
+                    # Use a very small threshold to preserve user intent
+                    if closest_obj and min_distance < 0.2:  # Only if almost overlapping
                         ref_pos = closest_obj.get('properties', {}).get('position', [0, 0, 0])
                         
-                        # Smart positioning: above and to the right
+                        # Very minimal adjustment: just slightly above and to the right
                         smart_pos = [
-                            ref_pos[0] + 0.5,  # Slightly right
-                            ref_pos[1] + 0.7,  # Above
+                            ref_pos[0] + 0.2,  # Very slightly right
+                            ref_pos[1] + 0.3,  # Very slightly above
                             text_pos[2] if len(text_pos) > 2 else 0
                         ]
                         
                         text_props['position'] = smart_pos
                         positioned_count += 1
-                        logger.debug(f"Smart positioned text '{text_content}' near {closest_obj.get('id', 'unknown')}")
+                        logger.debug(f"Minimal text adjustment for '{text_content}' near {closest_obj.get('id', 'unknown')}")
             
             if positioned_count > 0:
                 logger.info(f"Smart text positioning: Adjusted {positioned_count} text labels")
@@ -799,23 +880,12 @@ class EnhancedWorkflowOrchestrator:
     def _apply_overlap_prevention(self, objects: List[Dict[str, Any]]):
         """
         Applies comprehensive overlap prevention to ensure objects don't appear on top of each other.
-        This involves intelligent positioning and smart fade-out management.
+        DISABLED for coordinate systems to preserve user-specified positions.
         """
-        if len(objects) <= 1:
-            return
-        
-        # Group objects by type for better overlap management
-        geometric_objects = [obj for obj in objects if obj.get('type') in ['circle', 'square', 'point', 'triangle', 'rectangle']]
-        text_objects = [obj for obj in objects if obj.get('type') == 'text']
-        plot_objects = [obj for obj in objects if obj.get('type') == 'plot']
-        
-        # Apply smart positioning to prevent overlaps
-        self._prevent_geometric_overlaps(geometric_objects)
-        self._prevent_text_overlaps(text_objects)
-        self._prevent_plot_overlaps(plot_objects)
-        
-        # Apply smart fade-out management for sequential objects
-        self._apply_sequential_fade_out_management(objects)
+        # DISABLED: This was interfering with coordinate system positioning
+        # Return without modifying positions to preserve user intent
+        logger.debug("Comprehensive overlap prevention DISABLED to preserve coordinate system")
+        return
     
     def _prevent_geometric_overlaps(self, geometric_objects: List[Dict[str, Any]]):
         """Prevent overlaps between geometric objects"""
@@ -909,23 +979,11 @@ class EnhancedWorkflowOrchestrator:
         pass
     
     def _prevent_plot_overlaps(self, plot_objects: List[Dict[str, Any]]):
-        """Prevent overlaps between plot objects"""
-        if len(plot_objects) <= 1:
-            return
-        
-        # Plots should be positioned to avoid overlaps
-        spacing = 2.0
-        for i, obj in enumerate(plot_objects):
-            if 'properties' not in obj:
-                obj['properties'] = {}
-            
-            # Position plots in a grid to avoid overlap
-            row = i // 2
-            col = i % 2
-            x = (col - 0.5) * spacing
-            y = (row - len(plot_objects) / 4) * spacing
-            
-            obj['properties']['position'] = [x, y, 0]
+        """Prevent overlaps between plot objects - DISABLED for coordinate systems"""
+        # DISABLED: This was modifying plot positions and interfering with coordinate systems
+        # Return without modifying positions to preserve user-specified coordinates
+        logger.debug("Plot overlap prevention DISABLED to preserve coordinate system")
+        return
     
     def _apply_sequential_fade_out_management(self, objects: List[Dict[str, Any]]):
         """Apply smart fade-out management for sequential objects"""

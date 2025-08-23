@@ -98,6 +98,21 @@ FUNCTION PLOT RULES (CRITICAL):
 - For "exponential" → use "function": "exponential" (creates exp(x) plot)
 - Each function plot must be a separate object with unique id
 - Use different colors for each plot: sine=YELLOW, cosine=BLUE, tangent=GREEN, exponential=RED
+- Function plots should be positioned at [0, 0, 0] (origin) for proper coordinate system layout
+- Multiple function plots can overlap at origin - this is expected and desired for good visual layout
+
+COORDINATE SYSTEM LAYOUT RULES:
+- When creating "coordinate system with multiple function plots", all plots should be at origin [0, 0, 0]
+- Axes should be centered at [0, 0, 0] with appropriate ranges
+- Geometric shapes should be placed at their specified coordinates (e.g., "at key points")
+- Text annotations should be positioned near their corresponding objects
+- Function plots overlapping at origin is PERFECT and should not be prevented
+
+TEXT ANNOTATION TIMING:
+- Text labels should appear shortly after their corresponding objects
+- For function plots, text should appear right after the plot becomes visible
+- For geometric shapes, text should appear with or shortly after the shape
+- Use simple, descriptive labels like "sine", "cosine", "Point A", etc.
 - All plots should have position: [0, 0, 0] (center on axes)
 
 MULTIPLE FUNCTIONS EXAMPLE:
