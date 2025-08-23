@@ -351,8 +351,550 @@ class GeneratedScene(MovingCameraScene):
                 objects_created.append(square_obj)
                 self.wait(0.5)
                 
-            # Add more object types here as needed...
-            
+            elif obj_type == 'axes':
+                # Create coordinate system axes
+                color_name = props.get('color', 'WHITE')
+                pos = props.get('position', [0, 0, 0])
+                
+                # Color validation
+                try:
+                    if isinstance(color_name, str) and color_name.startswith('#'):
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
+                    else:
+                        color_mapping = {{
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }}
+                        color = color_mapping.get(str(color_name), WHITE)
+                except:
+                    color = WHITE
+                
+                # Create axes
+                axes_obj = Axes(
+                    x_range=[-4, 4, 1],
+                    y_range=[-3, 3, 1],
+                    x_length=8,
+                    y_length=6,
+                    axis_config={{"color": color, "stroke_width": 2}}
+                )
+                axes_obj.move_to(pos)
+                
+                # Handle animations
+                animations = obj.get('animations', [])
+                if not animations:
+                    self.add(axes_obj)
+                    self.play(Create(axes_obj), run_time=1.0)
+                else:
+                    # Process animations with timing
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 1.0)
+                        start_time = anim.get('start_time', 'immediate')
+                        
+                        if start_time == 'before_next':
+                            self.add(axes_obj)
+                            self.play(FadeIn(axes_obj), run_time=0.3)
+                            if not hasattr(self, 'objects_to_fade_out'):
+                                self.objects_to_fade_out = []
+                            self.objects_to_fade_out.append(axes_obj)
+                        elif start_time == 'after_previous_fade':
+                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
+                                prev_obj = self.objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(axes_obj)
+                            self.play(FadeIn(axes_obj), run_time=duration)
+                        else:
+                            if anim_type == 'fade_in':
+                                self.add(axes_obj)
+                                self.play(FadeIn(axes_obj), run_time=duration)
+                            elif anim_type == 'fade_out':
+                                self.play(FadeOut(axes_obj), run_time=duration)
+                            elif anim_type == 'wait':
+                                self.wait(duration)
+                            else:
+                                self.add(axes_obj)
+                                self.play(Create(axes_obj), run_time=duration)
+                
+                objects_created.append(axes_obj)
+                self.wait(0.5)
+                
+            elif obj_type == 'plot':
+                # Create function plots
+                color_name = props.get('color', 'YELLOW')
+                pos = props.get('position', [0, 0, 0])
+                function_type = props.get('function', 'sine')
+                
+                # Color validation
+                try:
+                    if isinstance(color_name, str) and color_name.startswith('#'):
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
+                    else:
+                        color_mapping = {{
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }}
+                        color = color_mapping.get(str(color_name), YELLOW)
+                except:
+                    color = YELLOW
+                
+                # Create plot based on function type
+                if function_type == 'sine':
+                    plot_obj = FunctionGraph(
+                        lambda x: np.sin(x),
+                        x_range=[-4, 4],
+                        color=color,
+                        stroke_width=3
+                    )
+                elif function_type == 'cosine':
+                    plot_obj = FunctionGraph(
+                        lambda x: np.cos(x),
+                        x_range=[-4, 4],
+                        color=color,
+                        stroke_width=3
+                    )
+                elif function_type == 'tangent':
+                    plot_obj = FunctionGraph(
+                        lambda x: np.tan(x),
+                        x_range=[-1.5, 1.5],
+                        color=color,
+                        stroke_width=3
+                    )
+                elif function_type == 'exponential':
+                    plot_obj = FunctionGraph(
+                        lambda x: np.exp(x),
+                        x_range=[-2, 2],
+                        color=color,
+                        stroke_width=3
+                    )
+                else:
+                    # Default to sine
+                    plot_obj = FunctionGraph(
+                        lambda x: np.sin(x),
+                        x_range=[-4, 4],
+                        color=color,
+                        stroke_width=3
+                    )
+                
+                plot_obj.move_to(pos)
+                
+                # Handle animations
+                animations = obj.get('animations', [])
+                if not animations:
+                    self.add(plot_obj)
+                    self.play(Create(plot_obj), run_time=1.0)
+                else:
+                    # Process animations with timing
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 1.0)
+                        start_time = anim.get('start_time', 'immediate')
+                        
+                        if start_time == 'before_next':
+                            self.add(plot_obj)
+                            self.play(FadeIn(plot_obj), run_time=0.3)
+                            if not hasattr(self, 'objects_to_fade_out'):
+                                self.objects_to_fade_out = []
+                            self.objects_to_fade_out.append(plot_obj)
+                        elif start_time == 'after_previous_fade':
+                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
+                                prev_obj = self.objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(plot_obj)
+                            self.play(FadeIn(plot_obj), run_time=duration)
+                        else:
+                            if anim_type == 'fade_in':
+                                self.add(plot_obj)
+                                self.play(FadeIn(plot_obj), run_time=duration)
+                            elif anim_type == 'fade_out':
+                                self.play(FadeOut(plot_obj), run_time=duration)
+                            elif anim_type == 'wait':
+                                self.wait(duration)
+                            else:
+                                self.add(plot_obj)
+                                self.play(Create(plot_obj), run_time=duration)
+                
+                objects_created.append(plot_obj)
+                self.wait(0.5)
+                
+            elif obj_type == 'dot':
+                # Create geometric points
+                size = props.get('size', 0.1)
+                color_name = props.get('color', 'RED')
+                pos = props.get('position', [0, 0, 0])
+                
+                # Color validation
+                try:
+                    if isinstance(color_name, str) and color_name.startswith('#'):
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
+                    else:
+                        color_mapping = {{
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }}
+                        color = color_mapping.get(str(color_name), RED)
+                except:
+                    color = RED
+                
+                dot_obj = Dot(
+                    radius=size,
+                    color=color,
+                    fill_opacity=1.0
+                )
+                dot_obj.move_to(pos)
+                
+                # Handle animations
+                animations = obj.get('animations', [])
+                if not animations:
+                    self.add(dot_obj)
+                    self.play(Create(dot_obj), run_time=0.5)
+                else:
+                    # Process animations with timing
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 0.5)
+                        start_time = anim.get('start_time', 'immediate')
+                        
+                        if start_time == 'before_next':
+                            self.add(dot_obj)
+                            self.play(FadeIn(dot_obj), run_time=0.3)
+                            if not hasattr(self, 'objects_to_fade_out'):
+                                self.objects_to_fade_out = []
+                            self.objects_to_fade_out.append(dot_obj)
+                        elif start_time == 'after_previous_fade':
+                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
+                                prev_obj = self.objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(dot_obj)
+                            self.play(FadeIn(dot_obj), run_time=duration)
+                        else:
+                            if anim_type == 'fade_in':
+                                self.add(dot_obj)
+                                self.play(FadeIn(dot_obj), run_time=duration)
+                            elif anim_type == 'fade_out':
+                                self.play(FadeOut(dot_obj), run_time=duration)
+                            elif anim_type == 'wait':
+                                self.wait(duration)
+                            else:
+                                self.add(dot_obj)
+                                self.play(Create(dot_obj), run_time=duration)
+                
+                objects_created.append(dot_obj)
+                self.wait(0.3)
+                
+            elif obj_type == 'text':
+                # Create text annotations
+                content = props.get('content', 'Text')
+                size = props.get('size', 0.5)
+                color_name = props.get('color', 'WHITE')
+                pos = props.get('position', [0, 0, 0])
+                
+                # Color validation
+                try:
+                    if isinstance(color_name, str) and color_name.startswith('#'):
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
+                    else:
+                        color_mapping = {{
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }}
+                        color = color_mapping.get(str(color_name), WHITE)
+                except:
+                    color = WHITE
+                
+                # Convert size to font size
+                font_size = int(size * 48)  # Scale factor for readable text
+                
+                text_obj = Text(
+                    content,
+                    font_size=font_size,
+                    color=color
+                )
+                text_obj.move_to(pos)
+                
+                # Handle animations
+                animations = obj.get('animations', [])
+                if not animations:
+                    self.add(text_obj)
+                    self.play(Write(text_obj), run_time=0.8)
+                else:
+                    # Process animations with timing
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 0.8)
+                        start_time = anim.get('start_time', 'immediate')
+                        
+                        if start_time == 'before_next':
+                            self.add(text_obj)
+                            self.play(FadeIn(text_obj), run_time=0.3)
+                            if not hasattr(self, 'objects_to_fade_out'):
+                                self.objects_to_fade_out = []
+                            self.objects_to_fade_out.append(text_obj)
+                        elif start_time == 'after_previous_fade':
+                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
+                                prev_obj = self.objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(text_obj)
+                            self.play(FadeIn(text_obj), run_time=duration)
+                        else:
+                            if anim_type == 'fade_in':
+                                self.add(text_obj)
+                                self.play(FadeIn(text_obj), run_time=duration)
+                            elif anim_type == 'fade_out':
+                                self.play(FadeOut(text_obj), run_time=duration)
+                            elif anim_type == 'wait':
+                                self.wait(duration)
+                            else:
+                                self.add(text_obj)
+                                self.play(Write(text_obj), run_time=duration)
+                
+                objects_created.append(text_obj)
+                self.wait(0.3)
+                
+            elif obj_type == 'wait':
+                # Handle wait objects (timing control)
+                duration = props.get('duration', 0.5)
+                
+                # Process animations if any
+                animations = obj.get('animations', [])
+                if animations:
+                    for anim in animations:
+                        anim_type = anim.get('type', 'wait')
+                        anim_duration = anim.get('duration', duration)
+                        start_time = anim.get('start_time', 'immediate')
+                        
+                        if start_time == 'after_previous_fade':
+                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
+                                prev_obj = self.objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.wait(anim_duration)
+                        else:
+                            self.wait(anim_duration)
+                else:
+                    self.wait(duration)
+                
+                # Don't add wait objects to objects_created as they're not visual
+                self.wait(0.1)
+                
+            elif obj_type == 'triangle':
+                # Create triangle geometric shape
+                size = props.get('size', 1)
+                color_name = props.get('color', 'GREEN')
+                pos = props.get('position', [0, 0, 0])
+                
+                # Color validation
+                try:
+                    if isinstance(color_name, str) and color_name.startswith('#'):
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
+                    else:
+                        color_mapping = {{
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }}
+                        color = color_mapping.get(str(color_name), GREEN)
+                except:
+                    color = GREEN
+                
+                triangle_obj = Triangle(
+                    fill_color=color,
+                    stroke_color=color,
+                    fill_opacity=1.0,
+                    stroke_width=3
+                )
+                triangle_obj.scale(size)
+                triangle_obj.move_to(pos)
+                
+                # Handle animations
+                animations = obj.get('animations', [])
+                if not animations:
+                    self.add(triangle_obj)
+                    self.play(Create(triangle_obj), run_time=0.8)
+                else:
+                    # Process animations with timing
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 0.8)
+                        start_time = anim.get('start_time', 'immediate')
+                        
+                        if start_time == 'before_next':
+                            self.add(triangle_obj)
+                            self.play(FadeIn(triangle_obj), run_time=0.3)
+                            if not hasattr(self, 'objects_to_fade_out'):
+                                self.objects_to_fade_out = []
+                            self.objects_to_fade_out.append(triangle_obj)
+                        elif start_time == 'after_previous_fade':
+                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
+                                prev_obj = self.objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(triangle_obj)
+                            self.play(FadeIn(triangle_obj), run_time=duration)
+                        else:
+                            if anim_type == 'fade_in':
+                                self.add(triangle_obj)
+                                self.play(FadeIn(triangle_obj), run_time=duration)
+                            elif anim_type == 'fade_out':
+                                self.play(FadeOut(triangle_obj), run_time=duration)
+                            elif anim_type == 'wait':
+                                self.wait(duration)
+                            else:
+                                self.add(triangle_obj)
+                                self.play(Create(triangle_obj), run_time=duration)
+                
+                objects_created.append(triangle_obj)
+                self.wait(0.3)
+                
+            elif obj_type == 'diamond':
+                # Create diamond geometric shape (using square rotated 45 degrees)
+                size = props.get('size', 1)
+                color_name = props.get('color', 'PURPLE')
+                pos = props.get('position', [0, 0, 0])
+                
+                # Color validation
+                try:
+                    if isinstance(color_name, str) and color_name.startswith('#'):
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
+                    else:
+                        color_mapping = {{
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }}
+                        color = color_mapping.get(str(color_name), PURPLE)
+                except:
+                    color = PURPLE
+                
+                diamond_obj = Square(
+                    side_length=size,
+                    fill_color=color,
+                    stroke_color=color,
+                    fill_opacity=1.0,
+                    stroke_width=3
+                )
+                diamond_obj.rotate(PI/4)  # Rotate 45 degrees to make it look like a diamond
+                diamond_obj.move_to(pos)
+                
+                # Handle animations
+                animations = obj.get('animations', [])
+                if not animations:
+                    self.add(diamond_obj)
+                    self.play(Create(diamond_obj), run_time=0.8)
+                else:
+                    # Process animations with timing
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 0.8)
+                        start_time = anim.get('start_time', 'immediate')
+                        
+                        if start_time == 'before_next':
+                            self.add(diamond_obj)
+                            self.play(FadeIn(diamond_obj), run_time=0.3)
+                            if not hasattr(self, 'objects_to_fade_out'):
+                                self.objects_to_fade_out = []
+                            self.objects_to_fade_out.append(diamond_obj)
+                        elif start_time == 'after_previous_fade':
+                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
+                                prev_obj = self.objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(diamond_obj)
+                            self.play(FadeIn(diamond_obj), run_time=duration)
+                        else:
+                            if anim_type == 'fade_in':
+                                self.add(diamond_obj)
+                                self.play(FadeIn(diamond_obj), run_time=duration)
+                            elif anim_type == 'fade_out':
+                                self.play(FadeOut(diamond_obj), run_time=duration)
+                            elif anim_type == 'wait':
+                                self.wait(duration)
+                            else:
+                                self.add(diamond_obj)
+                                self.play(Create(diamond_obj), run_time=duration)
+                
+                objects_created.append(diamond_obj)
+                self.wait(0.3)
+                
+            else:
+                # Handle any other object types with a fallback
+                print(f"⚠️ Unknown object type: {{obj_type}}, using fallback circle")
+                
+                # Create a fallback circle
+                size = props.get('size', 1)
+                color_name = props.get('color', 'WHITE')
+                pos = props.get('position', [0, 0, 0])
+                
+                # Color validation
+                try:
+                    if isinstance(color_name, str) and color_name.startswith('#'):
+                        rgb_values = hex_to_rgb(color_name)
+                        color = rgb_to_color(rgb_values)
+                    else:
+                        color_mapping = {{
+                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
+                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
+                        }}
+                        color = color_mapping.get(str(color_name), WHITE)
+                except:
+                    color = WHITE
+                
+                fallback_obj = Circle(
+                    radius=size/2,
+                    fill_color=color,
+                    stroke_color=color,
+                    fill_opacity=1.0,
+                    stroke_width=3
+                )
+                fallback_obj.move_to(pos)
+                
+                # Handle animations
+                animations = obj.get('animations', [])
+                if not animations:
+                    self.add(fallback_obj)
+                    self.play(Create(fallback_obj), run_time=0.8)
+                else:
+                    # Process animations with timing
+                    for anim in animations:
+                        anim_type = anim.get('type', 'fade_in')
+                        duration = anim.get('duration', 0.8)
+                        start_time = anim.get('start_time', 'immediate')
+                        
+                        if start_time == 'before_next':
+                            self.add(fallback_obj)
+                            self.play(FadeIn(fallback_obj), run_time=0.3)
+                            if not hasattr(self, 'objects_to_fade_out'):
+                                self.objects_to_fade_out = []
+                            self.objects_to_fade_out.append(fallback_obj)
+                        elif start_time == 'after_previous_fade':
+                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
+                                prev_obj = self.objects_to_fade_out.pop(0)
+                                self.play(FadeOut(prev_obj), run_time=0.3)
+                            self.wait(0.1)
+                            self.add(fallback_obj)
+                            self.play(FadeIn(fallback_obj), run_time=duration)
+                        else:
+                            if anim_type == 'fade_in':
+                                self.add(fallback_obj)
+                                self.play(FadeIn(fallback_obj), run_time=duration)
+                            elif anim_type == 'fade_out':
+                                self.play(FadeOut(fallback_obj), run_time=duration)
+                            elif anim_type == 'wait':
+                                self.wait(duration)
+                            else:
+                                self.add(fallback_obj)
+                                self.play(Create(fallback_obj), run_time=duration)
+                
+                objects_created.append(fallback_obj)
+                self.wait(0.3)
+        
         # Final pause and validation
         self.wait(2)
         
