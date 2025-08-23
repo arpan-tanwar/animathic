@@ -4,11 +4,14 @@ Integrates all enhanced systems for optimal complex prompt handling
 """
 
 import logging
+import time
 from typing import Dict, Any, List, Optional, Tuple
 from .object_tracking import ObjectTrackingSystem
 from .animation_analysis import AnimationSequenceAnalyzer
 from .fade_out_system import FadeOutSystem
 from .camera_management import CameraManagementSystem
+from .enhanced_validation import EnhancedValidationService
+from .real_time_overlap_monitoring import RealTimeOverlapMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,9 @@ class EnhancedWorkflowOrchestrator:
         self.animation_analyzer = AnimationSequenceAnalyzer()
         self.fade_out_system = FadeOutSystem()
         self.camera_manager = CameraManagementSystem()
+        self.enhanced_validator = EnhancedValidationService()
+        self.prompt_enhancer = None  # Will be set by AI service
+        self.real_time_monitor = RealTimeOverlapMonitor()
         
         # Workflow configuration
         self.config = {
@@ -35,12 +41,106 @@ class EnhancedWorkflowOrchestrator:
             'enable_fade_out_validation': True,  # NEW: Fade-out validation
             'max_fade_out_retries': 3,  # NEW: Maximum retry attempts
             'fade_out_timeout': 5.0,  # NEW: Timeout for fade-out operations
+            'enable_real_time_overlap_monitoring': True,  # NEW: Real-time overlap monitoring
+            'real_time_monitoring_config': {
+                'check_interval': 0.1,
+                'overlap_threshold': 0.1,
+                'auto_correct': True,
+                'max_concurrent_corrections': 3
+            },
+            'fade_out_conservative_mode': True,  # NEW: Ultra-conservative fade-out behavior
+            'fade_out_explicit_only': True,  # NEW: Only fade-out when explicitly requested
+            'preserve_mathematical_content': True  # NEW: Never fade-out mathematical functions unless requested
         }
         
         # NEW: Smart fade-out tracking
         self._fade_out_history = {}
         self._fade_out_validation_cache = {}
         self._active_fade_out_operations = set()
+    
+    def set_prompt_enhancer(self, prompt_enhancer):
+        """Set the prompt enhancer from the AI service"""
+        self.prompt_enhancer = prompt_enhancer
+        logger.info("Prompt enhancer set in workflow orchestrator")
+    
+    def start_real_time_overlap_monitoring(self, animation_spec: Dict[str, Any]) -> bool:
+        """Start real-time overlap monitoring for the animation"""
+        try:
+            if not self.config['enable_real_time_overlap_monitoring']:
+                logger.debug("Real-time overlap monitoring disabled")
+                return False
+            
+            # Convert animation spec objects to monitoring format
+            monitoring_objects = {}
+            for obj in animation_spec.get('objects', []):
+                obj_id = obj.get('id', f"obj_{len(monitoring_objects)}")
+                monitoring_objects[obj_id] = {
+                    'type': obj.get('type', 'unknown'),
+                    'properties': obj.get('properties', {}),
+                    'created_at': time.time()  # Track creation time for correction logic
+                }
+            
+            # Configure and start monitoring
+            config = self.config['real_time_monitoring_config']
+            self.real_time_monitor.config.check_interval = config['check_interval']
+            self.real_time_monitor.config.overlap_threshold = config['overlap_threshold']
+            self.real_time_monitor.config.auto_correct = config['auto_correct']
+            self.real_time_monitor.config.max_concurrent_corrections = config['max_concurrent_corrections']
+            
+            # Start monitoring
+            success = self.real_time_monitor.start_monitoring(monitoring_objects)
+            
+            if success:
+                logger.info(f"Real-time overlap monitoring started for {len(monitoring_objects)} objects")
+                
+                # Add callbacks for real-time feedback
+                self.real_time_monitor.add_overlap_callback(self._on_overlap_detected)
+                self.real_time_monitor.add_correction_callback(self._on_correction_applied)
+            else:
+                logger.warning("Failed to start real-time overlap monitoring")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error starting real-time overlap monitoring: {e}")
+            return False
+    
+    def stop_real_time_overlap_monitoring(self) -> bool:
+        """Stop real-time overlap monitoring"""
+        try:
+            if self.real_time_monitor.monitoring_active:
+                success = self.real_time_monitor.stop_monitoring()
+                if success:
+                    logger.info("Real-time overlap monitoring stopped")
+                return success
+            return True
+        except Exception as e:
+            logger.error(f"Error stopping real-time overlap monitoring: {e}")
+            return False
+    
+    def _on_overlap_detected(self, overlap_event) -> None:
+        """Callback for detected overlaps"""
+        try:
+            logger.warning(f"Real-time overlap detected: {overlap_event.object1_id} ({overlap_event.object1_type}) and {overlap_event.object2_id} ({overlap_event.object2_type}) - Severity: {overlap_event.severity.value}")
+            
+            # Store overlap event for workflow analysis
+            if not hasattr(self, '_real_time_overlaps'):
+                self._real_time_overlaps = []
+            self._real_time_overlaps.append(overlap_event)
+            
+        except Exception as e:
+            logger.error(f"Error in overlap callback: {e}")
+    
+    def _on_correction_applied(self, correction_id: str, success: bool) -> None:
+        """Callback for applied corrections"""
+        try:
+            if success:
+                logger.info(f"Real-time overlap correction {correction_id} applied successfully")
+            else:
+                logger.warning(f"Real-time overlap correction {correction_id} failed")
+            
+        except Exception as e:
+            logger.error(f"Error in correction callback: {e}")
     
     def process_complex_animation_request(self, animation_spec: Dict[str, Any], user_prompt: str) -> Dict[str, Any]:
         """Process complex animation requests with enhanced intelligence"""
@@ -67,10 +167,19 @@ class EnhancedWorkflowOrchestrator:
                 camera_strategy = self._optimize_camera_strategy(animation_spec, pre_analysis)
                 animation_spec['camera_strategy'] = camera_strategy
             
-            # Phase 6: Final validation and enhancement
-            final_spec = self._perform_final_validation(animation_spec, pre_analysis)
+            # Phase 6: Enhanced validation and enhancement
+            validation_result = self.enhanced_validator.enhanced_animation_validation(animation_spec)
+            final_spec = self._perform_final_validation(animation_spec, pre_analysis, validation_result)
             
-            # Phase 7: Generate workflow summary
+            # Phase 7: Start real-time overlap monitoring
+            if self.config['enable_real_time_overlap_monitoring']:
+                monitoring_started = self.start_real_time_overlap_monitoring(final_spec)
+                if monitoring_started:
+                    logger.info("Real-time overlap monitoring integrated into workflow")
+                else:
+                    logger.warning("Failed to start real-time overlap monitoring")
+            
+            # Phase 8: Generate workflow summary
             workflow_summary = self._generate_workflow_summary(pre_analysis, final_spec)
             
             return {
@@ -79,6 +188,11 @@ class EnhancedWorkflowOrchestrator:
                 'enhancements_applied': self._get_applied_enhancements(pre_analysis),
                 'risk_assessment': pre_analysis.get('risk_assessment', {}),
                 'performance_metrics': self._calculate_performance_metrics(pre_analysis),
+                'real_time_monitoring': {
+                    'active': self.config['enable_real_time_overlap_monitoring'],
+                    'status': self.real_time_monitor.get_monitoring_status() if self.config['enable_real_time_overlap_monitoring'] else None,
+                    'overlap_summary': self.real_time_monitor.get_overlap_summary() if self.config['enable_real_time_overlap_monitoring'] else None
+                },
                 'processing_metadata': {
                     'pre_analysis': pre_analysis,
                     'processing_time': 'optimized',
@@ -97,13 +211,31 @@ class EnhancedWorkflowOrchestrator:
             }
     
     def _perform_pre_processing_analysis(self, animation_spec: Dict[str, Any], user_prompt: str) -> Dict[str, Any]:
-        """Perform comprehensive pre-processing analysis"""
+        """Perform comprehensive pre-processing analysis with prompt enhancement insights"""
+        # Analyze prompt enhancement if available
+        prompt_enhancement_analysis = {}
+        if self.prompt_enhancer:
+            try:
+                # Get enhancement context for the user prompt
+                enhancement_context = self.prompt_enhancer._analyze_prompt_context(user_prompt)
+                prompt_enhancement_analysis = {
+                    'enhancement_context': enhancement_context,
+                    'overlap_risk_level': enhancement_context.overlap_risk_level,
+                    'performance_considerations': enhancement_context.performance_considerations,
+                    'applied_enhancements': self._get_applicable_enhancements(enhancement_context)
+                }
+                logger.info(f"Prompt enhancement analysis completed: {enhancement_context.prompt_complexity} complexity, {enhancement_context.overlap_risk_level} overlap risk")
+            except Exception as e:
+                logger.warning(f"Prompt enhancement analysis failed: {e}")
+                prompt_enhancement_analysis = {}
+        
         analysis = {
             'prompt_complexity': self._analyze_prompt_complexity(user_prompt),
             'object_analysis': self._analyze_objects(animation_spec),
             'sequence_analysis': self.animation_analyzer.analyze_animation_sequence(animation_spec),
             'overlap_risks': self._assess_overlap_risks(animation_spec),
             'performance_considerations': self._assess_performance_considerations(animation_spec),
+            'prompt_enhancement_analysis': prompt_enhancement_analysis,
             'risk_assessment': {},
             'optimization_opportunities': []
         }
@@ -115,6 +247,25 @@ class EnhancedWorkflowOrchestrator:
         analysis['optimization_opportunities'] = self._identify_optimization_opportunities(analysis)
         
         return analysis
+    
+    def _get_applicable_enhancements(self, enhancement_context) -> List[str]:
+        """Get list of applicable enhancements based on context"""
+        applicable_enhancements = []
+        
+        if enhancement_context.has_mathematical_content:
+            applicable_enhancements.append('mathematical_optimization')
+        if enhancement_context.has_geometric_shapes:
+            applicable_enhancements.append('geometric_optimization')
+        if enhancement_context.has_text_annotations:
+            applicable_enhancements.append('text_optimization')
+        if enhancement_context.has_animation_effects:
+            applicable_enhancements.append('animation_optimization')
+        if enhancement_context.overlap_risk_level in ['medium', 'high']:
+            applicable_enhancements.append('overlap_prevention')
+        if enhancement_context.has_sequence_requirements:
+            applicable_enhancements.append('sequence_optimization')
+        
+        return applicable_enhancements
     
     def _analyze_prompt_complexity(self, user_prompt: str) -> Dict[str, Any]:
         """Analyze the complexity of the user prompt"""
@@ -501,19 +652,10 @@ class EnhancedWorkflowOrchestrator:
             if transient_objects:
                 print(f"  🎬 Processing {len(transient_objects)} transient objects with smart display strategy")
                 
-                # For coordinate systems, objects should remain visible once they appear
-                # Only use fade-out if there are too many objects that would overlap
-                # Be very conservative - only use fade-out for extremely complex scenes
-                # Also check if the prompt specifically requests fade-out behavior
-                should_use_fade_out = (
-                    len(transient_objects) > 15 or  # Very high threshold
-                    'fade out' in user_prompt.lower() or  # Only if explicitly requested
-                    'disappear' in user_prompt.lower() or  # Only if explicitly requested
-                    'sequential fade' in user_prompt.lower() or  # Only if explicitly requested
-                    'then fade out' in user_prompt.lower() or  # Check for "appear then fade out" pattern
-                    'appear one by one, then fade out' in user_prompt.lower() or  # Specific pattern
-                    'appear one by one, then disappear' in user_prompt.lower()  # Alternative pattern
-                )
+                # ULTRA CONSERVATIVE: Only use fade-out if EXPLICITLY requested
+                # Mathematical functions, coordinate systems, and most objects should remain visible
+                # NEVER use fade-out for mathematical content unless explicitly requested
+                should_use_fade_out = self._should_use_fade_out_conservative(user_prompt, transient_objects)
                 
                 if should_use_fade_out:
                     # Check if this is an "appear then fade out" sequence
@@ -525,114 +667,96 @@ class EnhancedWorkflowOrchestrator:
                     
                     if is_appear_then_fade_out:
                         print(f"  🎭 Using 'appear then fade out' sequence strategy")
-                        # Use a much simpler approach: create a single animation sequence
-                        # that handles the entire timing in one place
+                        # Use Manim's built-in sequential animation approach
+                        # This is much simpler and more reliable
                         
-                        # Ensure animations list exists for all objects
+                        # Clear any existing animations
                         for obj in transient_objects:
-                            if 'animations' not in obj:
-                                obj['animations'] = []
-                            else:
-                                obj['animations'] = []  # Clear existing animations
+                            obj['animations'] = []
                         
-                        # Create a single, clean animation sequence
+                        # Add simple sequential animations using Manim's natural timing
                         for i, obj in enumerate(transient_objects):
-                            # Phase 1: Sequential appearance
-                            if i == 0:
-                                # First object appears immediately
-                                fade_in_anim = {
-                                    'type': 'fade_in',
-                                    'start_time': 'immediate',
-                                    'duration': 0.5,
-                                    'reason': 'first_object_appearance'
-                                }
-                            elif i == 1:
-                                # Second object appears after first
-                                fade_in_anim = {
-                                    'type': 'fade_in',
-                                    'start_time': 'after_first_object',
-                                    'duration': 0.5,
-                                    'reason': 'second_object_appearance'
-                                }
-                            else:
-                                # Third object appears after second
-                                fade_in_anim = {
-                                    'type': 'fade_in',
-                                    'start_time': 'after_second_object',
-                                    'duration': 0.5,
-                                    'reason': 'third_object_appearance'
-                                }
-                            
+                            # Each object gets a simple fade_in animation
+                            # The timing will be handled by Manim's sequential execution
+                            fade_in_anim = {
+                                'type': 'fade_in',
+                                'start_time': 'sequential',
+                                'duration': 0.5,
+                                'reason': f'sequential_appearance_{i+1}'
+                            }
                             obj['animations'].append(fade_in_anim)
-                            print(f"  📈 Added fade-in to {obj.get('id', 'unknown')} (phase 1)")
+                            print(f"  📈 Added sequential fade-in to {obj.get('id', 'unknown')}")
                         
-                        # Phase 2: Sequential fade-out (after all objects are visible)
-                        for i, obj in enumerate(transient_objects):
-                            if i == 0:
-                                # First object fades out after all are visible
+                        # Add fade-out animations that will execute after all fade-ins
+                        # ONLY if user explicitly requested fade-out behavior
+                        if 'fade out' in user_prompt.lower() or 'disappear' in user_prompt.lower():
+                            for i, obj in enumerate(transient_objects):
                                 fade_out_anim = {
                                     'type': 'fade_out',
-                                    'start_time': 'after_all_visible',
+                                    'start_time': 'after_sequence',
                                     'duration': 0.3,
-                                    'reason': 'first_object_fade_out'
+                                    'reason': f'explicit_user_request_{i+1}'
                                 }
-                            elif i == 1:
-                                # Second object fades out 0.3s later
-                                fade_out_anim = {
-                                    'type': 'fade_out',
-                                    'start_time': 'after_first_fade_out',
-                                    'duration': 0.3,
-                                    'reason': 'second_object_fade_out'
-                                }
-                            else:
-                                # Third object fades out 0.3s later
-                                fade_out_anim = {
-                                    'type': 'fade_out',
-                                    'start_time': 'after_second_fade_out',
-                                    'duration': 0.3,
-                                    'reason': 'third_object_fade_out'
-                                }
-                            
-                            obj['animations'].append(fade_out_anim)
-                            print(f"  📉 Added fade-out to {obj.get('id', 'unknown')} (phase 2)")
+                                obj['animations'].append(fade_out_anim)
+                                print(f"  📉 Added fade-out to {obj.get('id', 'unknown')} (user requested)")
+                        else:
+                            print(f"  ✅ No fade-out animations added - objects will remain visible")
                     else:
                         print(f"  ⚠️  Many objects detected - using sequential fade-out to prevent clutter")
-                        # Use the old sequential fade-out logic for very complex scenes
-                        for i, obj in enumerate(transient_objects):
-                            if 'animations' not in obj:
-                                obj['animations'] = []
-                            
-                            if i == 0:
-                                fade_in_anim = {
-                                    'type': 'fade_in',
-                                    'start_time': 'after_persistent_display',
-                                    'duration': 0.5,
-                                    'reason': 'first_transient_object'
-                                }
-                                obj['animations'].append(fade_in_anim)
-                                print(f"  📈 Added fade-in to {obj.get('id', 'unknown')} (first transient)")
-                            else:
-                                prev_obj = transient_objects[i-1]
-                                if 'animations' not in prev_obj:
-                                    prev_obj['animations'] = []
+                        # ULTRA CONSERVATIVE: Only use fade-out if explicitly requested
+                        # For complex scenes, prefer keeping objects visible
+                        if 'fade out' in user_prompt.lower() or 'disappear' in user_prompt.lower():
+                            print(f"  📉 User requested fade-out - applying sequential fade-out")
+                            for i, obj in enumerate(transient_objects):
+                                if 'animations' not in obj:
+                                    obj['animations'] = []
                                 
-                                fade_out_anim = {
-                                    'type': 'fade_out',
-                                    'start_time': 'before_next_transient',
-                                    'duration': 0.3,
-                                    'reason': 'sequential_display_requirement'
-                                }
-                                prev_obj['animations'].append(fade_out_anim)
-                                print(f"  📉 Added fade-out to {prev_obj.get('id', 'unknown')}")
-                                        
+                                if i == 0:
+                                    fade_in_anim = {
+                                        'type': 'fade_in',
+                                        'start_time': 'after_persistent_display',
+                                        'duration': 0.5,
+                                        'reason': 'first_transient_object'
+                                    }
+                                    obj['animations'].append(fade_in_anim)
+                                    print(f"  📈 Added fade-in to {obj.get('id', 'unknown')} (first transient)")
+                                else:
+                                    prev_obj = transient_objects[i-1]
+                                    if 'animations' not in prev_obj:
+                                        prev_obj['animations'] = []
+                                    
+                                    fade_out_anim = {
+                                        'type': 'fade_out',
+                                        'start_time': 'before_next_transient',
+                                        'duration': 0.3,
+                                        'reason': 'explicit_user_request'
+                                    }
+                                    prev_obj['animations'].append(fade_out_anim)
+                                    print(f"  📉 Added fade-out to {prev_obj.get('id', 'unknown')} (user requested)")
+                                            
+                                    fade_in_anim = {
+                                        'type': 'fade_in',
+                                        'start_time': 'after_previous_transient_fade',
+                                        'duration': 0.5,
+                                        'reason': 'sequential_display'
+                                    }
+                                    obj['animations'].append(fade_in_anim)
+                                    print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
+                        else:
+                            print(f"  ✅ No fade-out requested - all objects will remain visible")
+                            # Simple sequential fade-in without fade-out
+                            for i, obj in enumerate(transient_objects):
+                                if 'animations' not in obj:
+                                    obj['animations'] = []
+                                
                                 fade_in_anim = {
                                     'type': 'fade_in',
-                                    'start_time': 'after_previous_transient_fade',
+                                    'start_time': 'sequential',
                                     'duration': 0.5,
-                                    'reason': 'sequential_display'
+                                    'reason': 'sequential_appearance'
                                 }
                                 obj['animations'].append(fade_in_anim)
-                                print(f"  📈 Added fade-in to {obj.get('id', 'unknown')}")
+                                print(f"  📈 Added sequential fade-in to {obj.get('id', 'unknown')} (no fade-out)")
                 else:
                     print(f"  ✅ Using smart display - objects will remain visible (no unnecessary fade-out)")
                     # All transient objects fade in sequentially but stay visible
@@ -1182,16 +1306,16 @@ class EnhancedWorkflowOrchestrator:
             if 'animations' not in new_object:
                 new_object['animations'] = []
             
-                fade_out_anim = {
-                    'type': 'fade_out',
-                    'start_time': 'before_next',
-                    'duration': 0.3,
-                    'reason': 'sequential_display_requirement'
-                }
+            fade_out_anim = {
+                'type': 'fade_out',
+                'start_time': 'before_next',
+                'duration': 0.3,
+                'reason': 'sequential_display_requirement'
+            }
             new_object['animations'].append(fade_out_anim)
     
     def _optimize_camera_strategy(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Optimize camera strategy for the animation"""
+        """Optimize camera strategy for the animation with enhanced smart camera management"""
         objects = animation_spec.get('objects', [])
         if not objects:
             return {'action': 'none', 'reason': 'no_objects'}
@@ -1200,24 +1324,100 @@ class EnhancedWorkflowOrchestrator:
         new_object = objects[0]
         existing_objects = objects[1:] if len(objects) > 1 else []
         
-        # Get camera strategy
+        # Get enhanced camera strategy with object awareness
         camera_strategy = self.camera_manager.intelligent_camera_management(
             new_object, existing_objects, {}
         )
         
+        # ENHANCED: Apply additional camera optimizations based on analysis
+        camera_strategy = self._enhance_camera_strategy_with_analysis(camera_strategy, analysis, objects)
+        
+        # ENHANCED: Add camera strategy metadata for better tracking
+        camera_strategy['metadata'] = {
+            'total_objects': len(objects),
+            'object_types': list(set(obj.get('type', 'unknown') for obj in objects)),
+            'has_mathematical_content': any(obj.get('type') in ['plot', 'function', 'graph', 'axes'] for obj in objects),
+            'has_text_annotations': any(obj.get('type') == 'text' for obj in objects),
+            'has_geometric_shapes': any(obj.get('type') in ['circle', 'square', 'triangle', 'diamond'] for obj in objects),
+            'optimization_timestamp': time.time()
+        }
+        
         return camera_strategy
     
-    def _perform_final_validation(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Perform final validation of the enhanced animation specification"""
+    def _enhance_camera_strategy_with_analysis(self, camera_strategy: Dict[str, Any], analysis: Dict[str, Any], objects: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Enhance camera strategy based on animation analysis"""
+        try:
+            # Check if we need to override camera strategy based on analysis
+            prompt_complexity = analysis.get('prompt_complexity', {}).get('level', 'unknown')
+            overlap_risks = analysis.get('overlap_risks', {}).get('requires_intervention', False)
+            
+            # For complex prompts, ensure optimal camera positioning
+            if prompt_complexity == 'complex':
+                if camera_strategy['action'] == 'none':
+                    camera_strategy.update({
+                        'action': 'complex_prompt_optimization',
+                        'reason': 'complex_prompt_requires_enhanced_camera_management',
+                        'parameters': {
+                            'margin': 0.1,
+                            'duration': 0.5,
+                            'preserve_mathematical_precision': True,
+                            'ensure_text_readability': True
+                        },
+                        'priority': 'high'
+                    })
+            
+            # For overlap risks, adjust camera to provide more space
+            if overlap_risks:
+                if camera_strategy['action'] == 'none':
+                    camera_strategy.update({
+                        'action': 'overlap_prevention_camera_adjustment',
+                        'reason': 'overlap_risks_detected_need_more_space',
+                        'parameters': {
+                            'margin': 0.3,
+                            'duration': 0.4,
+                            'zoom_factor': 0.9,
+                            'prevent_overlaps': True
+                        },
+                        'priority': 'high'
+                    })
+            
+            return camera_strategy
+            
+        except Exception as e:
+            logger.error(f"Error enhancing camera strategy with analysis: {e}")
+            return camera_strategy
+    
+    def _perform_final_validation(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any], enhanced_validation: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform final validation using enhanced validation results"""
         validation_result = {
-            'is_valid': True,
-            'warnings': [],
-            'errors': [],
+            'is_valid': enhanced_validation.get('is_valid', True),
+            'warnings': enhanced_validation.get('warnings', []),
+            'errors': enhanced_validation.get('errors', []),
+            'suggestions': enhanced_validation.get('suggestions', []),
             'enhancements_applied': []
         }
         
-        # Validate object properties
+        # Apply enhanced validation suggestions automatically
         objects = animation_spec.get('objects', [])
+        
+        # Apply overlap prevention suggestions
+        for suggestion in enhanced_validation.get('suggestions', []):
+            if suggestion.get('suggested_action') == 'adjust_text_position':
+                # Apply text positioning optimization
+                self._apply_text_positioning_optimization(animation_spec, suggestion)
+                validation_result['enhancements_applied'].append('text_positioning_optimized')
+            
+            elif suggestion.get('suggested_action') == 'enable_sequential_display':
+                # Apply sequential display optimization
+                self._apply_sequential_display_optimization(animation_spec)
+                validation_result['enhancements_applied'].append('sequential_display_enabled')
+            
+            elif suggestion.get('suggested_action') == 'add_animation_delay':
+                # Apply animation delay optimization
+                self._apply_animation_delay_optimization(animation_spec, suggestion)
+                validation_result['enhancements_applied'].append('animation_delays_optimized')
+        
+        # Ensure basic properties are set (fallback to original logic)
         for obj in objects:
             if 'properties' not in obj:
                 obj['properties'] = {}
@@ -1232,16 +1432,77 @@ class EnhancedWorkflowOrchestrator:
                 obj['properties']['position'] = [0, 0, 0]
                 validation_result['enhancements_applied'].append(f'set_default_position_for_{obj.get("id", "unknown")}')
         
-        # Check for remaining overlaps
-        remaining_overlaps = self._assess_overlap_risks(animation_spec)
-        if remaining_overlaps.get('requires_intervention', False):
-            validation_result['warnings'].append({
-                'type': 'remaining_overlaps',
-                'message': 'Some object overlaps may still exist',
-                'count': len(remaining_overlaps.get('overlaps', []))
-            })
+        # Add enhanced validation metadata
+        animation_spec['enhanced_validation'] = {
+            'validation_result': enhanced_validation,
+            'summary': self.enhanced_validator.get_validation_summary(enhanced_validation),
+            'applied_enhancements': validation_result['enhancements_applied']
+        }
         
         return animation_spec
+    
+    def _apply_text_positioning_optimization(self, animation_spec: Dict[str, Any], suggestion: Dict[str, Any]):
+        """Apply text positioning optimization based on validation suggestion"""
+        try:
+            objects = animation_spec.get('objects', [])
+            for obj in objects:
+                if obj.get('type') == 'text':
+                    # Adjust text position to avoid overlaps
+                    current_pos = obj.get('properties', {}).get('position', [0, 0, 0])
+                    if len(current_pos) >= 2:
+                        # Move text slightly up and to the right to avoid overlaps
+                        new_pos = [current_pos[0] + 0.5, current_pos[1] + 0.5, current_pos[2]]
+                        obj['properties']['position'] = new_pos
+                        logger.info(f"Optimized text position for {obj.get('id', 'unknown')}: {current_pos} -> {new_pos}")
+            
+        except Exception as e:
+            logger.error(f"Error applying text positioning optimization: {e}")
+    
+    def _apply_sequential_display_optimization(self, animation_spec: Dict[str, Any]):
+        """Apply sequential display optimization based on validation suggestion"""
+        try:
+            objects = animation_spec.get('objects', [])
+            for i, obj in enumerate(objects):
+                if 'animations' not in obj:
+                    obj['animations'] = []
+                
+                # Add sequential timing to animations
+                for anim in obj['animations']:
+                    if anim.get('type') == 'fade_in':
+                        anim['start_time'] = f'after_persistent_display + {i * 0.3}s'
+                    elif anim.get('type') == 'fade_out':
+                        anim['start_time'] = f'after_persistent_display + {(i + 1) * 0.3}s'
+                
+                logger.info(f"Applied sequential display optimization to {obj.get('id', 'unknown')}")
+            
+        except Exception as e:
+            logger.error(f"Error applying sequential display optimization: {e}")
+    
+    def _apply_animation_delay_optimization(self, animation_spec: Dict[str, Any], suggestion: Dict[str, Any]):
+        """Apply animation delay optimization based on validation suggestion"""
+        try:
+            target_object_id = suggestion.get('parameters', {}).get('target_object')
+            delay_duration = suggestion.get('parameters', {}).get('delay_duration', 0.5)
+            
+            objects = animation_spec.get('objects', [])
+            for obj in objects:
+                if obj.get('id') == target_object_id:
+                    if 'animations' not in obj:
+                        obj['animations'] = []
+                    
+                    # Add delay animation before conflicting animations
+                    delay_anim = {
+                        'type': 'wait',
+                        'duration': delay_duration,
+                        'start_time': 'immediate'
+                    }
+                    obj['animations'].insert(0, delay_anim)
+                    
+                    logger.info(f"Added animation delay to {target_object_id}: {delay_duration}s")
+                    break
+            
+        except Exception as e:
+            logger.error(f"Error applying animation delay optimization: {e}")
     
     def _generate_workflow_summary(self, analysis: Dict[str, Any], final_spec: Dict[str, Any]) -> Dict[str, Any]:
         """Generate a summary of the workflow processing"""
@@ -1264,8 +1525,61 @@ class EnhancedWorkflowOrchestrator:
             },
             'enhancements_applied': len(analysis.get('optimization_opportunities', [])),
             'final_object_count': len(final_spec.get('objects', [])),
-            'performance_estimate': analysis.get('performance_considerations', {}).get('rendering_estimate', 'unknown')
+            'performance_estimate': analysis.get('performance_considerations', {}).get('rendering_estimate', 'unknown'),
+            'enhanced_validation': final_spec.get('enhanced_validation', {}).get('summary', {})
         }
+    
+    def _should_use_fade_out_conservative(self, user_prompt: str, transient_objects: List[Dict[str, Any]]) -> bool:
+        """Ultra-conservative decision making for fade-out usage"""
+        try:
+            # Check configuration first
+            if not self.config.get('fade_out_conservative_mode', True):
+                return False
+            
+            # FIRST: Check if user explicitly requested fade-out (this overrides everything)
+            # Use more flexible keyword detection
+            explicit_fade_out_keywords = [
+                'fade out', 'disappear', 'sequential fade', 'then fade', 'fade them',
+                'appear one by one, then fade', 'appear one by one, then disappear',
+                'temporary', 'brief', 'momentary', 'remove', 'hide'
+            ]
+            
+            # More flexible detection: check if any keyword is contained in the prompt
+            has_explicit_request = any(keyword in user_prompt.lower() for keyword in explicit_fade_out_keywords)
+            
+            if has_explicit_request:
+                print(f"  ✅ Explicit fade-out request detected - allowing fade-out")
+                return True
+            
+            # SECOND: If no explicit request, check if fade-out is required
+            if self.config.get('fade_out_explicit_only', True):
+                print(f"  🚫 No explicit fade-out request - keeping objects visible")
+                return False
+            
+            # THIRD: Check mathematical content (only if no explicit request)
+            if self.config.get('preserve_mathematical_content', True):
+                mathematical_keywords = ['function', 'plot', 'graph', 'sine', 'cosine', 'tangent', 'exponential', 'logarithmic']
+                has_mathematical_content = any(keyword in user_prompt.lower() for keyword in mathematical_keywords)
+                
+                if has_mathematical_content:
+                    print(f"  🧮 Mathematical content detected - NO fade-out for functions/plots")
+                    return False
+            
+            # FOURTH: Check object types - avoid fade-out for important objects
+            for obj in transient_objects:
+                obj_type = obj.get('type', '').lower()
+                if obj_type in ['axes', 'plot', 'function', 'coordinate']:
+                    print(f"  📊 Important object type '{obj_type}' detected - avoiding fade-out")
+                    return False
+            
+            # If we get here, fade-out might be acceptable
+            print(f"  ✅ Fade-out conditions met - proceeding with fade-out")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in conservative fade-out decision: {e}")
+            # Default to conservative (no fade-out)
+            return False
     
     def _get_applied_enhancements(self, analysis: Dict[str, Any]) -> List[str]:
         """Get list of enhancements that were applied"""

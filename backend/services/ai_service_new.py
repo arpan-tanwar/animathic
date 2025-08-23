@@ -25,6 +25,8 @@ from .animation_analysis import AnimationSequenceAnalyzer
 from .camera_management import CameraManagementSystem
 from .fade_out_system import FadeOutSystem
 from .enhanced_workflow_orchestrator import EnhancedWorkflowOrchestrator
+from .ai_prompt_enhancement import AIPromptEnhancementSystem
+from .real_time_overlap_monitoring import RealTimeOverlapMonitor
 
 load_dotenv()
 
@@ -46,6 +48,11 @@ class AIService:
         self.object_tracker = ObjectTrackingSystem()
         self.camera_manager = CameraManagementSystem()
         self.fade_out_manager = FadeOutSystem()
+        self.prompt_enhancer = AIPromptEnhancementSystem()
+        self.real_time_monitor = RealTimeOverlapMonitor()
+        
+        # Set prompt enhancer in workflow orchestrator
+        self.enhanced_orchestrator.set_prompt_enhancer(self.prompt_enhancer)
         
         # Initialize clients
         self._initialize_clients()
@@ -75,12 +82,16 @@ class AIService:
             raise
     
     async def generate_animation_spec(self, prompt: str) -> Dict[str, Any]:
-        """Generate animation specification using Gemini"""
+        """Generate animation specification using Gemini with enhanced prompts"""
         try:
             logger.info(f"Generating animation spec for prompt: {prompt}")
             
-            # Format the prompt
-            formatted_prompt = ANIMATION_PROMPT_TEMPLATE.replace("{prompt}", prompt)
+            # Enhance the prompt with context-aware improvements
+            enhanced_prompt = self.prompt_enhancer.enhance_ai_prompt_with_context(prompt)
+            logger.info(f"Prompt enhanced from {len(prompt)} to {len(enhanced_prompt)} characters")
+            
+            # Format the enhanced prompt
+            formatted_prompt = ANIMATION_PROMPT_TEMPLATE.replace("{prompt}", enhanced_prompt)
             
             # Generate response from Gemini
             response = self.gemini_client.generate_content(
@@ -489,6 +500,29 @@ class AIService:
         """Get current status of the fade-out system"""
         return self.fade_out_manager.get_fade_out_system_status(self.object_tracker.object_registry)
     
+    def get_prompt_enhancement_status(self) -> Dict[str, Any]:
+        """Get current status of the prompt enhancement system"""
+        return {
+            'system_active': True,
+            'enhancement_config': self.prompt_enhancer.enhancement_config,
+            'enhancement_templates_available': list(self.prompt_enhancer.enhancement_templates.keys()),
+            'performance_guidance_levels': list(self.prompt_enhancer.performance_guidance.keys())
+        }
+    
+    def get_real_time_overlap_monitoring_status(self) -> Dict[str, Any]:
+        """Get current status of the real-time overlap monitoring system"""
+        return {
+            'system_active': True,
+            'monitoring_status': self.real_time_monitor.get_monitoring_status(),
+            'overlap_summary': self.real_time_monitor.get_overlap_summary(),
+            'config': {
+                'check_interval': self.real_time_monitor.config.check_interval,
+                'overlap_threshold': self.real_time_monitor.config.overlap_threshold,
+                'auto_correct': self.real_time_monitor.config.auto_correct,
+                'max_concurrent_correction': self.real_time_monitor.config.max_concurrent_corrections
+            }
+        }
+    
     def debug_object_state(self, obj_id: str) -> Dict[str, Any]:
         """Debug information for a specific object"""
         return self.object_tracker.debug_object_state(obj_id)
@@ -578,8 +612,10 @@ class AIService:
         raise NotImplementedError("Local model generation not yet implemented")
     
     def _generate_smart_fallback_specification(self, prompt: str) -> Dict[str, Any]:
-        """Generate smart animation specification based on prompt content"""
-        prompt_lower = prompt.lower()
+        """Generate smart animation specification based on prompt content with enhanced prompts"""
+        # Enhance the prompt for better fallback generation
+        enhanced_prompt = self.prompt_enhancer.enhance_ai_prompt_with_context(prompt)
+        prompt_lower = enhanced_prompt.lower()
         objects = []
         object_id_counter = 1
         

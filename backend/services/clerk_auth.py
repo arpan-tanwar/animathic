@@ -80,9 +80,10 @@ class ClerkAuthService:
         token_age = current_time - iat
         
         # Can extend if token is not too old and has reasonable time left
+        # Simplified logic: extend if token is not too old and has less than 30 minutes left
         return (token_age < self.max_token_age and 
                 time_until_expiry > 0 and 
-                time_until_expiry < self.long_running_token_extension)
+                time_until_expiry < 1800)  # 30 minutes
     
     async def _fetch_jwks_with_cache(self) -> Dict[str, Any]:
         """Fetch JWKS with caching to avoid repeated requests"""
@@ -96,29 +97,29 @@ class ClerkAuthService:
         
         logger.debug("Fetching fresh JWKS from Clerk...")
         
-        async with httpx.AsyncClient() as client:
-            # Try multiple JWKS endpoints - Clerk might have different public endpoints
-            jwks_urls = [
-                "https://clerk.animathic.com/.well-known/jwks.json",
-                "https://clerk.dev/.well-known/jwks.json",
-                "https://api.clerk.dev/v1/jwks"
-            ]
-            
-            jwks = None
-            for url in jwks_urls:
-                try:
+            async with httpx.AsyncClient() as client:
+                # Try multiple JWKS endpoints - Clerk might have different public endpoints
+                jwks_urls = [
+                    "https://clerk.animathic.com/.well-known/jwks.json",
+                    "https://clerk.dev/.well-known/jwks.json",
+                    "https://api.clerk.dev/v1/jwks"
+                ]
+                
+                jwks = None
+                for url in jwks_urls:
+                    try:
                     logger.debug(f"Trying JWKS endpoint: {url}")
-                    response = await client.get(url, timeout=10.0)
-                    if response.status_code == 200:
-                        jwks = response.json()
-                        logger.info(f"Successfully retrieved JWKS from: {url}")
-                        break
-                    else:
+                        response = await client.get(url, timeout=10.0)
+                        if response.status_code == 200:
+                            jwks = response.json()
+                            logger.info(f"Successfully retrieved JWKS from: {url}")
+                            break
+                        else:
                         logger.debug(f"Failed to fetch from {url}: {response.status_code}")
-                except Exception as e:
+                    except Exception as e:
                     logger.debug(f"Error fetching from {url}: {e}")
-            
-            if not jwks:
+                
+                if not jwks:
                 # Fallback to secret key if available
                 if self.clerk_secret_key:
                     logger.warning("JWKS fetch failed, using secret key fallback")
@@ -192,17 +193,28 @@ class ClerkAuthService:
                     # Check if token is expired
                     if time_until_expiry <= 0:
                         logger.warning(f"JWT token has expired. Expired {abs(time_until_expiry)} seconds ago")
-                        raise HTTPException(
-                            status_code=401,
-                            detail={
-                                "error": "Token has expired",
-                                "requires_refresh": True,
-                                "message": "Your session has expired. Please refresh your authentication.",
-                                "expired_at": exp,
-                                "current_time": current_time,
-                                "expired_seconds_ago": abs(time_until_expiry)
-                            }
-                        )
+                        
+                        # For long-running operations, check if we can extend the token
+                        if allow_extended_lifetime and self._can_extend_token_lifetime(exp, iat):
+                            logger.info(f"Token expired but extended for long-running operation")
+                            # Don't raise exception, continue with extended lifetime
+                            # Update the expiration time for the extended token
+                            exp = exp + 3600  # Extend by 1 hour
+                            unverified_payload['_extended_lifetime'] = True
+                            unverified_payload['_original_exp'] = exp - 3600
+                            unverified_payload['_extended_exp'] = exp
+                        else:
+                            raise HTTPException(
+                                status_code=401,
+                                detail={
+                                    "error": "Token has expired",
+                                    "requires_refresh": True,
+                                    "message": "Your session has expired. Please refresh your authentication.",
+                                    "expired_at": exp,
+                                    "current_time": current_time,
+                                    "expired_seconds_ago": abs(time_until_expiry)
+                                }
+                            )
                     
                     # Check if token is too old
                     if iat and self._is_token_too_old(iat):
@@ -226,11 +238,11 @@ class ClerkAuthService:
                     can_extend = allow_extended_lifetime and self._can_extend_token_lifetime(exp, iat)
                     
                     if can_extend:
-                        logger.info(f"Token can be extended for long-running operation. Current expiry: {exp}, can extend by {self.long_running_token_extension}s")
+                        logger.info(f"Token extended for long-running operation. Current expiry: {exp}, extended by 1 hour")
                         # Add extended lifetime flag
                         unverified_payload['_extended_lifetime'] = True
                         unverified_payload['_original_exp'] = exp
-                        unverified_payload['_extended_exp'] = exp + self.long_running_token_extension
+                        unverified_payload['_extended_exp'] = exp + 3600  # Extend by 1 hour
                     
                     if needs_refresh_soon:
                         logger.warning(f"JWT token will expire soon in {time_until_expiry} seconds")
@@ -246,7 +258,7 @@ class ClerkAuthService:
                         "message": "Your session has expired. Please refresh your authentication."
                     }
                 )
-            except Exception as e:
+                    except Exception as e:
                 logger.debug(f"Error checking token expiration: {e}")
                 # Continue with verification even if expiration check fails
             
@@ -262,45 +274,45 @@ class ClerkAuthService:
             # Fetch public keys from Clerk (with caching)
             jwks = await self._fetch_jwks_with_cache()
             logger.debug(f"Retrieved {len(jwks.get('keys', []))} public keys from Clerk")
-            
-            public_key = None
-            
-            # Find the matching public key
-            for key in jwks.get('keys', []):
-                if key.get('kid') == key_id:
-                    try:
-                        logger.debug(f"Found matching public key for kid: {key_id}")
-                        # Convert JWK to PEM format
-                        n = int.from_bytes(
-                            base64.urlsafe_b64decode(key['n'] + '=='), 
-                            'big'
-                        )
-                        e = int.from_bytes(
-                            base64.urlsafe_b64decode(key['e'] + '=='), 
-                            'big'
-                        )
-                        
-                        public_numbers = RSAPublicNumbers(e, n)
-                        public_key = public_numbers.public_key()
-                        break
-                    except Exception as e:
-                        logger.debug(f"Failed to convert JWK to PEM: {e}")
-                        continue
-            
-            if not public_key:
-                raise HTTPException(status_code=401, detail="Public key not found for token")
-            
-            # Try to verify with primary issuer first
-            try:
-                logger.debug(f"Verifying JWT with primary issuer: {self.clerk_issuer}")
-                payload = jwt.decode(
-                    token,
-                    public_key,
-                    algorithms=['RS256'],
-                    issuer=self.clerk_issuer,
-                    options={"verify_aud": False}  # Don't verify audience for Clerk
-                )
                 
+                public_key = None
+                
+                # Find the matching public key
+                for key in jwks.get('keys', []):
+                    if key.get('kid') == key_id:
+                        try:
+                        logger.debug(f"Found matching public key for kid: {key_id}")
+                            # Convert JWK to PEM format
+                            n = int.from_bytes(
+                                base64.urlsafe_b64decode(key['n'] + '=='), 
+                                'big'
+                            )
+                            e = int.from_bytes(
+                                base64.urlsafe_b64decode(key['e'] + '=='), 
+                                'big'
+                            )
+                            
+                            public_numbers = RSAPublicNumbers(e, n)
+                            public_key = public_numbers.public_key()
+                            break
+                        except Exception as e:
+                        logger.debug(f"Failed to convert JWK to PEM: {e}")
+                            continue
+                
+                if not public_key:
+                    raise HTTPException(status_code=401, detail="Public key not found for token")
+                
+                # Try to verify with primary issuer first
+                try:
+                logger.debug(f"Verifying JWT with primary issuer: {self.clerk_issuer}")
+                    payload = jwt.decode(
+                        token,
+                        public_key,
+                        algorithms=['RS256'],
+                        issuer=self.clerk_issuer,
+                        options={"verify_aud": False}  # Don't verify audience for Clerk
+                    )
+                    
                 # Check if we need to warn about upcoming expiration
                 if payload.get('_warn_refresh_soon'):
                     logger.info(f"JWT token verified successfully but will expire soon - user should refresh")
@@ -311,9 +323,9 @@ class ClerkAuthService:
                 
                 # Add token metadata for better error handling
                 token_info = {
-                    "user_id": payload.get('sub'),
-                    "email": payload.get('email'),
-                    "authenticated": True,
+                        "user_id": payload.get('sub'),
+                        "email": payload.get('email'),
+                        "authenticated": True,
                     "payload": payload,
                     "expires_at": payload.get('exp'),
                     "issued_at": payload.get('iat'),
@@ -327,18 +339,18 @@ class ClerkAuthService:
                 
                 return token_info
                 
-            except jwt.InvalidIssuerError:
+                except jwt.InvalidIssuerError:
                 logger.debug(f"Primary issuer failed, trying fallback: {self.clerk_issuer_fallback}")
-                # Try with fallback issuer
-                try:
-                    payload = jwt.decode(
-                        token,
-                        public_key,
-                        algorithms=['RS256'],
-                        issuer=self.clerk_issuer_fallback,
-                        options={"verify_aud": False}  # Don't verify audience for Clerk
-                    )
-                    
+                    # Try with fallback issuer
+                    try:
+                        payload = jwt.decode(
+                            token,
+                            public_key,
+                            algorithms=['RS256'],
+                            issuer=self.clerk_issuer_fallback,
+                            options={"verify_aud": False}  # Don't verify audience for Clerk
+                        )
+                        
                     # Check if we need to warn about upcoming expiration
                     if payload.get('_warn_refresh_soon'):
                         logger.info(f"JWT token verified successfully with fallback but will expire soon - user should refresh")
@@ -346,12 +358,12 @@ class ClerkAuthService:
                         logger.info(f"JWT token verified successfully with fallback issuer for user: {payload.get('sub')}")
                     
                     logger.debug(f"JWT payload: {payload}")
-                    
+                        
                     # Add token metadata for better error handling
                     token_info = {
-                        "user_id": payload.get('sub'),
-                        "email": payload.get('email'),
-                        "authenticated": True,
+                            "user_id": payload.get('sub'),
+                            "email": payload.get('email'),
+                            "authenticated": True,
                         "payload": payload,
                         "expires_at": payload.get('exp'),
                         "issued_at": payload.get('iat'),
@@ -365,9 +377,9 @@ class ClerkAuthService:
                     
                     return token_info
                     
-                except jwt.InvalidIssuerError:
+                    except jwt.InvalidIssuerError:
                     logger.warning(f"Both primary and fallback issuers failed. Expected: {self.clerk_issuer} or {self.clerk_issuer_fallback}")
-                    raise HTTPException(status_code=401, detail="Invalid token issuer")
+                        raise HTTPException(status_code=401, detail="Invalid token issuer")
                 except jwt.ExpiredSignatureError:
                     logger.warning(f"JWT token has expired")
                     raise HTTPException(
@@ -394,8 +406,8 @@ class ClerkAuthService:
                 )
             except jwt.InvalidTokenError as e:
                 logger.debug(f"Invalid JWT token: {e}")
-                raise HTTPException(status_code=401, detail="Invalid token")
-                
+                    raise HTTPException(status_code=401, detail="Invalid token")
+                    
         except jwt.InvalidTokenError as e:
             logger.debug(f"Invalid JWT token: {e}")
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -562,17 +574,17 @@ async def require_authentication_long_running(authorization: str = Header(None))
         token_info = await clerk_auth.verify_jwt_token(token, allow_extended_lifetime=True)
         
         # Check if token needs refresh soon
-        if token_info.get('needs_refresh_soon'):
+        if token_info.get('_warn_refresh_soon'):
             logger.warning(f"Token for user {token_info.get('user_id')} will expire soon - long-running process may fail")
             # Don't fail the request, but add a warning
             token_info['_warn_refresh_soon'] = True
             token_info['_refresh_warning'] = "Your session will expire soon. Consider refreshing before starting long operations."
         
         # Check if token lifetime was extended
-        if token_info.get('can_extend_lifetime'):
-            logger.info(f"Token lifetime extended for long-running operation. Extended expiry: {token_info.get('extended_expiry')}")
+        if token_info.get('_extended_lifetime'):
+            logger.info(f"Token lifetime extended for long-running operation. Extended expiry: {token_info.get('_extended_exp')}")
             token_info['_lifetime_extended'] = True
-            token_info['_extended_expiry'] = token_info.get('extended_expiry')
+            token_info['_extended_expiry'] = token_info.get('_extended_exp')
         
         return token_info
         

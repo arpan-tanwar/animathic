@@ -58,9 +58,9 @@ class GeneratedScene(MovingCameraScene):
         # Log bounds
         print("Bounds: x=", [-6.0, 6.0], " y=", [-3.5, 3.5])
         
-        # FIXED: Simplified camera positioning - no more conflicting setup
+        # ENHANCED: Smart camera management with object awareness
         try:
-            # Set camera frame dimensions and center it properly
+            # Set initial camera frame dimensions and center it properly
             self.camera.frame.set(width=14, height=10)
             self.camera.frame.move_to([0, 0, 0])
             
@@ -68,6 +68,11 @@ class GeneratedScene(MovingCameraScene):
             self.camera.frame.set(x_range=[-7, 7], y_range=[-5, 5])
             
             print("Camera positioning: Applied - centered at (0,0) with 14x10 dimensions")
+            
+            # Initialize camera management tracking
+            self.camera_strategies = []
+            self.objects_for_camera_management = []
+            
         except Exception as e:
             print(f"Camera positioning failed: {{e}}")
         
@@ -149,38 +154,20 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.5)
                             self.add(circle_obj)
                             self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'sequential':
+                            # Object appears in sequence - Manim will handle timing automatically
                             self.add(circle_obj)
                             self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time == 'after_persistent_display':
-                            # Object appears after persistent objects (axes, plots) are visible
-                            # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time == 'after_first_object':
-                            # Object appears after the first object
-                            self.wait(0.5)  # Wait for first object to complete
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time == 'after_second_object':
-                            # Object appears after the second object
-                            self.wait(1.0)  # Wait for first two objects to complete
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time == 'after_all_visible':
-                            # Object fades out after all objects are visible
-                            self.wait(1.5)  # Wait for all objects to be visible
-                            self.play(FadeOut(circle_obj), run_time=duration)
-                        elif start_time == 'after_first_fade_out':
-                            # Object fades out after first object fades out
-                            self.wait(1.8)  # Wait for first fade-out to complete
-                            self.play(FadeOut(circle_obj), run_time=duration)
-                        elif start_time == 'after_second_fade_out':
-                            # Object fades out after second object fades out
-                            self.wait(2.1)  # Wait for second fade-out to complete
-                            self.play(FadeOut(circle_obj), run_time=duration)
+                        elif start_time == 'after_sequence':
+                            # Object fades out after the entire sequence is complete
+                            # ONLY if explicitly requested - be conservative
+                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
+                                self.wait(0.5)  # Small delay to ensure smooth transition
+                                self.play(FadeOut(circle_obj), run_time=duration)
+                            else:
+                                # Keep object visible - no unnecessary fade-out
+                                self.wait(0.5)
+                                print(f"  ✅ circle object kept visible (no fade-out)")
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(circle_obj)
@@ -269,38 +256,20 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(square_obj)
                             self.play(FadeIn(square_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'sequential':
+                            # Object appears in sequence - Manim will handle timing automatically
                             self.add(square_obj)
                             self.play(FadeIn(square_obj), run_time=duration)
-                        elif start_time == 'after_persistent_display':
-                            # Object appears after persistent objects (axes, plots) are visible
-                            # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
-                            self.add(square_obj)
-                            self.play(FadeIn(square_obj), run_time=duration)
-                        elif start_time == 'after_first_object':
-                            # Object appears after the first object
-                            self.wait(0.5)  # Wait for first object to complete
-                            self.add(square_obj)
-                            self.play(FadeIn(square_obj), run_time=duration)
-                        elif start_time == 'after_second_object':
-                            # Object appears after the second object
-                            self.wait(1.0)  # Wait for first two objects to complete
-                            self.add(square_obj)
-                            self.play(FadeIn(square_obj), run_time=duration)
-                        elif start_time == 'after_all_visible':
-                            # Object fades out after all objects are visible
-                            self.wait(1.5)  # Wait for all objects to be visible
-                            self.play(FadeOut(square_obj), run_time=duration)
-                        elif start_time == 'after_first_fade_out':
-                            # Object fades out after first object fades out
-                            self.wait(1.8)  # Wait for first fade-out to complete
-                            self.play(FadeOut(square_obj), run_time=duration)
-                        elif start_time == 'after_second_fade_out':
-                            # Object fades out after second object fades out
-                            self.wait(2.1)  # Wait for second fade-out to complete
-                            self.play(FadeOut(square_obj), run_time=duration)
+                        elif start_time == 'after_sequence':
+                            # Object fades out after the entire sequence is complete
+                            # ONLY if explicitly requested - be conservative
+                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
+                                self.wait(0.5)  # Small delay to ensure smooth transition
+                                self.play(FadeOut(square_obj), run_time=duration)
+                            else:
+                                # Keep object visible - no unnecessary fade-out
+                                self.wait(0.5)
+                                print(f"  ✅ square object kept visible (no fade-out)")
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(square_obj)
@@ -390,37 +359,14 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(axes_obj)
                             self.play(FadeIn(axes_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'sequential':
+                            # Object appears in sequence - Manim will handle timing automatically
                             self.add(axes_obj)
                             self.play(FadeIn(axes_obj), run_time=duration)
-                        elif start_time == 'after_persistent_display':
-                            # Object appears after persistent objects (axes, plots) are visible
-                            # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
-                            self.add(axes_obj)
-                            self.play(FadeIn(axes_obj), run_time=duration)
-                        elif start_time == 'after_first_object':
-                            # Object appears after the first object
-                            self.wait(0.5)  # Wait for first object to complete
-                            self.add(axes_obj)
-                            self.play(FadeIn(axes_obj), run_time=duration)
-                        elif start_time == 'after_second_object':
-                            # Object appears after the second object
-                            self.wait(1.0)  # Wait for first two objects to complete
-                            self.add(axes_obj)
-                            self.play(FadeIn(axes_obj), run_time=duration)
-                        elif start_time == 'after_all_visible':
-                            # Object fades out after all objects are visible
-                            self.wait(1.5)  # Wait for all objects to be visible
-                            self.play(FadeOut(axes_obj), run_time=duration)
-                        elif start_time == 'after_first_fade_out':
-                            # Object fades out after first object fades out
-                            self.wait(1.8)  # Wait for first fade-out to complete
-                            self.play(FadeOut(axes_obj), run_time=duration)
-                        elif start_time == 'after_second_fade_out':
-                            # Object fades out after second object fades out
-                            self.wait(2.1)  # Wait for second fade-out to complete
+                        elif start_time == 'after_sequence':
+                            # Object fades out after the entire sequence is complete
+                            # Wait for all fade-ins to complete, then fade out
+                            self.wait(0.5)  # Small delay to ensure smooth transition
                             self.play(FadeOut(axes_obj), run_time=duration)
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
@@ -637,38 +583,20 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(dot_obj)
                             self.play(FadeIn(dot_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'sequential':
+                            # Object appears in sequence - Manim will handle timing automatically
                             self.add(dot_obj)
                             self.play(FadeIn(dot_obj), run_time=duration)
-                        elif start_time == 'after_persistent_display':
-                            # Object appears after persistent objects (axes, plots) are visible
-                            # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
-                            self.add(dot_obj)
-                            self.play(FadeIn(dot_obj), run_time=duration)
-                        elif start_time == 'after_first_object':
-                            # Object appears after the first object
-                            self.wait(0.5)  # Wait for first object to complete
-                            self.add(dot_obj)
-                            self.play(FadeIn(dot_obj), run_time=duration)
-                        elif start_time == 'after_second_object':
-                            # Object appears after the second object
-                            self.wait(1.0)  # Wait for first two objects to complete
-                            self.add(dot_obj)
-                            self.play(FadeIn(dot_obj), run_time=duration)
-                        elif start_time == 'after_all_visible':
-                            # Object fades out after all objects are visible
-                            self.wait(1.5)  # Wait for all objects to be visible
-                            self.play(FadeOut(dot_obj), run_time=duration)
-                        elif start_time == 'after_first_fade_out':
-                            # Object fades out after first object fades out
-                            self.wait(1.8)  # Wait for first fade-out to complete
-                            self.play(FadeOut(dot_obj), run_time=duration)
-                        elif start_time == 'after_second_fade_out':
-                            # Object fades out after second object fades out
-                            self.wait(2.1)  # Wait for second fade-out to complete
-                            self.play(FadeOut(dot_obj), run_time=duration)
+                        elif start_time == 'after_sequence':
+                            # Object fades out after the entire sequence is complete
+                            # ONLY if explicitly requested - be conservative
+                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
+                                self.wait(0.5)  # Small delay to ensure smooth transition
+                                self.play(FadeOut(dot_obj), run_time=duration)
+                            else:
+                                # Keep object visible - no unnecessary fade-out
+                                self.wait(0.5)
+                                print(f"  ✅ dot object kept visible (no fade-out)")
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(dot_obj)
@@ -759,38 +687,20 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(text_obj)
                             self.play(FadeIn(text_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'sequential':
+                            # Object appears in sequence - Manim will handle timing automatically
                             self.add(text_obj)
                             self.play(FadeIn(text_obj), run_time=duration)
-                        elif start_time == 'after_persistent_display':
-                            # Object appears after persistent objects (axes, plots) are visible
-                            # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
-                            self.add(text_obj)
-                            self.play(FadeIn(text_obj), run_time=duration)
-                        elif start_time == 'after_first_object':
-                            # Object appears after the first object
-                            self.wait(0.5)  # Wait for first object to complete
-                            self.add(text_obj)
-                            self.play(FadeIn(text_obj), run_time=duration)
-                        elif start_time == 'after_second_object':
-                            # Object appears after the second object
-                            self.wait(1.0)  # Wait for first two objects to complete
-                            self.add(text_obj)
-                            self.play(FadeIn(text_obj), run_time=duration)
-                        elif start_time == 'after_all_visible':
-                            # Object fades out after all objects are visible
-                            self.wait(1.5)  # Wait for all objects to be visible
-                            self.play(FadeOut(text_obj), run_time=duration)
-                        elif start_time == 'after_first_fade_out':
-                            # Object fades out after first object fades out
-                            self.wait(1.8)  # Wait for first fade-out to complete
-                            self.play(FadeOut(text_obj), run_time=duration)
-                        elif start_time == 'after_second_fade_out':
-                            # Object fades out after second object fades out
-                            self.wait(2.1)  # Wait for second fade-out to complete
-                            self.play(FadeOut(text_obj), run_time=duration)
+                        elif start_time == 'after_sequence':
+                            # Object fades out after the entire sequence is complete
+                            # ONLY if explicitly requested - be conservative
+                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
+                                self.wait(0.5)  # Small delay to ensure smooth transition
+                                self.play(FadeOut(text_obj), run_time=duration)
+                            else:
+                                # Keep object visible - no unnecessary fade-out
+                                self.wait(0.5)
+                                print(f"  ✅ text object kept visible (no fade-out)")
                         elif start_time == 'after_previous_transient_fade':
                             # This transient object should fade out before the next transient object
                             self.add(text_obj)
@@ -866,38 +776,20 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(triangle_obj)
                             self.play(FadeIn(triangle_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'sequential':
+                            # Object appears in sequence - Manim will handle timing automatically
                             self.add(triangle_obj)
                             self.play(FadeIn(triangle_obj), run_time=duration)
-                        elif start_time == 'after_persistent_display':
-                            # Object appears after persistent objects (axes, plots) are visible
-                            # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
-                            self.add(triangle_obj)
-                            self.play(FadeIn(triangle_obj), run_time=duration)
-                        elif start_time == 'after_first_object':
-                            # Object appears after the first object
-                            self.wait(0.5)  # Wait for first object to complete
-                            self.add(triangle_obj)
-                            self.play(FadeIn(triangle_obj), run_time=duration)
-                        elif start_time == 'after_second_object':
-                            # Object appears after the second object
-                            self.wait(1.0)  # Wait for first two objects to complete
-                            self.add(triangle_obj)
-                            self.play(FadeIn(triangle_obj), run_time=duration)
-                        elif start_time == 'after_all_visible':
-                            # Object fades out after all objects are visible
-                            self.wait(1.5)  # Wait for all objects to be visible
-                            self.play(FadeOut(triangle_obj), run_time=duration)
-                        elif start_time == 'after_first_fade_out':
-                            # Object fades out after first object fades out
-                            self.wait(1.8)  # Wait for first fade-out to complete
-                            self.play(FadeOut(triangle_obj), run_time=duration)
-                        elif start_time == 'after_second_fade_out':
-                            # Object fades out after second object fades out
-                            self.wait(2.1)  # Wait for second fade-out to complete
-                            self.play(FadeOut(triangle_obj), run_time=duration)
+                        elif start_time == 'after_sequence':
+                            # Object fades out after the entire sequence is complete
+                            # ONLY if explicitly requested - be conservative
+                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
+                                self.wait(0.5)  # Small delay to ensure smooth transition
+                                self.play(FadeOut(triangle_obj), run_time=duration)
+                            else:
+                                # Keep object visible - no unnecessary fade-out
+                                self.wait(0.5)
+                                print(f"  ✅ triangle object kept visible (no fade-out)")
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(triangle_obj)
@@ -987,38 +879,20 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(diamond_obj)
                             self.play(FadeIn(diamond_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
+                        elif start_time == 'sequential':
+                            # Object appears in sequence - Manim will handle timing automatically
                             self.add(diamond_obj)
                             self.play(FadeIn(diamond_obj), run_time=duration)
-                        elif start_time == 'after_persistent_display':
-                            # Object appears after persistent objects (axes, plots) are visible
-                            # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
-                            self.add(diamond_obj)
-                            self.play(FadeIn(diamond_obj), run_time=duration)
-                        elif start_time == 'after_first_object':
-                            # Object appears after the first object
-                            self.wait(0.5)  # Wait for first object to complete
-                            self.add(diamond_obj)
-                            self.play(FadeIn(diamond_obj), run_time=duration)
-                        elif start_time == 'after_second_object':
-                            # Object appears after the second object
-                            self.wait(1.0)  # Wait for first two objects to complete
-                            self.add(diamond_obj)
-                            self.play(FadeIn(diamond_obj), run_time=duration)
-                        elif start_time == 'after_all_visible':
-                            # Object fades out after all objects are visible
-                            self.wait(1.5)  # Wait for all objects to be visible
-                            self.play(FadeOut(diamond_obj), run_time=duration)
-                        elif start_time == 'after_first_fade_out':
-                            # Object fades out after first object fades out
-                            self.wait(1.8)  # Wait for first fade-out to complete
-                            self.play(FadeOut(diamond_obj), run_time=duration)
-                        elif start_time == 'after_second_fade_out':
-                            # Object fades out after second object fades out
-                            self.wait(2.1)  # Wait for second fade-out to complete
-                            self.play(FadeOut(diamond_obj), run_time=duration)
+                        elif start_time == 'after_sequence':
+                            # Object fades out after the entire sequence is complete
+                            # ONLY if explicitly requested - be conservative
+                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
+                                self.wait(0.5)  # Small delay to ensure smooth transition
+                                self.play(FadeOut(diamond_obj), run_time=duration)
+                            else:
+                                # Keep object visible - no unnecessary fade-out
+                                self.wait(0.5)
+                                print(f"  ✅ diamond object kept visible (no fade-out)")
                         elif start_time == 'before_next_transient':
                             # This transient object should fade out before the next transient object
                             self.add(diamond_obj)
@@ -1058,6 +932,14 @@ class GeneratedScene(MovingCameraScene):
                 print(f"Unknown object type: {{obj_type}} for object {{obj_id}}")
                 continue
         
+        # ENHANCED: Apply smart camera management strategies
+        try:
+            # Apply camera strategies based on object types and positioning
+            self._apply_smart_camera_management(objects_created)
+            print("Smart camera management applied successfully")
+        except Exception as e:
+            print(f"Camera management failed: {{e}}")
+        
         # Final wait to show all objects
         self.wait(2.0)
         print(f"Animation completed with {{len(objects_created)}} objects")
@@ -1068,3 +950,135 @@ class GeneratedScene(MovingCameraScene):
         except Exception as e:
             logger.error(f"Error generating Manim code: {{e}}")
             raise
+    
+    def _apply_smart_camera_management(self, objects_created):
+        """Apply smart camera management based on object types and positioning"""
+        try:
+            if not objects_created:
+                return
+            
+            # Analyze objects for camera optimization
+            math_objects = [obj for obj in objects_created if hasattr(obj, 'type') and obj.type in ['plot', 'function', 'graph', 'axes']]
+            text_objects = [obj for obj in objects_created if hasattr(obj, 'type') and obj.type == 'text']
+            geometric_objects = [obj for obj in objects_created if hasattr(obj, 'type') and obj.type in ['circle', 'square', 'triangle', 'diamond']]
+            
+            # Apply mathematical content optimization if needed
+            if math_objects:
+                print(f"Optimizing camera for {len(math_objects)} mathematical objects")
+                self._optimize_camera_for_math()
+            
+            # Apply text readability optimization if needed
+            if text_objects:
+                print(f"Optimizing camera for {len(text_objects)} text objects")
+                self._optimize_camera_for_text()
+            
+            # Apply geometric shape framing if needed
+            if geometric_objects:
+                print(f"Optimizing camera for {len(geometric_objects)} geometric shapes")
+                self._optimize_camera_for_shapes(len(geometric_objects))
+            
+            # Final camera adjustment based on overall object distribution
+            self._adjust_camera_for_object_distribution(objects_created)
+            
+        except Exception as e:
+            print(f"Error in smart camera management: {{e}}")
+    
+    def _optimize_camera_for_math(self):
+        """Optimize camera for mathematical content"""
+        try:
+            # Tight margins for mathematical precision
+            current_width = float(self.camera.frame.get_width())
+            optimal_width = current_width * 0.84  # 8% margin on each side
+            
+            self.camera.frame.set_width(optimal_width)
+            self.camera.frame.move_to([0, 0, 0])
+            
+            # Ensure coordinate system integrity
+            self.camera.frame.set(x_range=[-7, 7], y_range=[-5, 5])
+            
+            print("Camera optimized for mathematical content")
+            
+        except Exception as e:
+            print(f"Math camera optimization failed: {{e}}")
+    
+    def _optimize_camera_for_text(self):
+        """Optimize camera for text readability"""
+        try:
+            # Increase width for better text visibility
+            current_width = float(self.camera.frame.get_width())
+            optimal_width = current_width * 1.2  # 20% increase
+            
+            self.camera.frame.set_width(optimal_width)
+            self.camera.frame.move_to([0, 0, 0])
+            
+            print("Camera optimized for text readability")
+            
+        except Exception as e:
+            print(f"Text camera optimization failed: {{e}}")
+    
+    def _optimize_camera_for_shapes(self, shape_count):
+        """Optimize camera for geometric shapes"""
+        try:
+            # Adjust margin based on shape count
+            base_margin = 0.25
+            if shape_count > 3:
+                base_margin += 0.1
+            
+            current_width = float(self.camera.frame.get_width())
+            optimal_width = current_width * (1 + base_margin)
+            
+            self.camera.frame.set_width(optimal_width)
+            self.camera.frame.move_to([0, 0, 0])
+            
+            print(f"Camera optimized for {shape_count} geometric shapes")
+                    
+        except Exception as e:
+            print(f"Shape camera optimization failed: {{e}}")
+    
+    def _adjust_camera_for_object_distribution(self, objects_created):
+        """Adjust camera based on overall object distribution"""
+        try:
+            if len(objects_created) <= 1:
+                return
+            
+            # Calculate bounding box of all objects
+            positions = []
+            for obj in objects_created:
+                try:
+                    center = obj.get_center()
+                    positions.append(center)
+                except:
+                    continue
+            
+            if len(positions) < 2:
+                return
+            
+            # Find min/max positions
+            x_coords = [pos[0] for pos in positions]
+            y_coords = [pos[1] for pos in positions]
+            
+            min_x, max_x = min(x_coords), max(x_coords)
+            min_y, max_y = min(y_coords), max(y_coords)
+            
+            # Calculate required frame size
+            width_needed = max_x - min_x
+            height_needed = max_y - min_y
+            
+            # Ensure minimum frame size
+            min_frame_width = 8.0
+            optimal_width = max(width_needed * 1.4, min_frame_width)  # 40% margin
+            
+            # Apply camera adjustment if needed
+            current_width = float(self.camera.frame.get_width())
+            if abs(current_width - optimal_width) > 1.0:
+                self.camera.frame.set_width(optimal_width)
+                
+                # Center camera on objects
+                center_x = (min_x + max_x) / 2
+                center_y = (min_y + max_y) / 2
+                self.camera.frame.move_to([center_x, center_y, 0])
+                
+                print(f"Camera adjusted for object distribution: width={optimal_width:.2f}, center=({center_x:.2f}, {center_y:.2f})")
+            
+        except Exception as e:
+            print(f"Object distribution camera adjustment failed: {{e}}")

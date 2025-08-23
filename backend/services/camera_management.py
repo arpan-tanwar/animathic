@@ -191,10 +191,110 @@ class CameraManagementSystem:
                     'priority': 'high'
                 })
             
+            # NEW: Smart camera positioning based on object types
+            camera_strategy = self._enhance_camera_strategy_with_object_awareness(
+                camera_strategy, new_object, existing_objects, total_bbox, screen_bbox
+            )
+            
+            # NEW: Dynamic camera adjustment for mathematical plots
+            if self._has_mathematical_content(existing_objects + [new_object]):
+                camera_strategy = self._optimize_for_mathematical_content(
+                    camera_strategy, total_bbox, screen_bbox
+                )
+            
             return camera_strategy
             
         except Exception as e:
             logger.error(f"Error in intelligent camera management: {e}")
+            return camera_strategy
+    
+    def _enhance_camera_strategy_with_object_awareness(self, camera_strategy, new_object, existing_objects, total_bbox, screen_bbox):
+        """Enhance camera strategy based on object types and their relationships"""
+        try:
+            new_obj_type = new_object.get('type', 'unknown')
+            
+            # Special handling for mathematical objects
+            if new_obj_type in ['plot', 'function', 'graph', 'axes']:
+                # Ensure mathematical plots have optimal viewing
+                if camera_strategy['action'] == 'none':
+                    camera_strategy.update({
+                        'action': 'optimize_math_view',
+                        'reason': 'mathematical_content_optimization',
+                        'parameters': {
+                            'margin': 0.1,  # Tighter margin for math
+                            'duration': 0.3,
+                            'preserve_aspect_ratio': True
+                        },
+                        'priority': 'high'
+                    })
+            
+            # Special handling for text annotations
+            elif new_obj_type == 'text':
+                # Position camera to ensure text is readable
+                if camera_strategy['action'] == 'none':
+                    camera_strategy.update({
+                        'action': 'ensure_text_readability',
+                        'reason': 'text_annotation_optimization',
+                        'parameters': {
+                            'margin': 0.2,
+                            'duration': 0.2,
+                            'text_priority': 'high'
+                        },
+                        'priority': 'medium'
+                    })
+            
+            # Special handling for geometric shapes
+            elif new_obj_type in ['circle', 'square', 'triangle', 'diamond']:
+                # Ensure geometric shapes are properly framed
+                if camera_strategy['action'] == 'none':
+                    camera_strategy.update({
+                        'action': 'frame_geometric_shapes',
+                        'reason': 'geometric_shape_optimization',
+                        'parameters': {
+                            'margin': 0.25,
+                            'duration': 0.3,
+                            'shape_count': len([obj for obj in existing_objects + [new_object] if obj.get('type') in ['circle', 'square', 'triangle', 'diamond']])
+                        },
+                        'priority': 'medium'
+                    })
+            
+            return camera_strategy
+            
+        except Exception as e:
+            logger.error(f"Error enhancing camera strategy with object awareness: {e}")
+            return camera_strategy
+    
+    def _has_mathematical_content(self, objects):
+        """Check if the scene contains mathematical content"""
+        try:
+            math_types = ['plot', 'function', 'graph', 'axes']
+            return any(obj.get('type') in math_types for obj in objects)
+        except Exception:
+            return False
+    
+    def _optimize_for_mathematical_content(self, camera_strategy, total_bbox, screen_bbox):
+        """Optimize camera for mathematical content"""
+        try:
+            if camera_strategy['action'] != 'none':
+                return camera_strategy
+            
+            # For mathematical content, ensure optimal viewing
+            camera_strategy.update({
+                'action': 'math_optimization',
+                'reason': 'mathematical_content_requires_precise_viewing',
+                'parameters': {
+                    'margin': 0.08,  # Very tight margin for math
+                    'duration': 0.4,
+                    'preserve_coordinate_system': True,
+                    'ensure_axis_visibility': True
+                },
+                'priority': 'high'
+            })
+            
+            return camera_strategy
+            
+        except Exception as e:
+            logger.error(f"Error optimizing for mathematical content: {e}")
             return camera_strategy
     
     def _fits_in_screen(self, total_bbox, screen_bbox, margin=0.2):
@@ -528,11 +628,123 @@ class CameraManagementSystem:
                     run_time=duration
                 )
             
+            # NEW: Handle enhanced camera actions
+            elif action == 'optimize_math_view':
+                margin = params.get('margin', 0.1)
+                preserve_aspect = params.get('preserve_aspect_ratio', True)
+                
+                # Optimize camera for mathematical content
+                self._apply_math_optimization(scene, margin, preserve_aspect, duration)
+            
+            elif action == 'ensure_text_readability':
+                margin = params.get('margin', 0.2)
+                text_priority = params.get('text_priority', 'high')
+                
+                # Ensure text is readable
+                self._apply_text_readability_optimization(scene, margin, text_priority, duration)
+            
+            elif action == 'frame_geometric_shapes':
+                margin = params.get('margin', 0.25)
+                shape_count = params.get('shape_count', 1)
+                
+                # Frame geometric shapes optimally
+                self._apply_geometric_shape_framing(scene, margin, shape_count, duration)
+            
+            elif action == 'math_optimization':
+                margin = params.get('margin', 0.08)
+                preserve_coords = params.get('preserve_coordinate_system', True)
+                ensure_axes = params.get('ensure_axis_visibility', True)
+                
+                # Apply mathematical optimization
+                self._apply_mathematical_optimization(scene, margin, preserve_coords, ensure_axes, duration)
+            
             return True
             
         except Exception as e:
             logger.error(f"Error applying camera strategy: {e}")
             return False
+    
+    def _apply_math_optimization(self, scene, margin, preserve_aspect, duration):
+        """Apply mathematical content optimization to camera"""
+        try:
+            # Ensure tight margins for mathematical precision
+            current_width = float(scene.camera.frame.get_width())
+            optimal_width = current_width * (1 - margin * 2)
+            
+            if preserve_aspect:
+                # Maintain aspect ratio for mathematical plots
+                scene.camera.frame.set_width(optimal_width)
+            else:
+                # Allow independent width/height adjustment
+                current_height = float(scene.camera.frame.get_height())
+                optimal_height = current_height * (1 - margin * 2)
+                scene.camera.frame.set_width(optimal_width)
+                scene.camera.frame.set_height(optimal_height)
+            
+            logger.info(f"Applied math optimization: margin={margin}, preserve_aspect={preserve_aspect}")
+            
+        except Exception as e:
+            logger.error(f"Error applying math optimization: {e}")
+    
+    def _apply_text_readability_optimization(self, scene, margin, text_priority, duration):
+        """Ensure text is readable by optimizing camera position"""
+        try:
+            # For text readability, ensure adequate spacing
+            current_width = float(scene.camera.frame.get_width())
+            optimal_width = current_width * (1 + margin)  # Increase width for text
+            
+            scene.camera.frame.set_width(optimal_width)
+            
+            # Center the camera to ensure text is visible
+            scene.camera.frame.move_to([0, 0, 0])
+            
+            logger.info(f"Applied text readability optimization: margin={margin}, priority={text_priority}")
+            
+        except Exception as e:
+            logger.error(f"Error applying text readability optimization: {e}")
+    
+    def _apply_geometric_shape_framing(self, scene, margin, shape_count, duration):
+        """Optimally frame geometric shapes"""
+        try:
+            # Calculate optimal frame size based on shape count
+            base_margin = margin
+            if shape_count > 3:
+                base_margin += 0.1  # Increase margin for more shapes
+            
+            current_width = float(scene.camera.frame.get_width())
+            optimal_width = current_width * (1 + base_margin)
+            
+            scene.camera.frame.set_width(optimal_width)
+            
+            # Ensure shapes are centered
+            scene.camera.frame.move_to([0, 0, 0])
+            
+            logger.info(f"Applied geometric shape framing: margin={base_margin}, shape_count={shape_count}")
+            
+        except Exception as e:
+            logger.error(f"Error applying geometric shape framing: {e}")
+    
+    def _apply_mathematical_optimization(self, scene, margin, preserve_coords, ensure_axes, duration):
+        """Apply comprehensive mathematical optimization"""
+        try:
+            # Very tight margins for mathematical precision
+            current_width = float(scene.camera.frame.get_width())
+            optimal_width = current_width * (1 - margin * 2)
+            
+            scene.camera.frame.set_width(optimal_width)
+            
+            if preserve_coords:
+                # Preserve coordinate system integrity
+                scene.camera.frame.set(x_range=[-7, 7], y_range=[-5, 5])
+            
+            if ensure_axes:
+                # Ensure axes remain visible
+                scene.camera.frame.move_to([0, 0, 0])
+            
+            logger.info(f"Applied mathematical optimization: margin={margin}, preserve_coords={preserve_coords}, ensure_axes={ensure_axes}")
+            
+        except Exception as e:
+            logger.error(f"Error applying mathematical optimization: {e}")
     
     def get_camera_management_status(self, object_registry):
         """Get current status of the camera management system"""
