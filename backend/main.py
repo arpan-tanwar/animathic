@@ -40,7 +40,7 @@ from schemas import (
     VideoResponse, FeedbackRequest, HealthResponse
 )
 from services.ai_service_new import AIService
-from services.clerk_auth import require_authentication, optional_authentication
+from services.clerk_auth import require_authentication, require_authentication_long_running, optional_authentication
 from services.supabase_storage import supabase_storage
 
 # Load environment variables
@@ -630,6 +630,11 @@ async def generate_animation(
         if not user_id or user_id == "anonymous":
             raise HTTPException(status_code=401, detail="Authentication required")
         
+        # Check if token will expire soon and warn user
+        if auth.get("_warn_refresh_soon"):
+            logger.warning(f"User {user_id} starting long operation with token expiring soon")
+            # Don't block the request, but log the warning
+        
         logger.info(f"Starting animation generation for user {user_id} with prompt: {request.prompt[:100]}...")
         
         # Create job record
@@ -1014,11 +1019,45 @@ async def process_generation_job(job_id: str, prompt: str, user_id: str):
         
         # No DB-side job/video updates needed on failure for minimal schema
 
+@app.get("/api/auth/token-status")
+async def check_token_status(
+    auth: Dict[str, Any] = Depends(require_authentication)
+):
+    """Check the current token status and provide refresh guidance"""
+    try:
+        # Get token lifetime information
+        from services.clerk_auth import clerk_auth
+        token_info = auth
+        
+        # Get detailed token lifetime info
+        lifetime_info = clerk_auth.get_token_lifetime_info(token_info)
+        
+        # Add user context
+        response_data = {
+            "user_id": auth.get("user_id"),
+            "authenticated": True,
+            "token_status": lifetime_info,
+            "refresh_recommended": lifetime_info.get("refresh_recommended", False),
+            "message": lifetime_info.get("message", "Token status unknown")
+        }
+        
+        # Add specific guidance for long-running processes
+        if lifetime_info.get("status") == "expiring_soon":
+            response_data["long_running_warning"] = "Your session will expire soon. Consider refreshing before starting long operations like video generation."
+        elif lifetime_info.get("status") == "expired":
+            response_data["long_running_warning"] = "Your session has expired. You must refresh your authentication to continue."
+        
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"Error checking token status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check token status")
+
 @app.get("/api/status/{job_id}", response_model=StatusResponse)
 async def get_generation_status(
     job_id: str, 
     request: Request, 
-    auth: Dict[str, Any] = Depends(require_authentication)
+    auth: Dict[str, Any] = Depends(require_authentication_long_running)
 ):
     """Get the status of a generation job"""
     try:
