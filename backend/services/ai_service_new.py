@@ -555,9 +555,9 @@ class AIService:
                 except Exception as e:
                     logger.warning(f"Local model generation failed: {e}")
             
-            # Final fallback - basic specification
-            logger.warning("Using basic fallback specification")
-            return self._generate_basic_specification(prompt)
+            # Final fallback - smart specification based on prompt content
+            logger.warning("Using smart fallback specification")
+            return self._generate_smart_fallback_specification(prompt)
             
         except Exception as e:
             logger.error(f"Error generating animation specification: {e}")
@@ -577,22 +577,136 @@ class AIService:
         # Placeholder for local model implementation
         raise NotImplementedError("Local model generation not yet implemented")
     
-    def _generate_basic_specification(self, prompt: str) -> Dict[str, Any]:
-        """Generate basic animation specification as fallback"""
-        return {
-            'objects': [{
-                'id': 'obj_1',
+    def _generate_smart_fallback_specification(self, prompt: str) -> Dict[str, Any]:
+        """Generate smart animation specification based on prompt content"""
+        prompt_lower = prompt.lower()
+        objects = []
+        object_id_counter = 1
+        
+        # Detect if this is a complex mathematical prompt
+        if any(keyword in prompt_lower for keyword in ['function', 'plot', 'sine', 'cosine', 'tangent', 'exponential']):
+            logger.info("Detected mathematical prompt - generating function plots")
+            
+            # Add coordinate axes
+            objects.append({
+                'id': 'axes_1',
+                'type': 'axes',
+                'properties': {
+                    'position': [0, 0, 0],
+                    'color': 'WHITE',
+                    'x_range': [-4, 4, 1],
+                    'y_range': [-3, 3, 1],
+                    'show_labels': True
+                },
+                'animations': [{
+                    'type': 'fade_in',
+                    'duration': 0.8,
+                    'start_time': 'immediate'
+                }]
+            })
+            
+            # Add function plots based on what's mentioned
+            function_keywords = {
+                'sine': {'function': 'sine', 'color': 'YELLOW'},
+                'cosine': {'function': 'cosine', 'color': 'BLUE'},
+                'tangent': {'function': 'tangent', 'color': 'GREEN'},
+                'exponential': {'function': 'exponential', 'color': 'RED'}
+            }
+            
+            for func_name, func_props in function_keywords.items():
+                if func_name in prompt_lower:
+                    object_id_counter += 1
+                    objects.append({
+                        'id': f'plot_{func_name}',
+                        'type': 'plot',
+                        'properties': {
+                            'position': [0, 0, 0],
+                            'color': func_props['color'],
+                            'function': func_props['function'],
+                            'x_range_plot': [-4, 4]
+                        },
+                        'animations': [{
+                            'type': 'fade_in',
+                            'duration': 0.5,
+                            'start_time': 'after_persistent_display'
+                        }]
+                    })
+            
+            # Add geometric shapes if mentioned
+            shape_keywords = {
+                'circle': {'type': 'circle', 'color': 'RED', 'position': [2, 1, 0]},
+                'square': {'type': 'square', 'color': 'BLUE', 'position': [-2, 1, 0]},
+                'triangle': {'type': 'triangle', 'color': 'GREEN', 'position': [0, 2, 0]},
+                'diamond': {'type': 'diamond', 'color': 'PURPLE', 'position': [1, -1, 0]}
+            }
+            
+            for shape_name, shape_props in shape_keywords.items():
+                if shape_name in prompt_lower or 'geometric' in prompt_lower or 'shape' in prompt_lower:
+                    object_id_counter += 1
+                    objects.append({
+                        'id': f'{shape_name}_{object_id_counter}',
+                        'type': shape_props['type'],
+                        'properties': {
+                            'position': shape_props['position'],
+                            'color': shape_props['color'],
+                            'size': 0.5
+                        },
+                        'animations': [{
+                            'type': 'fade_in',
+                            'duration': 0.5,
+                            'start_time': 'after_previous_transient_fade'
+                        }]
+                    })
+            
+            # Add text annotations if mentioned
+            if any(keyword in prompt_lower for keyword in ['text', 'annotation', 'label']):
+                annotations = ['A', 'B', 'C', 'f(x)', 'g(x)']
+                positions = [[2.5, 1.5, 0], [-2.5, 1.5, 0], [0.5, 2.5, 0], [3, -1, 0], [-3, -1, 0]]
+                
+                for i, (annotation, pos) in enumerate(zip(annotations[:3], positions[:3])):
+                    object_id_counter += 1
+                    objects.append({
+                        'id': f'text_{object_id_counter}',
+                        'type': 'text',
+                        'properties': {
+                            'text': annotation,
+                            'position': pos,
+                            'color': 'WHITE',
+                            'size': 0.6
+                        },
+                        'animations': [{
+                            'type': 'fade_in',
+                            'duration': 0.4,
+                            'start_time': 'after_previous_transient_fade'
+                        }]
+                    })
+            
+        else:
+            # Basic fallback for non-mathematical prompts
+            objects.append({
+                'id': 'text_1',
                 'type': 'text',
                 'properties': {
                     'text': prompt[:50] + '...' if len(prompt) > 50 else prompt,
                     'color': 'WHITE',
-                    'size': 36,
+                    'size': 0.8,
                     'position': [0, 0, 0]
                 },
-                'animations': []
-            }],
-            'duration': 3.0,
-            'background_color': 'BLACK'
+                'animations': [{
+                    'type': 'fade_in',
+                    'duration': 1.0,
+                    'start_time': 'immediate'
+                }]
+            })
+        
+        return {
+            'animation_type': 'mathematical' if 'function' in prompt_lower else 'geometric',
+            'scene_description': f"Smart fallback animation for: {prompt[:100]}...",
+            'objects': objects,
+            'camera_settings': {'position': [0, 0, 0], 'zoom': 8},
+            'duration': 8.0 if len(objects) > 3 else 5.0,
+            'background_color': '#1a1a1a',
+            'style': 'modern'
         }
     
     def _generate_manim_code(self, animation_spec: Dict[str, Any]) -> Optional[str]:

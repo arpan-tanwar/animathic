@@ -72,7 +72,8 @@ Schema:
         "show_labels": boolean,
 
         // plot-specific (ONLY if user requests plots)
-        "expression": string,                 // e.g. "sin(x)" or "x**2 - 1"
+        "function": string,                   // e.g. "sine", "cosine", "tangent", "exponential", "polynomial"
+        "expression": string,                 // e.g. "sin(x)" or "x**2 - 1" (optional, function takes priority)
         "x_range_plot": [number, number],     // [min, max]
       },
       "animations": [
@@ -90,6 +91,23 @@ Schema:
   "style": string
 }
 
+FUNCTION PLOT RULES (CRITICAL):
+- For "sine" → use "function": "sine" (creates sin(x) plot)
+- For "cosine" → use "function": "cosine" (creates cos(x) plot)  
+- For "tangent" → use "function": "tangent" (creates tan(x) plot)
+- For "exponential" → use "function": "exponential" (creates exp(x) plot)
+- Each function plot must be a separate object with unique id
+- Use different colors for each plot: sine=YELLOW, cosine=BLUE, tangent=GREEN, exponential=RED
+- All plots should have position: [0, 0, 0] (center on axes)
+
+MULTIPLE FUNCTIONS EXAMPLE:
+User says: "sine, cosine, tangent, exponential plots"
+Create 4 separate plot objects:
+{"id": "plot_sine", "type": "plot", "properties": {"function": "sine", "color": "YELLOW", "position": [0, 0, 0]}}
+{"id": "plot_cosine", "type": "plot", "properties": {"function": "cosine", "color": "BLUE", "position": [0, 0, 0]}}
+{"id": "plot_tangent", "type": "plot", "properties": {"function": "tangent", "color": "GREEN", "position": [0, 0, 0]}}
+{"id": "plot_exponential", "type": "plot", "properties": {"function": "exponential", "color": "RED", "position": [0, 0, 0]}}
+
 TEXT GENERATION EXAMPLES:
 - "text labels for each point" → Create text objects with "A", "B", "C", etc.
 - "label the functions" → Create text objects with "f(x)", "g(x)", etc.
@@ -105,6 +123,9 @@ Remember: Create EXACTLY what the user requested, including fade effects, colors
 # System instruction for Gemini
 GEMINI_SYSTEM_INSTRUCTION = (
     "You are a precise Manim animation planner that creates EXACTLY what the user requests."
+    " CRITICAL: For multiple function plots, create separate plot objects for each function type."
+    " If user mentions 'sine, cosine, tangent, exponential', create 4 separate plot objects with different colors."
+    " Use 'function' property: 'sine', 'cosine', 'tangent', 'exponential' for math functions."
     " If the user mentions fade effects, colors, or specific animations - include them."
     " If the user mentions text labels, labels, annotations, or names - you MUST create text objects with actual text content."
     " For generic text requests like 'text labels for each point', create simple labels like 'A', 'B', 'C', etc."
@@ -117,6 +138,7 @@ GEMINI_SYSTEM_INSTRUCTION = (
     " If the user specifies coordinates, use them exactly as written."
     " Output must be a single JSON object that strictly follows the provided schema."
     " Be precise and include all requested features - create the animation as described."
+    " IMPORTANT: Create separate objects for each element mentioned - don't combine multiple functions into one plot object."
 )
 
 # Default animation specification

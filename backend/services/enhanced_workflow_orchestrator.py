@@ -327,18 +327,94 @@ class EnhancedWorkflowOrchestrator:
         return opportunities
     
     def _optimize_object_positions(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Optimize object positions to prevent overlaps - DISABLED to prevent blank videos"""
-        # DISABLED: This was causing objects to move outside camera view
-        # Return the original spec unchanged to preserve user-specified positions
-        logger.debug("Object position optimization DISABLED to prevent blank videos")
-        return animation_spec
+        """Optimize object positions to prevent overlaps - SMART VERSION"""
+        try:
+            objects = animation_spec.get('objects', [])
+            if len(objects) <= 1:
+                return animation_spec
+        
+            # Smart positioning: Only adjust if objects are truly overlapping
+            overlapping_objects = []
+            for i, obj1 in enumerate(objects):
+                for j, obj2 in enumerate(objects[i+1:], i+1):
+                    pos1 = obj1.get('properties', {}).get('position', [0, 0, 0])
+                    pos2 = obj2.get('properties', {}).get('position', [0, 0, 0])
+                    
+                    # Only consider objects overlapping if they're at the EXACT same position
+                    if (len(pos1) >= 2 and len(pos2) >= 2 and 
+                        abs(pos1[0] - pos2[0]) < 0.1 and abs(pos1[1] - pos2[1]) < 0.1):
+                        overlapping_objects.extend([i, j])
+            
+            # Only adjust truly overlapping objects with minimal changes
+            if overlapping_objects:
+                logger.info(f"Smart positioning: Adjusting {len(set(overlapping_objects))} overlapping objects")
+                for idx in set(overlapping_objects):
+                    if idx < len(objects):
+                        obj = objects[idx]
+                        props = obj.get('properties', {})
+                        pos = props.get('position', [0, 0, 0])
+                        
+                        # Minimal adjustment: just 0.3 unit offset
+                        offset = 0.3 * (idx % 4 - 1.5)  # Small spread pattern
+                        if len(pos) >= 2:
+                            props['position'] = [pos[0] + offset, pos[1], pos[2] if len(pos) > 2 else 0]
+                        
+                logger.debug(f"Smart object positioning applied to {len(set(overlapping_objects))} objects")
+            else:
+                logger.debug("No overlapping objects found - positions preserved")
+            
+            return animation_spec
+            
+        except Exception as e:
+            logger.error(f"Error in object positioning: {e}")
+            return animation_spec
     
     def _prevent_object_overlaps(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Prevent object overlaps using intelligent positioning - DISABLED to prevent blank videos"""
-        # DISABLED: This was interfering with object positioning and causing blank videos
-        # Return the original spec unchanged to preserve user-specified positions
-        logger.debug("Object overlap prevention DISABLED to prevent blank videos")
-        return animation_spec
+        """Prevent object overlaps using intelligent positioning - SMART VERSION"""
+        try:
+            # This now works in tandem with _optimize_object_positions
+            # Only handles cases where different object types might interfere
+            objects = animation_spec.get('objects', [])
+            if len(objects) <= 1:
+                return animation_spec
+        
+            # Group objects by type for smarter handling
+            plot_objects = [obj for obj in objects if obj.get('type') in ['plot', 'axes']]
+            text_objects = [obj for obj in objects if obj.get('type') == 'text']
+            shape_objects = [obj for obj in objects if obj.get('type') in ['circle', 'square', 'triangle', 'diamond']]
+            
+            # Only adjust text positions if they're interfering with plots
+            adjusted_count = 0
+            for text_obj in text_objects:
+                text_pos = text_obj.get('properties', {}).get('position', [0, 0, 0])
+                
+                # Check if text is too close to a plot center
+                for plot_obj in plot_objects:
+                    plot_pos = plot_obj.get('properties', {}).get('position', [0, 0, 0])
+                    if (len(text_pos) >= 2 and len(plot_pos) >= 2 and 
+                        abs(text_pos[0] - plot_pos[0]) < 0.5 and abs(text_pos[1] - plot_pos[1]) < 0.5):
+                        
+                        # Move text slightly away from plot center
+                        offset_x = 0.8 if text_pos[0] >= plot_pos[0] else -0.8
+                        offset_y = 0.5 if text_pos[1] >= plot_pos[1] else -0.5
+                        text_obj['properties']['position'] = [
+                            text_pos[0] + offset_x, 
+                            text_pos[1] + offset_y, 
+                            text_pos[2] if len(text_pos) > 2 else 0
+                        ]
+                        adjusted_count += 1
+                        break
+            
+            if adjusted_count > 0:
+                logger.info(f"Smart overlap prevention: Adjusted {adjusted_count} text positions")
+            else:
+                logger.debug("No overlap prevention needed")
+            
+            return animation_spec
+            
+        except Exception as e:
+            logger.error(f"Error in overlap prevention: {e}")
+            return animation_spec
     
     def _optimize_animation_sequence(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
         """Optimize the animation sequence for better flow"""
@@ -533,12 +609,60 @@ class EnhancedWorkflowOrchestrator:
     
     def _apply_intelligent_text_positioning(self, objects: List[Dict[str, Any]]):
         """
-        Applies intelligent text positioning to text objects - DISABLED to prevent blank videos
+        Applies intelligent text positioning to text objects - SMART VERSION
         """
-        # DISABLED: This was modifying object positions and causing blank videos
-        # Return without modifying positions to preserve user-specified coordinates
-        logger.debug("Intelligent text positioning DISABLED to prevent blank videos")
-        return
+        try:
+            text_objects = [obj for obj in objects if obj.get('type') == 'text']
+            if not text_objects:
+                logger.debug("No text objects found for intelligent positioning")
+                return
+            
+            # Get non-text objects for reference
+            reference_objects = [obj for obj in objects if obj.get('type') != 'text']
+            
+            positioned_count = 0
+            for text_obj in text_objects:
+                text_props = text_obj.get('properties', {})
+                text_pos = text_props.get('position', [0, 0, 0])
+                text_content = text_props.get('text', '')
+                
+                # Only adjust position if text seems to be auto-generated (short labels)
+                if len(text_content) <= 3:  # Only adjust single letters or short labels
+                    # Find the closest reference object
+                    closest_obj = None
+                    min_distance = float('inf')
+                    
+                    for ref_obj in reference_objects:
+                        ref_pos = ref_obj.get('properties', {}).get('position', [0, 0, 0])
+                        if len(ref_pos) >= 2 and len(text_pos) >= 2:
+                            distance = ((text_pos[0] - ref_pos[0])**2 + (text_pos[1] - ref_pos[1])**2)**0.5
+                            if distance < min_distance:
+                                min_distance = distance
+                                closest_obj = ref_obj
+                    
+                    # Position text near the closest object but not overlapping
+                    if closest_obj and min_distance < 2.0:  # Only if close enough to be related
+                        ref_pos = closest_obj.get('properties', {}).get('position', [0, 0, 0])
+                        
+                        # Smart positioning: above and to the right
+                        smart_pos = [
+                            ref_pos[0] + 0.5,  # Slightly right
+                            ref_pos[1] + 0.7,  # Above
+                            text_pos[2] if len(text_pos) > 2 else 0
+                        ]
+                        
+                        text_props['position'] = smart_pos
+                        positioned_count += 1
+                        logger.debug(f"Smart positioned text '{text_content}' near {closest_obj.get('id', 'unknown')}")
+            
+            if positioned_count > 0:
+                logger.info(f"Smart text positioning: Adjusted {positioned_count} text labels")
+            else:
+                logger.debug("No text positioning adjustments needed")
+            
+        except Exception as e:
+            logger.error(f"Error in intelligent text positioning: {e}")
+            return
     
     def _is_text_for_object(self, text_id: str, geo_id: str) -> bool:
         """Check if a text object is meant to label a specific geometric object"""

@@ -238,17 +238,17 @@ class GeneratedScene(MovingCameraScene):
                             self.play(FadeIn(circle_obj), run_time=duration)
                         else:
                             # Immediate animation
-                            if anim_type == 'fade_in':
-                                self.add(circle_obj)
-                                self.play(FadeIn(circle_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(circle_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                # Default fallback
-                                self.add(circle_obj)
-                                self.play(Create(circle_obj), run_time=duration)
+                        if anim_type == 'fade_in':
+                            self.add(circle_obj)
+                            self.play(FadeIn(circle_obj), run_time=duration)
+                        elif anim_type == 'fade_out':
+                            self.play(FadeOut(circle_obj), run_time=duration)
+                        elif anim_type == 'wait':
+                            self.wait(duration)
+                        else:
+                            # Default fallback
+                            self.add(circle_obj)
+                            self.play(Create(circle_obj), run_time=duration)
                 
                 objects_created.append(circle_obj)
                 self.wait(0.5)
@@ -392,17 +392,17 @@ class GeneratedScene(MovingCameraScene):
                             self.play(FadeIn(square_obj), run_time=duration)
                         else:
                             # Immediate animation
-                            if anim_type == 'fade_in':
-                                self.add(square_obj)
-                                self.play(FadeIn(square_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(square_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                # Default fallback
-                                self.add(square_obj)
-                                self.play(Create(square_obj), run_time=duration)
+                        if anim_type == 'fade_in':
+                            self.add(square_obj)
+                            self.play(FadeIn(square_obj), run_time=duration)
+                        elif anim_type == 'fade_out':
+                            self.play(FadeOut(square_obj), run_time=duration)
+                        elif anim_type == 'wait':
+                            self.wait(duration)
+                        else:
+                            # Default fallback
+                            self.add(square_obj)
+                            self.play(Create(square_obj), run_time=duration)
                 
                 objects_created.append(square_obj)
                 self.wait(0.5)
@@ -490,14 +490,14 @@ class GeneratedScene(MovingCameraScene):
                             self.add(axes_obj)
                             self.play(FadeIn(axes_obj), run_time=duration)
                         else:
-                            if anim_type == 'fade_in':
+                        if anim_type == 'fade_in':
                                 self.add(axes_obj)
                                 self.play(FadeIn(axes_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
+                        elif anim_type == 'fade_out':
                                 self.play(FadeOut(axes_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
+                        elif anim_type == 'wait':
+                            self.wait(duration)
+                        else:
                                 self.add(axes_obj)
                                 self.play(Create(axes_obj), run_time=duration)
                 
@@ -529,7 +529,7 @@ class GeneratedScene(MovingCameraScene):
                     plot_obj = FunctionGraph(
                         lambda x: np.sin(x),
                         x_range=[-4, 4],
-                        color=color,
+                    color=color,
                         stroke_width=3
                     )
                 elif function_type == 'cosine':
@@ -569,7 +569,7 @@ class GeneratedScene(MovingCameraScene):
                 if not animations:
                     self.add(plot_obj)
                     self.play(Create(plot_obj), run_time=1.0)
-                else:
+                    else:
                     # Process animations with timing
                     for anim in animations:
                         anim_type = anim.get('type', 'fade_in')
@@ -664,7 +664,7 @@ class GeneratedScene(MovingCameraScene):
                 if not animations:
                     self.add(dot_obj)
                     self.play(Create(dot_obj), run_time=0.5)
-                else:
+                    else:
                     # Process animations with timing
                     for anim in animations:
                         anim_type = anim.get('type', 'fade_in')
@@ -691,7 +691,7 @@ class GeneratedScene(MovingCameraScene):
                         elif start_time == 'after_persistent_display':
                             # Object appears after persistent objects (axes, plots) are visible
                             # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
+                self.wait(0.5)
                             self.add(dot_obj)
                             self.play(FadeIn(dot_obj), run_time=duration)
                         elif start_time == 'before_next_transient':
@@ -712,9 +712,9 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(dot_obj)
                             self.play(FadeIn(dot_obj), run_time=duration)
-                        else:
+                    else:
                             if anim_type == 'fade_in':
-                                self.add(dot_obj)
+                self.add(dot_obj)
                                 self.play(FadeIn(dot_obj), run_time=duration)
                             elif anim_type == 'fade_out':
                                 self.play(FadeOut(dot_obj), run_time=duration)
@@ -812,13 +812,13 @@ class GeneratedScene(MovingCameraScene):
                             self.add(text_obj)
                             self.play(FadeIn(text_obj), run_time=duration)
                         else:
-                            if anim_type == 'fade_in':
+                        if anim_type == 'fade_in':
                                 self.add(text_obj)
                                 self.play(FadeIn(text_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
+                        elif anim_type == 'fade_out':
                                 self.play(FadeOut(text_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
+                        elif anim_type == 'wait':
+                            self.wait(duration)
                             else:
                                 self.add(text_obj)
                                 self.play(Write(text_obj), run_time=duration)
@@ -850,9 +850,9 @@ class GeneratedScene(MovingCameraScene):
                                 self.play(FadeOut(prev_obj), run_time=0.3)
                             self.wait(0.1)
                             self.wait(anim_duration)
-                        else:
+                            else:
                             self.wait(anim_duration)
-                else:
+                        else:
                     self.wait(duration)
                 
                 # Don't add wait objects to objects_created as they're not visual
@@ -879,11 +879,11 @@ class GeneratedScene(MovingCameraScene):
                     color = GREEN
                 
                 triangle_obj = Triangle(
-                    fill_color=color,
-                    stroke_color=color,
-                    fill_opacity=1.0,
-                    stroke_width=3
-                )
+                        fill_color=color, 
+                        stroke_color=color, 
+                        fill_opacity=1.0, 
+                        stroke_width=3
+                    )
                 triangle_obj.scale(size)
                 triangle_obj.move_to(pos)
                 
@@ -941,14 +941,14 @@ class GeneratedScene(MovingCameraScene):
                             self.add(triangle_obj)
                             self.play(FadeIn(triangle_obj), run_time=duration)
                         else:
-                            if anim_type == 'fade_in':
+                        if anim_type == 'fade_in':
                                 self.add(triangle_obj)
                                 self.play(FadeIn(triangle_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
+                        elif anim_type == 'fade_out':
                                 self.play(FadeOut(triangle_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
+                        elif anim_type == 'wait':
+                            self.wait(duration)
+                        else:
                                 self.add(triangle_obj)
                                 self.play(Create(triangle_obj), run_time=duration)
                 
@@ -975,13 +975,13 @@ class GeneratedScene(MovingCameraScene):
                 except:
                     color = PURPLE
                 
-                diamond_obj = Square(
-                    side_length=size,
-                    fill_color=color,
-                    stroke_color=color,
-                    fill_opacity=1.0,
-                    stroke_width=3
-                )
+                    diamond_obj = Square(
+                        side_length=size, 
+                        fill_color=color, 
+                        stroke_color=color, 
+                        fill_opacity=1.0, 
+                        stroke_width=3
+                    )
                 diamond_obj.rotate(np.pi/4)  # Rotate 45 degrees to make it look like a diamond
                 diamond_obj.move_to(pos)
                 
@@ -1039,15 +1039,15 @@ class GeneratedScene(MovingCameraScene):
                             self.add(diamond_obj)
                             self.play(FadeIn(diamond_obj), run_time=duration)
                         else:
-                            if anim_type == 'fade_in':
-                                self.add(diamond_obj)
-                                self.play(FadeIn(diamond_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(diamond_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                self.add(diamond_obj)
+                        if anim_type == 'fade_in':
+                            self.add(diamond_obj)
+                            self.play(FadeIn(diamond_obj), run_time=duration)
+                        elif anim_type == 'fade_out':
+                            self.play(FadeOut(diamond_obj), run_time=duration)
+                        elif anim_type == 'wait':
+                            self.wait(duration)
+                        else:
+                            self.add(diamond_obj)
                                 self.play(Create(diamond_obj), run_time=duration)
                 
                 objects_created.append(diamond_obj)
@@ -1077,10 +1077,10 @@ class GeneratedScene(MovingCameraScene):
                     color = WHITE
                 
                 fallback_obj = Circle(
-                    radius=size/2,
-                    fill_color=color,
-                    stroke_color=color,
-                    fill_opacity=1.0,
+                    radius=size/2, 
+                    fill_color=color, 
+                    stroke_color=color, 
+                    fill_opacity=1.0, 
                     stroke_width=3
                 )
                 fallback_obj.move_to(pos)
@@ -1117,7 +1117,7 @@ class GeneratedScene(MovingCameraScene):
                         elif start_time == 'after_persistent_display':
                             # Object appears after persistent objects (axes, plots) are visible
                             # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
+                self.wait(0.5)
                             self.add(fallback_obj)
                             self.play(FadeIn(fallback_obj), run_time=duration)
                         elif start_time == 'before_next_transient':
@@ -1138,7 +1138,7 @@ class GeneratedScene(MovingCameraScene):
                             self.wait(0.1)
                             self.add(fallback_obj)
                             self.play(FadeIn(fallback_obj), run_time=duration)
-                        else:
+            else:
                             if anim_type == 'fade_in':
                                 self.add(fallback_obj)
                                 self.play(FadeIn(fallback_obj), run_time=duration)
@@ -1149,9 +1149,9 @@ class GeneratedScene(MovingCameraScene):
                             else:
                                 self.add(fallback_obj)
                                 self.play(Create(fallback_obj), run_time=duration)
-                
+                    
                 objects_created.append(fallback_obj)
-                self.wait(0.3)
+                    self.wait(0.3)
         
         # Final pause and validation
         self.wait(2)
