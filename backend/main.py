@@ -625,9 +625,15 @@ async def generate_animation(
         if not request.prompt or not request.prompt.strip():
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
         
+        # Validate authentication result
+        if not auth:
+            logger.error("Authentication returned None - this should not happen")
+            raise HTTPException(status_code=500, detail="Authentication error - no user information")
+        
         # Use authenticated user ID
         user_id = auth.get("user_id")
         if not user_id or user_id == "anonymous":
+            logger.error(f"Invalid user_id from auth: {user_id}")
             raise HTTPException(status_code=401, detail="Authentication required")
         
         # Check if token will expire soon and warn user
@@ -696,6 +702,9 @@ async def generate_animation(
         raise
     except Exception as e:
         logger.error(f"Error in generate endpoint: {e}")
+        # Add more context to the error
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 async def process_generation_job_async(job_id: str, prompt: str, user_id: str):

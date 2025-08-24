@@ -97,40 +97,40 @@ class ClerkAuthService:
         
         logger.debug("Fetching fresh JWKS from Clerk...")
         
-            async with httpx.AsyncClient() as client:
-                # Try multiple JWKS endpoints - Clerk might have different public endpoints
-                jwks_urls = [
-                    "https://clerk.animathic.com/.well-known/jwks.json",
-                    "https://clerk.dev/.well-known/jwks.json",
-                    "https://api.clerk.dev/v1/jwks"
-                ]
-                
-                jwks = None
-                for url in jwks_urls:
-                    try:
+        async with httpx.AsyncClient() as client:
+            # Try multiple JWKS endpoints - Clerk might have different public endpoints
+            jwks_urls = [
+                "https://clerk.animathic.com/.well-known/jwks.json",
+                "https://clerk.dev/.well-known/jwks.json",
+                "https://api.clerk.dev/v1/jwks"
+            ]
+            
+            jwks = None
+            for url in jwks_urls:
+                try:
                     logger.debug(f"Trying JWKS endpoint: {url}")
-                        response = await client.get(url, timeout=10.0)
-                        if response.status_code == 200:
-                            jwks = response.json()
-                            logger.info(f"Successfully retrieved JWKS from: {url}")
-                            break
-                        else:
+                    response = await client.get(url, timeout=10.0)
+                    if response.status_code == 200:
+                        jwks = response.json()
+                        logger.info(f"Successfully retrieved JWKS from: {url}")
+                        break
+                    else:
                         logger.debug(f"Failed to fetch from {url}: {response.status_code}")
-                    except Exception as e:
+                except Exception as e:
                     logger.debug(f"Error fetching from {url}: {e}")
-                
-                if not jwks:
+            
+            if not jwks:
                 # Fallback to secret key if available
                 if self.clerk_secret_key:
                     logger.warning("JWKS fetch failed, using secret key fallback")
                     jwks = {"keys": [{"kid": "fallback", "secret": self.clerk_secret_key}]}
                 else:
                     raise HTTPException(status_code=500, detail="Failed to fetch JWKS and no fallback available")
-            
-            # Cache the JWKS
-            self._jwks_cache = jwks
-            self._jwks_cache_time = current_time
-            return jwks
+        
+        # Cache the JWKS
+        self._jwks_cache = jwks
+        self._jwks_cache_time = current_time
+        return jwks
     
     def _get_cached_token_info(self, token: str) -> Optional[Dict[str, Any]]:
         """Get cached token information if available and valid"""
@@ -258,22 +258,23 @@ class ClerkAuthService:
                         "message": "Your session has expired. Please refresh your authentication."
                     }
                 )
-                    except Exception as e:
+            except Exception as e:
                 logger.debug(f"Error checking token expiration: {e}")
                 # Continue with verification even if expiration check fails
             
-            unverified_header = jwt.get_unverified_header(token)
-            key_id = unverified_header.get('kid')
-            
-            logger.debug(f"JWT header: {unverified_header}")
-            logger.debug(f"Key ID: {key_id}")
-            
-            if not key_id:
-                raise HTTPException(status_code=401, detail="Invalid token format - missing key ID")
-            
-            # Fetch public keys from Clerk (with caching)
-            jwks = await self._fetch_jwks_with_cache()
-            logger.debug(f"Retrieved {len(jwks.get('keys', []))} public keys from Clerk")
+            try:
+                unverified_header = jwt.get_unverified_header(token)
+                key_id = unverified_header.get('kid')
+                
+                logger.debug(f"JWT header: {unverified_header}")
+                logger.debug(f"Key ID: {key_id}")
+                
+                if not key_id:
+                    raise HTTPException(status_code=401, detail="Invalid token format - missing key ID")
+                
+                # Fetch public keys from Clerk (with caching)
+                jwks = await self._fetch_jwks_with_cache()
+                logger.debug(f"Retrieved {len(jwks.get('keys', []))} public keys from Clerk")
                 
                 public_key = None
                 
@@ -281,7 +282,7 @@ class ClerkAuthService:
                 for key in jwks.get('keys', []):
                     if key.get('kid') == key_id:
                         try:
-                        logger.debug(f"Found matching public key for kid: {key_id}")
+                            logger.debug(f"Found matching public key for kid: {key_id}")
                             # Convert JWK to PEM format
                             n = int.from_bytes(
                                 base64.urlsafe_b64decode(key['n'] + '=='), 
@@ -296,7 +297,7 @@ class ClerkAuthService:
                             public_key = public_numbers.public_key()
                             break
                         except Exception as e:
-                        logger.debug(f"Failed to convert JWK to PEM: {e}")
+                            logger.debug(f"Failed to convert JWK to PEM: {e}")
                             continue
                 
                 if not public_key:
@@ -304,7 +305,7 @@ class ClerkAuthService:
                 
                 # Try to verify with primary issuer first
                 try:
-                logger.debug(f"Verifying JWT with primary issuer: {self.clerk_issuer}")
+                    logger.debug(f"Verifying JWT with primary issuer: {self.clerk_issuer}")
                     payload = jwt.decode(
                         token,
                         public_key,
@@ -313,52 +314,14 @@ class ClerkAuthService:
                         options={"verify_aud": False}  # Don't verify audience for Clerk
                     )
                     
-                # Check if we need to warn about upcoming expiration
-                if payload.get('_warn_refresh_soon'):
-                    logger.info(f"JWT token verified successfully but will expire soon - user should refresh")
-                else:
-                    logger.info(f"JWT token verified successfully for user: {payload.get('sub')}")
-                
-                logger.debug(f"JWT payload: {payload}")
-                
-                # Add token metadata for better error handling
-                token_info = {
-                        "user_id": payload.get('sub'),
-                        "email": payload.get('email'),
-                        "authenticated": True,
-                    "payload": payload,
-                    "expires_at": payload.get('exp'),
-                    "issued_at": payload.get('iat'),
-                    "needs_refresh_soon": payload.get('_warn_refresh_soon', False),
-                    "can_extend_lifetime": payload.get('_extended_lifetime', False),
-                    "extended_expiry": payload.get('_extended_exp')
-                }
-                
-                # Cache the token information
-                self._cache_token_info(token, token_info)
-                
-                return token_info
-                
-                except jwt.InvalidIssuerError:
-                logger.debug(f"Primary issuer failed, trying fallback: {self.clerk_issuer_fallback}")
-                    # Try with fallback issuer
-                    try:
-                        payload = jwt.decode(
-                            token,
-                            public_key,
-                            algorithms=['RS256'],
-                            issuer=self.clerk_issuer_fallback,
-                            options={"verify_aud": False}  # Don't verify audience for Clerk
-                        )
-                        
                     # Check if we need to warn about upcoming expiration
                     if payload.get('_warn_refresh_soon'):
-                        logger.info(f"JWT token verified successfully with fallback but will expire soon - user should refresh")
+                        logger.info(f"JWT token verified successfully but will expire soon - user should refresh")
                     else:
-                        logger.info(f"JWT token verified successfully with fallback issuer for user: {payload.get('sub')}")
+                        logger.info(f"JWT token verified successfully for user: {payload.get('sub')}")
                     
                     logger.debug(f"JWT payload: {payload}")
-                        
+                    
                     # Add token metadata for better error handling
                     token_info = {
                             "user_id": payload.get('sub'),
@@ -376,9 +339,47 @@ class ClerkAuthService:
                     self._cache_token_info(token, token_info)
                     
                     return token_info
+                
+                except jwt.InvalidIssuerError:
+                    logger.debug(f"Primary issuer failed, trying fallback: {self.clerk_issuer_fallback}")
+                    # Try with fallback issuer
+                    try:
+                        payload = jwt.decode(
+                            token,
+                            public_key,
+                            algorithms=['RS256'],
+                            issuer=self.clerk_issuer_fallback,
+                            options={"verify_aud": False}  # Don't verify audience for Clerk
+                        )
+                        
+                        # Check if we need to warn about upcoming expiration
+                        if payload.get('_warn_refresh_soon'):
+                            logger.info(f"JWT token verified successfully with fallback but will expire soon - user should refresh")
+                        else:
+                            logger.info(f"JWT token verified successfully with fallback issuer for user: {payload.get('sub')}")
+                        
+                        logger.debug(f"JWT payload: {payload}")
+                            
+                        # Add token metadata for better error handling
+                        token_info = {
+                                "user_id": payload.get('sub'),
+                                "email": payload.get('email'),
+                                "authenticated": True,
+                            "payload": payload,
+                            "expires_at": payload.get('exp'),
+                            "issued_at": payload.get('iat'),
+                            "needs_refresh_soon": payload.get('_warn_refresh_soon', False),
+                            "can_extend_lifetime": payload.get('_extended_lifetime', False),
+                            "extended_expiry": payload.get('_extended_exp')
+                        }
+                        
+                        # Cache the token information
+                        self._cache_token_info(token, token_info)
+                        
+                        return token_info
                     
                     except jwt.InvalidIssuerError:
-                    logger.warning(f"Both primary and fallback issuers failed. Expected: {self.clerk_issuer} or {self.clerk_issuer_fallback}")
+                        logger.warning(f"Both primary and fallback issuers failed. Expected: {self.clerk_issuer} or {self.clerk_issuer_fallback}")
                         raise HTTPException(status_code=401, detail="Invalid token issuer")
                 except jwt.ExpiredSignatureError:
                     logger.warning(f"JWT token has expired")
@@ -397,7 +398,7 @@ class ClerkAuthService:
             except jwt.ExpiredSignatureError:
                 logger.warning(f"JWT token has expired")
                 raise HTTPException(
-                    status_code=401, 
+                    status_code=401,
                     detail={
                         "error": "Token has expired",
                         "requires_refresh": True,
@@ -406,7 +407,10 @@ class ClerkAuthService:
                 )
             except jwt.InvalidTokenError as e:
                 logger.debug(f"Invalid JWT token: {e}")
-                    raise HTTPException(status_code=401, detail="Invalid token")
+                raise HTTPException(status_code=401, detail="Invalid token")
+            except Exception as e:
+                logger.error(f"Unexpected error during JWT verification: {e}")
+                raise HTTPException(status_code=500, detail="Internal authentication error")
                     
         except jwt.InvalidTokenError as e:
             logger.debug(f"Invalid JWT token: {e}")
@@ -416,6 +420,10 @@ class ClerkAuthService:
         except Exception as e:
             logger.error(f"Unexpected error during JWT verification: {e}")
             raise HTTPException(status_code=500, detail="Internal authentication error")
+        
+        # This should never be reached, but just in case
+        logger.error("JWT verification method reached unexpected end - this should not happen")
+        raise HTTPException(status_code=500, detail="Internal authentication error - unexpected code path")
     
     async def refresh_token_if_needed(self, token: str) -> Dict[str, Any]:
         """Check if token needs refresh and provide guidance"""
