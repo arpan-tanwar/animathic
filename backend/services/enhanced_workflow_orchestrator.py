@@ -12,6 +12,7 @@ from .fade_out_system import FadeOutSystem
 from .camera_management import CameraManagementSystem
 from .enhanced_validation import EnhancedValidationService
 from .real_time_overlap_monitoring import RealTimeOverlapMonitor
+from .advanced_positioning import AdvancedObjectPositioningSystem
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class EnhancedWorkflowOrchestrator:
         self.enhanced_validator = EnhancedValidationService()
         self.prompt_enhancer = None  # Will be set by AI service
         self.real_time_monitor = RealTimeOverlapMonitor()
+        self.advanced_positioning = AdvancedObjectPositioningSystem()
         
         # Workflow configuration
         self.config = {
@@ -50,7 +52,17 @@ class EnhancedWorkflowOrchestrator:
             },
             'fade_out_conservative_mode': True,  # NEW: Ultra-conservative fade-out behavior
             'fade_out_explicit_only': True,  # NEW: Only fade-out when explicitly requested
-            'preserve_mathematical_content': True  # NEW: Never fade-out mathematical functions unless requested
+            'preserve_mathematical_content': True,  # NEW: Never fade-out mathematical functions unless requested
+            'enable_advanced_positioning': True,  # NEW: Advanced object positioning algorithms
+            'advanced_positioning_config': {
+                'grid_size': 8,
+                'spacing_factor': 1.2,
+                'collision_threshold': 0.5,
+                'prefer_center': True,
+                'enable_smart_spacing': True,
+                'max_positioning_attempts': 10,
+                'enable_adaptive_positioning': True
+            }
         }
         
         # NEW: Smart fade-out tracking
@@ -494,7 +506,46 @@ class EnhancedWorkflowOrchestrator:
         return opportunities
     
     def _optimize_object_positions(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """Optimize object positions to prevent overlaps - SMART VERSION"""
+        """Optimize object positions using advanced positioning algorithms"""
+        try:
+            objects = animation_spec.get('objects', [])
+            if len(objects) <= 1:
+                return animation_spec
+            
+            # Check if advanced positioning is enabled
+            if self.config.get('enable_advanced_positioning', False):
+                logger.info("Applying advanced object positioning algorithms...")
+                
+                # Apply advanced positioning system
+                enhanced_spec = self.apply_advanced_positioning(animation_spec)
+                
+                # Log positioning results
+                positioning_metadata = enhanced_spec.get('positioning_metadata', {})
+                if positioning_metadata:
+                    results = positioning_metadata.get('results', {})
+                    logger.info(f"Advanced positioning completed: {results.get('objects_positioned', 0)} objects positioned, "
+                               f"{len(results.get('camera_adjustments', []))} camera adjustments, "
+                               f"{results.get('collision_resolutions', 0)} collisions resolved")
+                    
+                    # Log strategy usage
+                    strategies = results.get('positioning_strategies_used', {})
+                    if strategies:
+                        strategy_log = ", ".join([f"{strategy}: {count}" for strategy, count in strategies.items()])
+                        logger.debug(f"Positioning strategies used: {strategy_log}")
+                
+                return enhanced_spec
+            else:
+                # Fallback to smart positioning for backward compatibility
+                logger.debug("Advanced positioning disabled, using smart positioning fallback")
+                return self._apply_smart_positioning_fallback(animation_spec, analysis)
+            
+        except Exception as e:
+            logger.error(f"Error in advanced object positioning: {e}")
+            # Fallback to basic positioning
+            return self._apply_smart_positioning_fallback(animation_spec, analysis)
+    
+    def _apply_smart_positioning_fallback(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """Fallback smart positioning method for backward compatibility"""
         try:
             objects = animation_spec.get('objects', [])
             if len(objects) <= 1:
@@ -524,7 +575,7 @@ class EnhancedWorkflowOrchestrator:
             
             # Only adjust truly overlapping objects with minimal changes
             if overlapping_objects:
-                logger.info(f"Smart positioning: Adjusting {len(set(overlapping_objects))} overlapping objects")
+                logger.info(f"Smart positioning fallback: Adjusting {len(set(overlapping_objects))} overlapping objects")
                 for idx in set(overlapping_objects):
                     if idx < len(objects):
                         obj = objects[idx]
@@ -536,14 +587,14 @@ class EnhancedWorkflowOrchestrator:
                         if len(pos) >= 2:
                             props['position'] = [pos[0] + offset, pos[1], pos[2] if len(pos) > 2 else 0]
                         
-                logger.debug(f"Smart object positioning applied to {len(set(overlapping_objects))} objects")
+                logger.debug(f"Smart object positioning fallback applied to {len(set(overlapping_objects))} objects")
             else:
                 logger.debug("No overlapping objects found - positions preserved")
         
             return animation_spec
             
         except Exception as e:
-            logger.error(f"Error in object positioning: {e}")
+            logger.error(f"Error in smart positioning fallback: {e}")
             return animation_spec
     
     def _prevent_object_overlaps(self, animation_spec: Dict[str, Any], analysis: Dict[str, Any]) -> Dict[str, Any]:
@@ -1506,6 +1557,10 @@ class EnhancedWorkflowOrchestrator:
     
     def _generate_workflow_summary(self, analysis: Dict[str, Any], final_spec: Dict[str, Any]) -> Dict[str, Any]:
         """Generate a summary of the workflow processing"""
+        # Get advanced positioning information
+        positioning_metadata = final_spec.get('positioning_metadata', {})
+        positioning_results = positioning_metadata.get('results', {}) if positioning_metadata else {}
+        
         return {
             'status': 'completed',
             'processing_stages': [
@@ -1526,7 +1581,18 @@ class EnhancedWorkflowOrchestrator:
             'enhancements_applied': len(analysis.get('optimization_opportunities', [])),
             'final_object_count': len(final_spec.get('objects', [])),
             'performance_estimate': analysis.get('performance_considerations', {}).get('rendering_estimate', 'unknown'),
-            'enhanced_validation': final_spec.get('enhanced_validation', {}).get('summary', {})
+            'enhanced_validation': final_spec.get('enhanced_validation', {}).get('summary', {}),
+            'advanced_positioning': {
+                'enabled': self.config.get('enable_advanced_positioning', False),
+                'objects_positioned': positioning_results.get('objects_positioned', 0),
+                'strategies_used': positioning_results.get('positioning_strategies_used', {}),
+                'camera_adjustments': len(positioning_results.get('camera_adjustments', [])),
+                'collision_resolutions': positioning_results.get('collision_resolutions', 0),
+                'positioning_errors': len(positioning_results.get('errors', []))
+            } if positioning_metadata else {
+                'enabled': False,
+                'message': 'Advanced positioning not applied'
+            }
         }
     
     def _should_use_fade_out_conservative(self, user_prompt: str, transient_objects: List[Dict[str, Any]]) -> bool:
@@ -1597,6 +1663,10 @@ class EnhancedWorkflowOrchestrator:
         
         if analysis.get('prompt_complexity', {}).get('requires_enhancement', False):
             enhancements.append('complexity_handling')
+        
+        # Check if advanced positioning was applied
+        if self.config.get('enable_advanced_positioning', False):
+            enhancements.append('advanced_positioning')
         
         return enhancements
     
@@ -1898,6 +1968,202 @@ class EnhancedWorkflowOrchestrator:
         """Get current timestamp for tracking"""
         import time
         return time.time()
+    
+    def apply_advanced_positioning(self, animation_spec: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply advanced object positioning algorithms to the animation specification
+        
+        Args:
+            animation_spec: The animation specification to enhance
+            
+        Returns:
+            Enhanced animation specification with optimal object positions
+        """
+        try:
+            if not self.config['enable_advanced_positioning']:
+                logger.debug("Advanced positioning disabled")
+                return animation_spec
+            
+            logger.info("Applying advanced object positioning algorithms...")
+            
+            # Get screen bounds
+            screen_bounds = self._get_screen_bounds()
+            
+            # Track positioning results
+            positioning_results = {
+                'objects_positioned': 0,
+                'positioning_strategies_used': {},
+                'camera_adjustments': [],
+                'collision_resolutions': 0,
+                'errors': []
+            }
+            
+            objects = animation_spec.get('objects', [])
+            existing_objects = []
+            
+            # Process objects in sequence to build up existing objects list
+            for i, obj in enumerate(objects):
+                try:
+                    # Get object properties
+                    properties = obj.get('properties', {})
+                    obj_type = obj.get('type', 'unknown')
+                    
+                    # Apply advanced positioning
+                    positioning_strategy = self.advanced_positioning.find_optimal_position(
+                        obj, existing_objects, screen_bounds
+                    )
+                    
+                    if positioning_strategy and positioning_strategy['position']:
+                        # Update object position
+                        properties['position'] = positioning_strategy['position']
+                        obj['properties'] = properties
+                        
+                        # Track strategy usage
+                        strategy = positioning_strategy['method']
+                        positioning_results['positioning_strategies_used'][strategy] = \
+                            positioning_results['positioning_strategies_used'].get(strategy, 0) + 1
+                        
+                        # Check for camera adjustments
+                        if positioning_strategy['camera_adjustment']:
+                            positioning_results['camera_adjustments'].append({
+                                'object_id': obj.get('id', f'obj_{i}'),
+                                'adjustment': positioning_strategy['camera_adjustment']
+                            })
+                        
+                        positioning_results['objects_positioned'] += 1
+                        
+                        # Log positioning details
+                        logger.debug(f"Object {obj.get('id', f'obj_{i}')} ({obj_type}) positioned using "
+                                   f"{strategy} at {positioning_strategy['position']} "
+                                   f"(confidence: {positioning_strategy['confidence']:.2f})")
+                        
+                        # Add to existing objects for next iteration
+                        existing_objects.append(obj)
+                        
+                        # Resolve collisions if needed
+                        if positioning_strategy['collision_risk'] > 0.5:
+                            self._resolve_positioning_collision(obj, existing_objects, screen_bounds)
+                            positioning_results['collision_resolutions'] += 1
+                    else:
+                        # Fallback positioning
+                        properties['position'] = [0, 0, 0]
+                        obj['properties'] = properties
+                        existing_objects.append(obj)
+                        positioning_results['errors'].append({
+                            'object_id': obj.get('id', f'obj_{i}'),
+                            'error': 'Positioning strategy failed, using fallback'
+                        })
+                        
+                except Exception as e:
+                    logger.error(f"Error positioning object {i}: {e}")
+                    positioning_results['errors'].append({
+                        'object_id': obj.get('id', f'obj_{i}'),
+                        'error': str(e)
+                    })
+                    # Use fallback position
+                    properties = obj.get('properties', {})
+                    properties['position'] = [0, 0, 0]
+                    obj['properties'] = properties
+                    existing_objects.append(obj)
+            
+            # Apply camera adjustments if needed
+            if positioning_results['camera_adjustments']:
+                self._apply_camera_adjustments(positioning_results['camera_adjustments'])
+            
+            # Update animation spec with positioning metadata
+            animation_spec['positioning_metadata'] = {
+                'advanced_positioning_applied': True,
+                'timestamp': time.time(),
+                'results': positioning_results
+            }
+            
+            logger.info(f"Advanced positioning completed: {positioning_results['objects_positioned']} objects positioned, "
+                       f"{len(positioning_results['camera_adjustments'])} camera adjustments, "
+                       f"{positioning_results['collision_resolutions']} collisions resolved")
+            
+            return animation_spec
+            
+        except Exception as e:
+            logger.error(f"Error in advanced positioning: {e}")
+            return animation_spec
+    
+    def _get_screen_bounds(self) -> Dict[str, float]:
+        """Get screen bounds for positioning calculations"""
+        try:
+            # Use camera management system to get screen bounds
+            return self.camera_manager.get_screen_bounds()
+        except Exception as e:
+            logger.error(f"Error getting screen bounds: {e}")
+            # Fallback to default bounds
+            return {
+                'min_x': -8,
+                'min_y': -4.5,
+                'max_x': 8,
+                'max_y': 4.5,
+                'width': 16,
+                'height': 9
+            }
+    
+    def _resolve_positioning_collision(self, obj: Dict[str, Any], existing_objects: List[Dict[str, Any]], 
+                                     screen_bounds: Dict[str, float]) -> None:
+        """Resolve positioning collisions using advanced algorithms"""
+        try:
+            # Get alternative positions
+            positioning_strategy = self.advanced_positioning.find_optimal_position(
+                obj, existing_objects, screen_bounds
+            )
+            
+            if positioning_strategy and positioning_strategy['alternatives']:
+                # Try alternative positions
+                for alt_pos in positioning_strategy['alternatives']:
+                    collision_risk = self._calculate_collision_risk(alt_pos, existing_objects)
+                    if collision_risk < 0.3:  # Acceptable collision risk
+                        properties = obj.get('properties', {})
+                        properties['position'] = alt_pos
+                        obj['properties'] = properties
+                        logger.debug(f"Resolved collision for {obj.get('id', 'unknown')} using alternative position {alt_pos}")
+                        break
+                        
+        except Exception as e:
+            logger.error(f"Error resolving positioning collision: {e}")
+    
+    def _calculate_collision_risk(self, position: List[float], existing_objects: List[Dict[str, Any]]) -> float:
+        """Calculate collision risk for a position"""
+        try:
+            if not existing_objects:
+                return 0.0
+            
+            min_distance = float('inf')
+            for obj in existing_objects:
+                properties = obj.get('properties', {})
+                obj_pos = properties.get('position', [0, 0, 0])
+                
+                distance = ((position[0] - obj_pos[0])**2 + (position[1] - obj_pos[1])**2)**0.5
+                min_distance = min(min_distance, distance)
+            
+            # Convert distance to collision risk (closer = higher risk)
+            collision_threshold = self.config['advanced_positioning_config']['collision_threshold']
+            if min_distance < collision_threshold:
+                return 1.0 - (min_distance / collision_threshold)
+            else:
+                return 0.0
+                
+        except Exception as e:
+            logger.error(f"Error calculating collision risk: {e}")
+            return 0.5
+    
+    def _apply_camera_adjustments(self, camera_adjustments: List[Dict[str, Any]]) -> None:
+        """Apply camera adjustments from positioning system"""
+        try:
+            for adjustment in camera_adjustments:
+                camera_strategy = adjustment['adjustment']
+                if camera_strategy['action'] == 'zoom_out':
+                    # Apply zoom out using camera management system
+                    self.camera_manager.apply_camera_strategy(camera_strategy, None)  # Scene will be passed later
+                    logger.debug(f"Applied camera adjustment: {camera_strategy['action']} for {adjustment['object_id']}")
+                    
+        except Exception as e:
+            logger.error(f"Error applying camera adjustments: {e}")
     
     def get_fade_out_statistics(self) -> Dict[str, Any]:
         """Get statistics about fade-out operations"""
