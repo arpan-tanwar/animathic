@@ -7,7 +7,11 @@ steps:
       - "-f"
       - "backend/Dockerfile"
       - "backend"
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_IMAGE}"
 images:
   - "${_IMAGE}"
 substitutions:
-  _IMAGE: "gcr.io/animathic-backend/animathic-backend:latest"
+  _IMAGE: "us-central1-docker.pkg.dev/animathic-backend/cloud-run-source-deploy/animathic-backend:latest"

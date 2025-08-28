@@ -1,0 +1,296 @@
+{
+  "Circle": {
+    "name": "Circle",
+    "symbol_type": "class",
+    "canonical_path": "manim.mobject.geometry.line.Circle",
+    "signature": "Circle(radius=1, color=WHITE, fill_opacity=0, stroke_width=4)",
+    "defaults": {
+      "radius": 1,
+      "color": "WHITE",
+      "fill_opacity": 0,
+      "stroke_width": 4
+    },
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.mobject.geometry.line.Circle.html",
+    "description": "A circle geometric shape",
+    "examples": [
+      "Circle(radius=2, color=RED)",
+      "Circle().scale(0.5)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "shape",
+      "geometry",
+      "circle",
+      "basic"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "Square": {
+    "name": "Square",
+    "symbol_type": "class",
+    "canonical_path": "manim.mobject.geometry.line.Square",
+    "signature": "Square(side_length=2, color=WHITE, fill_opacity=0, stroke_width=4)",
+    "defaults": {
+      "side_length": 2,
+      "color": "WHITE",
+      "fill_opacity": 0,
+      "stroke_width": 4
+    },
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.mobject.geometry.line.Square.html",
+    "description": "A square geometric shape",
+    "examples": [
+      "Square(side_length=3, color=BLUE)",
+      "Square().rotate(PI/4)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "shape",
+      "geometry",
+      "square",
+      "basic"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "Rectangle": {
+    "name": "Rectangle",
+    "symbol_type": "class",
+    "canonical_path": "manim.mobject.geometry.line.Rectangle",
+    "signature": "Rectangle(width=4, height=2, color=WHITE, fill_opacity=0, stroke_width=4)",
+    "defaults": {
+      "width": 4,
+      "height": 2,
+      "color": "WHITE",
+      "fill_opacity": 0,
+      "stroke_width": 4
+    },
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.mobject.geometry.line.Rectangle.html",
+    "description": "A rectangle geometric shape",
+    "examples": [
+      "Rectangle(width=6, height=3, color=GREEN)",
+      "Rectangle().scale(0.8)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "shape",
+      "geometry",
+      "rectangle",
+      "basic"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "Create": {
+    "name": "Create",
+    "symbol_type": "class",
+    "canonical_path": "manim.animation.creation.Create",
+    "signature": "Create(mobject, lag_ratio=0, run_time=1.0)",
+    "defaults": {
+      "lag_ratio": 0,
+      "run_time": 1.0
+    },
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.animation.creation.Create.html",
+    "description": "Animation that creates a mobject by drawing it",
+    "examples": [
+      "Create(circle)",
+      "Create(square, run_time=2.0)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "animation",
+      "creation",
+      "drawing"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "FadeIn": {
+    "name": "FadeIn",
+    "symbol_type": "class",
+    "canonical_path": "manim.animation.fading.FadeIn",
+    "signature": "FadeIn(mobject, lag_ratio=0, run_time=1.0, shift=ORIGIN, scale=1)",
+    "defaults": {
+      "lag_ratio": 0,
+      "run_time": 1.0,
+      "shift": "ORIGIN",
+      "scale": 1
+    },
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.animation.fading.FadeIn.html",
+    "description": "Animation that fades in a mobject",
+    "examples": [
+      "FadeIn(circle)",
+      "FadeIn(square, scale=1.5)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "animation",
+      "fading",
+      "appear"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "FadeOut": {
+    "name": "FadeOut",
+    "symbol_type": "class",
+    "canonical_path": "manim.animation.fading.FadeOut",
+    "signature": "FadeOut(mobject, lag_ratio=0, run_time=1.0, shift=ORIGIN, scale=1)",
+    "defaults": {
+      "lag_ratio": 0,
+      "run_time": 1.0,
+      "shift": "ORIGIN",
+      "scale": 1
+    },
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.animation.fading.FadeOut.html",
+    "description": "Animation that fades out a mobject",
+    "examples": [
+      "FadeOut(circle)",
+      "FadeOut(square, scale=0.5)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "animation",
+      "fading",
+      "disappear"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "RED": {
+    "name": "RED",
+    "symbol_type": "constant",
+    "canonical_path": "manim.constants.RED",
+    "signature": "RED",
+    "defaults": {},
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.constants.html",
+    "description": "Red color constant",
+    "examples": [
+      "Circle(color=RED)",
+      "Square().set_color(RED)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "color",
+      "constant",
+      "red"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "BLUE": {
+    "name": "BLUE",
+    "symbol_type": "constant",
+    "canonical_path": "manim.constants.BLUE",
+    "signature": "BLUE",
+    "defaults": {},
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.constants.html",
+    "description": "Blue color constant",
+    "examples": [
+      "Circle(color=BLUE)",
+      "Square().set_color(BLUE)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "color",
+      "constant",
+      "blue"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "GREEN": {
+    "name": "GREEN",
+    "symbol_type": "constant",
+    "canonical_path": "manim.constants.GREEN",
+    "signature": "GREEN",
+    "defaults": {},
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.constants.html",
+    "description": "Green color constant",
+    "examples": [
+      "Circle(color=GREEN)",
+      "Square().set_color(GREEN)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "color",
+      "constant",
+      "green"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "Scene": {
+    "name": "Scene",
+    "symbol_type": "class",
+    "canonical_path": "manim.scene.scene.Scene",
+    "signature": "Scene(camera=None, always_update_mobjects=False, random_seed=None)",
+    "defaults": {
+      "camera": null,
+      "always_update_mobjects": false,
+      "random_seed": null
+    },
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.scene.scene.Scene.html",
+    "description": "Base scene class for Manim animations",
+    "examples": [
+      "class MyScene(Scene):",
+      "def construct(self):"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "scene",
+      "base",
+      "animation"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  },
+  "MovingCameraScene": {
+    "name": "MovingCameraScene",
+    "symbol_type": "class",
+    "canonical_path": "manim.scene.moving_camera_scene.MovingCameraScene",
+    "signature": "MovingCameraScene(camera=None, always_update_mobjects=False, random_seed=None)",
+    "defaults": {
+      "camera": null,
+      "always_update_mobjects": false,
+      "random_seed": null
+    },
+    "doc_url": "https://docs.manim.community/en/stable/reference/manim.scene.moving_camera_scene.MovingCameraScene.html",
+    "description": "Scene with a moving camera for dynamic perspectives",
+    "examples": [
+      "class MyScene(MovingCameraScene):",
+      "self.camera.frame.move_to(point)"
+    ],
+    "source_code": "",
+    "version": "0.19.0",
+    "tags": [
+      "scene",
+      "camera",
+      "moving",
+      "dynamic"
+    ],
+    "dependencies": [
+      "manim"
+    ]
+  }
+}

@@ -10,1075 +10,360 @@ logger = logging.getLogger(__name__)
 
 class ManimCodeGenerator:
     """Generates Manim Python code from animation specifications"""
-    
+
     def __init__(self):
-        """Initialize the Manim code generator"""
         pass
-    
+
     def generate_manim_code(self, animation_spec: Dict[str, Any]) -> str:
-        """Generate Manim Python code from animation specification"""
         try:
-            # Extract values for proper f-string formatting
-            scene_description = animation_spec.get('scene_description', 'Generated animation')
-            bg_color = animation_spec.get('background_color', '#000000')
-            objects_list = animation_spec.get('objects', [])
-            
-            # Generate the complete Manim code as a single f-string
-            manim_code = f"""import numpy as np
-from manim import *
+            scene_description = animation_spec.get("scene_description", "Generated animation")
+            bg_color = animation_spec.get("background_color", "#000000")
+            objects_list: List[Dict[str, Any]] = animation_spec.get("objects", [])
 
-class GeneratedScene(MovingCameraScene):
-    def construct(self):
-        # Animation: {scene_description}
-        
-        # Set background color
-        bg_color = "{bg_color}"
-        if bg_color.lower() in ['#ffffff', '#fff', 'white', 'ffffff']:
-            bg_color = "#000000"
-        
-        # Ensure valid Manim color using inline validation
-        try:
-            if bg_color.startswith('#'):
-                # Convert hex to RGB then to Manim color
-                rgb_values = hex_to_rgb(bg_color)
-                self.camera.background_color = rgb_to_color(rgb_values)
-            else:
-                # Map common color names to valid Manim colors
-                color_mapping = {{
-                    'white': rgb_to_color([1, 1, 1]), 'black': rgb_to_color([0, 0, 0]), 'red': rgb_to_color([1, 0, 0]), 'green': rgb_to_color([0, 1, 0]), 'blue': rgb_to_color([0, 0, 1]),
-                    'yellow': rgb_to_color([1, 1, 0]), 'purple': rgb_to_color([1, 0, 1]), 'orange': rgb_to_color([1, 0.5, 0]), 'pink': rgb_to_color([1, 0.75, 0.8]),
-                    'brown': rgb_to_color([0.5, 0.25, 0]), 'gray': rgb_to_color([0.5, 0.5, 0.5]), 'grey': rgb_to_color([0.5, 0.5, 0.5]), 'cyan': rgb_to_color([0, 1, 1]), 'magenta': rgb_to_color([1, 0, 1]),
-                    'lime': rgb_to_color([0.5, 1, 0]), 'navy': rgb_to_color([0, 0, 0.5]), 'teal': rgb_to_color([0, 0.5, 0.5]), 'maroon': rgb_to_color([0.5, 0, 0]), 'olive': rgb_to_color([0.5, 0.5, 0]),
-                    'fuchsia': rgb_to_color([1, 0, 1]), 'aqua': rgb_to_color([0, 1, 1]), 'silver': rgb_to_color([0.75, 0.75, 0.75]), 'gold': rgb_to_color([1, 0.84, 0])
-                }}
-                self.camera.background_color = color_mapping.get(bg_color.lower(), rgb_to_color([0, 0, 0]))
-        except Exception:
-            self.camera.background_color = rgb_to_color([0, 0, 0])
-        
-        # Log bounds
-        print("Bounds: x=", [-6.0, 6.0], " y=", [-3.5, 3.5])
-        
-        # ENHANCED: Smart camera management with object awareness
-        try:
-            # Set initial camera frame dimensions and center it properly
-            self.camera.frame.set(width=14, height=10)
-            self.camera.frame.move_to([0, 0, 0])
-            
-            # Set coordinate system bounds for mathematical plots
-            self.camera.frame.set(x_range=[-7, 7], y_range=[-5, 5])
-            
-            print("Camera positioning: Applied - centered at (0,0) with 14x10 dimensions")
-            
-            # Initialize camera management tracking
-            self.camera_strategies = []
-            self.objects_for_camera_management = []
-            
-        except Exception as e:
-            print(f"Camera positioning failed: {{e}}")
-        
-        # Initialize tracking for fade-out management
-        self.transient_objects_to_fade_out = []
-        
-        # Create all objects
-        objects_created = []
-        
-        # Process each object
-        for obj in {objects_list}:
-            obj_type = obj.get('type', 'unknown')
-            obj_id = obj.get('id', 'unknown')
-            props = obj.get('properties', {{}})
-            
-            print(f"Creating {{obj_type}} object: {{obj_id}}")
-            
-            if obj_type == 'circle':
-                # Create circle geometric shape
-                size = props.get('size', 1)
-                color_name = props.get('color', 'RED')
-                pos = props.get('position', [0, 0, 0])
-                
-                # Color validation
-                try:
-                    if isinstance(color_name, str) and color_name.startswith('#'):
-                        rgb_values = hex_to_rgb(color_name)
-                        color = rgb_to_color(rgb_values)
-                    else:
-                        color_mapping = {{
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
-                        }}
-                        color = color_mapping.get(str(color_name), RED)
-                except:
-                    color = RED
-                
-                circle_obj = Circle(
-                    radius=size,
-                    fill_color=color,
-                    stroke_color=color,
-                    fill_opacity=1.0,
-                    stroke_width=3
-                )
-                circle_obj.move_to(pos)
-                
-                # Handle animations
-                animations = obj.get('animations', [])
-                if not animations:
-                    self.add(circle_obj)
-                    self.play(Create(circle_obj), run_time=0.8)
+            try:
+                # Determine scene type based on animation spec or content
+                scene_type = animation_spec.get("scene_type", "Scene")
+                if scene_type == "ThreeDScene":
+                    use_3d = True
+                    scene_base = "ThreeDScene"
+                elif scene_type == "GraphScene":
+                    use_3d = False
+                    scene_base = "GraphScene"
+                elif scene_type == "MovingCameraScene":
+                    use_3d = False
+                    scene_base = "MovingCameraScene"
                 else:
-                    # Process animations with timing
-                    for anim in animations:
-                        anim_type = anim.get('type', 'fade_in')
-                        duration = anim.get('duration', 0.8)
-                        start_time = anim.get('start_time', 'immediate')
-                        
-                        if start_time == 'before_next':
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=0.3)
-                            if not hasattr(self, 'objects_to_fade_out'):
-                                self.objects_to_fade_out = []
-                            self.objects_to_fade_out.append(circle_obj)
-                        elif start_time == 'after_previous_fade':
-                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
-                                prev_obj = self.objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            self.wait(0.1)
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time == 'after_persistent_display':
-                            # Object appears after persistent objects (axes, plots) are visible
-                            # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time == 'sequential':
-                            # Object appears in sequence - Manim will handle timing automatically
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=duration)
-                        elif start_time == 'after_sequence':
-                            # Object fades out after the entire sequence is complete
-                            # ONLY if explicitly requested - be conservative
-                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
-                                self.wait(0.5)  # Small delay to ensure smooth transition
-                                self.play(FadeOut(circle_obj), run_time=duration)
-                            else:
-                                # Keep object visible - no unnecessary fade-out
-                                self.wait(0.5)
-                                print(f"  ✅ circle object kept visible (no fade-out)")
-                        elif start_time == 'before_next_transient':
-                            # This transient object should fade out before the next transient object
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=0.3)
-                            # Store for fade-out when next transient object appears
-                            if not hasattr(self, 'transient_objects_to_fade_out'):
-                                self.transient_objects_to_fade_out = []
-                            self.transient_objects_to_fade_out.append(circle_obj)
-                        elif start_time == 'after_previous_transient_fade':
-                            # This transient object should fade in after the previous transient object fades out
-                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
-                                prev_obj = self.transient_objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            
-                            # Small delay for smooth transition
-                            self.wait(0.1)
-                            self.add(circle_obj)
-                            self.play(FadeIn(circle_obj), run_time=duration)
-                        else:
-                            # Default animation handling
-                            if anim_type == 'fade_in':
-                                self.add(circle_obj)
-                                self.play(FadeIn(circle_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(circle_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                self.add(circle_obj)
-                                self.play(Create(circle_obj), run_time=duration)
-                
-                objects_created.append(circle_obj)
-                self.wait(0.3)
-                
-            elif obj_type == 'square':
-                # Create square geometric shape
-                size = props.get('size', 2)
-                color_name = props.get('color', 'BLUE')
-                pos = props.get('position', [0, 0, 0])
-                
-                # Color validation
-                try:
-                    if isinstance(color_name, str) and color_name.startswith('#'):
-                        rgb_values = hex_to_rgb(color_name)
-                        color = rgb_to_color(rgb_values)
-                    else:
-                        color_mapping = {{
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
-                        }}
-                        color = color_mapping.get(str(color_name), BLUE)
-                except:
-                    color = BLUE
-                
-                square_obj = Square(
-                    side_length=size,
-                    fill_color=color,
-                    stroke_color=color,
-                    fill_opacity=1.0,
-                    stroke_width=3
-                )
-                square_obj.move_to(pos)
-                
-                # Handle animations
-                animations = obj.get('animations', [])
-                if not animations:
-                    self.add(square_obj)
-                    self.play(Create(square_obj), run_time=0.8)
-                else:
-                    # Process animations with timing
-                    for anim in animations:
-                        anim_type = anim.get('type', 'fade_in')
-                        duration = anim.get('duration', 0.8)
-                        start_time = anim.get('start_time', 'immediate')
-                        
-                        if start_time == 'before_next':
-                            self.add(square_obj)
-                            self.play(FadeIn(square_obj), run_time=0.3)
-                            if not hasattr(self, 'objects_to_fade_out'):
-                                self.objects_to_fade_out = []
-                            self.objects_to_fade_out.append(square_obj)
-                        elif start_time == 'after_previous_fade':
-                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
-                                prev_obj = self.objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            self.wait(0.1)
-                            self.add(square_obj)
-                            self.play(FadeIn(square_obj), run_time=duration)
-                        elif start_time == 'sequential':
-                            # Object appears in sequence - Manim will handle timing automatically
-                            self.add(square_obj)
-                            self.play(FadeIn(square_obj), run_time=duration)
-                        elif start_time == 'after_sequence':
-                            # Object fades out after the entire sequence is complete
-                            # ONLY if explicitly requested - be conservative
-                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
-                                self.wait(0.5)  # Small delay to ensure smooth transition
-                                self.play(FadeOut(square_obj), run_time=duration)
-                            else:
-                                # Keep object visible - no unnecessary fade-out
-                                self.wait(0.5)
-                                print(f"  ✅ square object kept visible (no fade-out)")
-                        elif start_time == 'before_next_transient':
-                            # This transient object should fade out before the next transient object
-                            self.add(square_obj)
-                            self.play(FadeIn(square_obj), run_time=0.3)
-                            # Store for fade-out when next transient object appears
-                            if not hasattr(self, 'transient_objects_to_fade_out'):
-                                self.transient_objects_to_fade_out = []
-                            self.transient_objects_to_fade_out.append(square_obj)
-                        elif start_time == 'after_previous_transient_fade':
-                            # This transient object should fade in after the previous transient object fades out
-                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
-                                prev_obj = self.transient_objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            
-                            # Small delay for smooth transition
-                            self.wait(0.1)
-                            self.add(square_obj)
-                            self.play(FadeIn(square_obj), run_time=duration)
-                        else:
-                            # Default animation handling
-                            if anim_type == 'fade_in':
-                                self.add(square_obj)
-                                self.play(FadeIn(square_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(square_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                self.add(square_obj)
-                                self.play(Create(square_obj), run_time=duration)
-                
-                objects_created.append(square_obj)
-                self.wait(0.3)
-                
-            elif obj_type == 'axes':
-                # Create coordinate axes
-                x_range = props.get('x_range', [-4, 4, 1])
-                y_range = props.get('y_range', [-3, 3, 1])
-                pos = props.get('position', [0, 0, 0])
-                color_name = props.get('color', 'WHITE')
-                show_labels = props.get('show_labels', True)
-                
-                # Color validation
-                try:
-                    if isinstance(color_name, str) and color_name.startswith('#'):
-                        rgb_values = hex_to_rgb(color_name)
-                        color = rgb_to_color(rgb_values)
-                    else:
-                        color_mapping = {{
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
-                        }}
-                        color = color_mapping.get(str(color_name), WHITE)
-                except:
-                    color = WHITE
-                
-                axes_obj = Axes(
-                    x_range=x_range,
-                    y_range=y_range,
-                    axis_config={{"color": color}},
-                    tips=True
-                )
-                axes_obj.move_to(pos)
-                
-                # Handle animations
-                animations = obj.get('animations', [])
-                if not animations:
-                    self.add(axes_obj)
-                    self.play(Create(axes_obj), run_time=1.0)
-                else:
-                    # Process animations with timing
-                    for anim in animations:
-                        anim_type = anim.get('type', 'fade_in')
-                        duration = anim.get('duration', 1.0)
-                        start_time = anim.get('start_time', 'immediate')
-                        
-                        if start_time == 'before_next':
-                            self.add(axes_obj)
-                            self.play(FadeIn(axes_obj), run_time=0.3)
-                            if not hasattr(self, 'objects_to_fade_out'):
-                                self.objects_to_fade_out = []
-                            self.objects_to_fade_out.append(axes_obj)
-                        elif start_time == 'after_previous_fade':
-                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
-                                prev_obj = self.objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            self.wait(0.1)
-                            self.add(axes_obj)
-                            self.play(FadeIn(axes_obj), run_time=duration)
-                        elif start_time == 'sequential':
-                            # Object appears in sequence - Manim will handle timing automatically
-                            self.add(axes_obj)
-                            self.play(FadeIn(axes_obj), run_time=duration)
-                        elif start_time == 'after_sequence':
-                            # Object fades out after the entire sequence is complete
-                            # Wait for all fade-ins to complete, then fade out
-                            self.wait(0.5)  # Small delay to ensure smooth transition
-                            self.play(FadeOut(axes_obj), run_time=duration)
-                        elif start_time == 'before_next_transient':
-                            # This transient object should fade out before the next transient object
-                            self.add(axes_obj)
-                            self.play(FadeIn(axes_obj), run_time=0.3)
-                            # Store for fade-out when next transient object appears
-                            if not hasattr(self, 'transient_objects_to_fade_out'):
-                                self.transient_objects_to_fade_out = []
-                            self.transient_objects_to_fade_out.append(axes_obj)
-                        elif start_time == 'after_previous_transient_fade':
-                            # This transient object should fade in after the previous transient object fades out
-                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
-                                prev_obj = self.transient_objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            
-                            # Small delay for smooth transition
-                            self.wait(0.1)
-                            self.add(axes_obj)
-                            self.play(FadeIn(axes_obj), run_time=duration)
-                        else:
-                            # Default animation handling
-                            if anim_type == 'fade_in':
-                                self.add(axes_obj)
-                                self.play(FadeIn(axes_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(axes_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                self.add(axes_obj)
-                                self.play(Create(axes_obj), run_time=duration)
-                
-                objects_created.append(axes_obj)
-                self.wait(0.5)
-                
-            elif obj_type == 'plot':
-                # Create function plots
-                color_name = props.get('color', 'YELLOW')
-                pos = props.get('position', [0, 0, 0])
-                function_type = props.get('function', 'sine')
-                
-                # Color validation
-                try:
-                    if isinstance(color_name, str) and color_name.startswith('#'):
-                        rgb_values = hex_to_rgb(color_name)
-                        color = rgb_to_color(rgb_values)
-                    else:
-                        color_mapping = {{
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
-                        }}
-                        color = color_mapping.get(str(color_name), YELLOW)
-                except:
-                    color = YELLOW
-                
-                # Create plot based on function type
-                if function_type == 'sine':
-                    plot_obj = FunctionGraph(
-                        lambda x: np.sin(x),
-                        x_range=[-4, 4],
-                    color=color,
-                        stroke_width=3
-                    )
-                elif function_type == 'cosine':
-                    plot_obj = FunctionGraph(
-                        lambda x: np.cos(x),
-                        x_range=[-4, 4],
-                        color=color,
-                        stroke_width=3
-                    )
-                elif function_type == 'tangent':
-                    plot_obj = FunctionGraph(
-                        lambda x: np.tan(x),
-                        x_range=[-1.5, 1.5],
-                        color=color,
-                        stroke_width=3
-                    )
-                elif function_type == 'exponential':
-                    plot_obj = FunctionGraph(
-                        lambda x: np.exp(x),
-                        x_range=[-2, 2],
-                        color=color,
-                        stroke_width=3
-                    )
-                else:
-                    # Default to sine
-                    plot_obj = FunctionGraph(
-                        lambda x: np.sin(x),
-                        x_range=[-4, 4],
-                        color=color,
-                        stroke_width=3
-                    )
-                
-                plot_obj.move_to(pos)
-                
-                # Handle animations
-                animations = obj.get('animations', [])
-                if not animations:
-                    self.add(plot_obj)
-                    self.play(Create(plot_obj), run_time=1.0)
-                else:
-                    # Process animations with timing
-                    for anim in animations:
-                        anim_type = anim.get('type', 'fade_in')
-                        duration = anim.get('duration', 1.0)
-                        start_time = anim.get('start_time', 'immediate')
-                        
-                        if start_time == 'before_next':
-                            self.add(plot_obj)
-                            self.play(FadeIn(plot_obj), run_time=0.3)
-                            if not hasattr(self, 'objects_to_fade_out'):
-                                self.objects_to_fade_out = []
-                            self.objects_to_fade_out.append(plot_obj)
-                        elif start_time == 'after_previous_fade':
-                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
-                                prev_obj = self.objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            self.wait(0.1)
-                            self.add(plot_obj)
-                            self.play(FadeIn(plot_obj), run_time=duration)
-                        elif start_time == 'immediate':
-                            # Object appears immediately
-                            self.add(plot_obj)
-                            self.play(FadeIn(plot_obj), run_time=duration)
-                        elif start_time == 'after_persistent_display':
-                            # Object appears after persistent objects (axes, plots) are visible
-                            # Wait a bit for persistent objects to be fully visible
-                            self.wait(0.5)
-                            self.add(plot_obj)
-                            self.play(FadeIn(plot_obj), run_time=duration)
-                        elif start_time == 'before_next_transient':
-                            # This transient object should fade out before the next transient object
-                            self.add(plot_obj)
-                            self.play(FadeIn(plot_obj), run_time=0.3)
-                            # Store for fade-out when next transient object appears
-                            if not hasattr(self, 'transient_objects_to_fade_out'):
-                                self.transient_objects_to_fade_out = []
-                            self.transient_objects_to_fade_out.append(plot_obj)
-                        elif start_time == 'after_previous_transient_fade':
-                            # This transient object should fade in after the previous transient object fades out
-                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
-                                prev_obj = self.transient_objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            
-                            # Small delay for smooth transition
-                            self.wait(0.1)
-                            self.add(plot_obj)
-                            self.play(FadeIn(plot_obj), run_time=duration)
-                        else:
-                            # Default animation handling
-                            if anim_type == 'fade_in':
-                                self.add(plot_obj)
-                                self.play(FadeIn(plot_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(plot_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                self.add(plot_obj)
-                                self.play(Create(plot_obj), run_time=duration)
-                
-                objects_created.append(plot_obj)
-                self.wait(0.5)
-                
-            elif obj_type == 'dot':
-                # Create geometric points
-                size = props.get('size', 0.1)
-                color_name = props.get('color', 'RED')
-                pos = props.get('position', [0, 0, 0])
-                
-                # Color validation
-                try:
-                    if isinstance(color_name, str) and color_name.startswith('#'):
-                        rgb_values = hex_to_rgb(color_name)
-                        color = rgb_to_color(rgb_values)
-                    else:
-                        color_mapping = {{
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
-                        }}
-                        color = color_mapping.get(str(color_name), RED)
-                except:
-                    color = RED
-                
-                dot_obj = Dot(
-                    radius=size,
-                    color=color,
-                    fill_opacity=1.0
-                )
-                dot_obj.move_to(pos)
-                
-                # Handle animations
-                animations = obj.get('animations', [])
-                if not animations:
-                    self.add(dot_obj)
-                    self.play(Create(dot_obj), run_time=0.5)
-                else:
-                    # Process animations with timing
-                    for anim in animations:
-                        anim_type = anim.get('type', 'fade_in')
-                        duration = anim.get('duration', 0.5)
-                        start_time = anim.get('start_time', 'immediate')
-                        
-                        if start_time == 'before_next':
-                            self.add(dot_obj)
-                            self.play(FadeIn(dot_obj), run_time=0.3)
-                            if not hasattr(self, 'objects_to_fade_out'):
-                                self.objects_to_fade_out = []
-                            self.objects_to_fade_out.append(dot_obj)
-                        elif start_time == 'after_previous_fade':
-                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
-                                prev_obj = self.objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            self.wait(0.1)
-                            self.add(dot_obj)
-                            self.play(FadeIn(dot_obj), run_time=duration)
-                        elif start_time == 'sequential':
-                            # Object appears in sequence - Manim will handle timing automatically
-                            self.add(dot_obj)
-                            self.play(FadeIn(dot_obj), run_time=duration)
-                        elif start_time == 'after_sequence':
-                            # Object fades out after the entire sequence is complete
-                            # ONLY if explicitly requested - be conservative
-                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
-                                self.wait(0.5)  # Small delay to ensure smooth transition
-                                self.play(FadeOut(dot_obj), run_time=duration)
-                            else:
-                                # Keep object visible - no unnecessary fade-out
-                                self.wait(0.5)
-                                print(f"  ✅ dot object kept visible (no fade-out)")
-                        elif start_time == 'before_next_transient':
-                            # This transient object should fade out before the next transient object
-                            self.add(dot_obj)
-                            self.play(FadeIn(dot_obj), run_time=0.3)
-                            # Store for fade-out when next transient object appears
-                            if not hasattr(self, 'transient_objects_to_fade_out'):
-                                self.transient_objects_to_fade_out = []
-                            self.transient_objects_to_fade_out.append(dot_obj)
-                        elif start_time == 'after_previous_transient_fade':
-                            # This transient object should fade in after the previous transient object fades out
-                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
-                                prev_obj = self.transient_objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            
-                            # Small delay for smooth transition
-                            self.wait(0.1)
-                            self.add(dot_obj)
-                            self.play(FadeIn(dot_obj), run_time=duration)
-                        else:
-                            # Default animation handling
-                            if anim_type == 'fade_in':
-                                self.add(dot_obj)
-                                self.play(FadeIn(dot_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(dot_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                self.add(dot_obj)
-                                self.play(Create(dot_obj), run_time=duration)
-                
-                objects_created.append(dot_obj)
-                self.wait(0.3)
-                
-            elif obj_type == 'text':
-                # Create text annotations
-                content = props.get('text', 'Text')
-                size = props.get('size', 0.5)
-                color_name = props.get('color', 'WHITE')
-                pos = props.get('position', [0, 0, 0])
-                
-                # Color validation
-                try:
-                    if isinstance(color_name, str) and color_name.startswith('#'):
-                        rgb_values = hex_to_rgb(color_name)
-                        color = rgb_to_color(rgb_values)
-                    else:
-                        color_mapping = {{
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
-                        }}
-                        color = color_mapping.get(str(color_name), WHITE)
-                except:
-                    color = WHITE
-                
-                # Convert size to font size
-                font_size = int(size * 48)  # Scale factor for readable text
-                
-                text_obj = Text(
-                    content,
-                    font_size=font_size,
-                    color=color
-                )
-                text_obj.move_to(pos)
-                
-                # Handle animations
-                animations = obj.get('animations', [])
-                if not animations:
-                    self.add(text_obj)
-                    self.play(FadeIn(text_obj), run_time=0.5)
-                else:
-                    # Process animations with timing
-                    for anim in animations:
-                        anim_type = anim.get('type', 'fade_in')
-                        duration = anim.get('duration', 0.5)
-                        start_time = anim.get('start_time', 'immediate')
-                        
-                        if start_time == 'before_next':
-                            self.add(text_obj)
-                            self.play(FadeIn(text_obj), run_time=0.3)
-                            if not hasattr(self, 'objects_to_fade_out'):
-                                self.objects_to_fade_out = []
-                            self.objects_to_fade_out.append(text_obj)
-                        elif start_time == 'after_previous_fade':
-                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
-                                prev_obj = self.objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            self.wait(0.1)
-                            self.add(text_obj)
-                            self.play(FadeIn(text_obj), run_time=duration)
-                        elif start_time == 'sequential':
-                            # Object appears in sequence - Manim will handle timing automatically
-                            self.add(text_obj)
-                            self.play(FadeIn(text_obj), run_time=duration)
-                        elif start_time == 'after_sequence':
-                            # Object fades out after the entire sequence is complete
-                            # ONLY if explicitly requested - be conservative
-                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
-                                self.wait(0.5)  # Small delay to ensure smooth transition
-                                self.play(FadeOut(text_obj), run_time=duration)
-                            else:
-                                # Keep object visible - no unnecessary fade-out
-                                self.wait(0.5)
-                                print(f"  ✅ text object kept visible (no fade-out)")
-                        elif start_time == 'after_previous_transient_fade':
-                            # This transient object should fade out before the next transient object
-                            self.add(text_obj)
-                            self.play(FadeIn(text_obj), run_time=0.3)
-                            self.play(FadeOut(text_obj), run_time=0.3)
-                        else:
-                            # Default animation handling
-                            if anim_type == 'fade_in':
-                                self.add(text_obj)
-                                self.play(FadeIn(text_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(text_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                self.add(text_obj)
-                                self.play(Create(text_obj), run_time=duration)
-                
-                objects_created.append(text_obj)
-                self.wait(0.3)
-                
-            elif obj_type == 'triangle':
-                # Create triangle geometric shape
-                size = props.get('size', 1)
-                color_name = props.get('color', 'GREEN')
-                pos = props.get('position', [0, 0, 0])
-                
-                # Color validation
-                try:
-                    if isinstance(color_name, str) and color_name.startswith('#'):
-                        rgb_values = hex_to_rgb(color_name)
-                        color = rgb_to_color(rgb_values)
-                    else:
-                        color_mapping = {{
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
-                        }}
-                        color = color_mapping.get(str(color_name), GREEN)
-                except:
-                    color = GREEN
-                
-                triangle_obj = Triangle(
-                        fill_color=color, 
-                        stroke_color=color, 
-                        fill_opacity=1.0, 
-                        stroke_width=3
-                    )
-                triangle_obj.scale(size)
-                triangle_obj.move_to(pos)
-                
-                # Handle animations
-                animations = obj.get('animations', [])
-                if not animations:
-                    self.add(triangle_obj)
-                    self.play(Create(triangle_obj), run_time=0.8)
-                else:
-                    # Process animations with timing
-                    for anim in animations:
-                        anim_type = anim.get('type', 'fade_in')
-                        duration = anim.get('duration', 0.8)
-                        start_time = anim.get('start_time', 'immediate')
-                        
-                        if start_time == 'before_next':
-                            self.add(triangle_obj)
-                            self.play(FadeIn(triangle_obj), run_time=0.3)
-                            if not hasattr(self, 'objects_to_fade_out'):
-                                self.objects_to_fade_out = []
-                            self.objects_to_fade_out.append(triangle_obj)
-                        elif start_time == 'after_previous_fade':
-                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
-                                prev_obj = self.objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            self.wait(0.1)
-                            self.add(triangle_obj)
-                            self.play(FadeIn(triangle_obj), run_time=duration)
-                        elif start_time == 'sequential':
-                            # Object appears in sequence - Manim will handle timing automatically
-                            self.add(triangle_obj)
-                            self.play(FadeIn(triangle_obj), run_time=duration)
-                        elif start_time == 'after_sequence':
-                            # Object fades out after the entire sequence is complete
-                            # ONLY if explicitly requested - be conservative
-                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
-                                self.wait(0.5)  # Small delay to ensure smooth transition
-                                self.play(FadeOut(triangle_obj), run_time=duration)
-                            else:
-                                # Keep object visible - no unnecessary fade-out
-                                self.wait(0.5)
-                                print(f"  ✅ triangle object kept visible (no fade-out)")
-                        elif start_time == 'before_next_transient':
-                            # This transient object should fade out before the next transient object
-                            self.add(triangle_obj)
-                            self.play(FadeIn(triangle_obj), run_time=0.3)
-                            # Store for fade-out when next transient object appears
-                            if not hasattr(self, 'transient_objects_to_fade_out'):
-                                self.transient_objects_to_fade_out = []
-                            self.transient_objects_to_fade_out.append(triangle_obj)
-                        elif start_time == 'after_previous_transient_fade':
-                            # This transient object should fade in after the previous transient object fades out
-                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
-                                prev_obj = self.transient_objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            
-                            # Small delay for smooth transition
-                            self.wait(0.1)
-                            self.add(triangle_obj)
-                            self.play(FadeIn(triangle_obj), run_time=duration)
-                        else:
-                            # Default animation handling
-                            if anim_type == 'fade_in':
-                                self.add(triangle_obj)
-                                self.play(FadeIn(triangle_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(triangle_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                self.add(triangle_obj)
-                                self.play(Create(triangle_obj), run_time=duration)
-                
-                objects_created.append(triangle_obj)
-                self.wait(0.3)
-                
-            elif obj_type == 'diamond':
-                # Create diamond geometric shape (using square rotated 45 degrees)
-                size = props.get('size', 1)
-                color_name = props.get('color', 'PURPLE')
-                pos = props.get('position', [0, 0, 0])
-                
-                # Color validation
-                try:
-                    if isinstance(color_name, str) and color_name.startswith('#'):
-                        rgb_values = hex_to_rgb(color_name)
-                        color = rgb_to_color(rgb_values)
-                    else:
-                        color_mapping = {{
-                            'WHITE': WHITE, 'BLACK': BLACK, 'RED': RED, 'GREEN': GREEN, 'BLUE': BLUE,
-                            'YELLOW': YELLOW, 'PURPLE': PURPLE, 'ORANGE': ORANGE, 'PINK': PINK
-                        }}
-                        color = color_mapping.get(str(color_name), PURPLE)
-                except:
-                    color = PURPLE
-                
-                diamond_obj = Square(
-                    side_length=size, 
-                    fill_color=color, 
-                    stroke_color=color, 
-                    fill_opacity=1.0, 
-                    stroke_width=3
-                )
-                diamond_obj.rotate(np.pi/4)  # Rotate 45 degrees
-                diamond_obj.move_to(pos)
-                
-                # Handle animations
-                animations = obj.get('animations', [])
-                if not animations:
-                    self.add(diamond_obj)
-                    self.play(Create(diamond_obj), run_time=0.8)
-                else:
-                    # Process animations with timing
-                    for anim in animations:
-                        anim_type = anim.get('type', 'fade_in')
-                        duration = anim.get('duration', 0.8)
-                        start_time = anim.get('start_time', 'immediate')
-                        
-                        if start_time == 'before_next':
-                            self.add(diamond_obj)
-                            self.play(FadeIn(diamond_obj), run_time=0.3)
-                            if not hasattr(self, 'objects_to_fade_out'):
-                                self.objects_to_fade_out = []
-                            self.objects_to_fade_out.append(diamond_obj)
-                        elif start_time == 'after_previous_fade':
-                            if hasattr(self, 'objects_to_fade_out') and self.objects_to_fade_out:
-                                prev_obj = self.objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            self.wait(0.1)
-                            self.add(diamond_obj)
-                            self.play(FadeIn(diamond_obj), run_time=duration)
-                        elif start_time == 'sequential':
-                            # Object appears in sequence - Manim will handle timing automatically
-                            self.add(diamond_obj)
-                            self.play(FadeIn(diamond_obj), run_time=duration)
-                        elif start_time == 'after_sequence':
-                            # Object fades out after the entire sequence is complete
-                            # ONLY if explicitly requested - be conservative
-                            if 'fade_out' in str(anim) or 'disappear' in str(anim):
-                                self.wait(0.5)  # Small delay to ensure smooth transition
-                                self.play(FadeOut(diamond_obj), run_time=duration)
-                            else:
-                                # Keep object visible - no unnecessary fade-out
-                                self.wait(0.5)
-                                print(f"  ✅ diamond object kept visible (no fade-out)")
-                        elif start_time == 'before_next_transient':
-                            # This transient object should fade out before the next transient object
-                            self.add(diamond_obj)
-                            self.play(FadeIn(diamond_obj), run_time=duration)
-                            # Store for fade-out when next transient object appears
-                            if not hasattr(self, 'transient_objects_to_fade_out'):
-                                self.transient_objects_to_fade_out = []
-                            self.transient_objects_to_fade_out.append(diamond_obj)
-                        elif start_time == 'after_previous_transient_fade':
-                            # This transient object should fade in after the previous transient object fades out
-                            if hasattr(self, 'transient_objects_to_fade_out') and self.transient_objects_to_fade_out:
-                                prev_obj = self.transient_objects_to_fade_out.pop(0)
-                                self.play(FadeOut(prev_obj), run_time=0.3)
-                            
-                            # Small delay for smooth transition
-                            self.wait(0.1)
-                            self.add(diamond_obj)
-                            self.play(FadeIn(diamond_obj), run_time=duration)
-                        else:
-                            # Default animation handling
-                            if anim_type == 'fade_in':
-                                self.add(diamond_obj)
-                                self.play(FadeIn(diamond_obj), run_time=duration)
-                            elif anim_type == 'fade_out':
-                                self.play(FadeOut(diamond_obj), run_time=duration)
-                            elif anim_type == 'wait':
-                                self.wait(duration)
-                            else:
-                                self.add(diamond_obj)
-                                self.play(Create(diamond_obj), run_time=duration)
-                
-                objects_created.append(diamond_obj)
-                self.wait(0.3)
-                
-            else:
-                # Unknown object type - skip
-                print(f"Unknown object type: {{obj_type}} for object {{obj_id}}")
-                continue
-        
-        # ENHANCED: Apply smart camera management strategies
-        try:
-            # Apply camera strategies based on object types and positioning
-            self._apply_smart_camera_management(objects_created)
-            print("Smart camera management applied successfully")
-        except Exception as e:
-            print(f"Camera management failed: {{e}}")
-        
-        # Final wait to show all objects
-        self.wait(2.0)
-        print(f"Animation completed with {{len(objects_created)}} objects")
-"""
+                    # Auto-detect based on content
+                    use_3d = any(str(o.get("type", "")).lower() in {"surface", "parametric_surface", "surface3d"} for o in objects_list)
+                    scene_base = "ThreeDScene" if use_3d else "Scene"
+            except Exception:
+                use_3d = False
+                scene_base = "Scene"
 
-            return manim_code
-            
+            parts: List[str] = []
+            parts.append("import numpy as np")
+            parts.append("from manim import *")
+            parts.append("")
+            parts.append(f"class GeneratedScene({scene_base}):")
+            parts.append("    def construct(self):")
+            parts.append(f"        # Animation: {scene_description}")
+            parts.append("        bg_color = '" + bg_color + "'")
+            parts.append("        try:")
+            parts.append("            if bg_color.lower() in ['#ffffff', '#fff', 'white', 'ffffff']:")
+            parts.append("                bg_color = '#000000'")
+            parts.append("            if bg_color.startswith('#'):")
+            parts.append("                self.camera.background_color = rgb_to_color(hex_to_rgb(bg_color))")
+            parts.append("            else:")
+            parts.append("                self.camera.background_color = rgb_to_color([0, 0, 0])")
+            parts.append("        except Exception:")
+            parts.append("            self.camera.background_color = rgb_to_color([0, 0, 0])")
+            parts.append("")
+            parts.append("        try:")
+            parts.append("            self.camera.frame.set(width=14, height=10)")
+            parts.append("            self.camera.frame.move_to([0, 0, 0])")
+            parts.append("        except Exception:")
+            parts.append("            pass")
+            parts.append("")
+
+            def emit_anims(var_name: str, animations: List[Dict[str, Any]]):
+                queue: List[str] = []
+                for anim in animations or []:
+                    a = str(anim.get('type', 'fade_in')).lower()
+                    dur = float(anim.get('duration', 1.0))
+                    params = anim.get('parameters', {})
+                    group = anim.get('group')
+
+                    if a == 'wait':
+                        parts.append(f"        self.wait({dur})")
+                    elif a == 'fade_in':
+                        if group == 'parallel':
+                            queue.append(f"FadeIn({var_name}, run_time={dur})")
+                        else:
+                            parts.append(f"        self.add({var_name})")
+                            parts.append(f"        self.play(FadeIn({var_name}), run_time={dur})")
+                    elif a == 'fade_out':
+                        if group == 'parallel':
+                            queue.append(f"FadeOut({var_name}, run_time={dur})")
+                        else:
+                            parts.append(f"        self.play(FadeOut({var_name}), run_time={dur})")
+                    elif a == 'create':
+                        if group == 'parallel':
+                            queue.append(f"Create({var_name}, run_time={dur})")
+                        else:
+                            parts.append(f"        self.play(Create({var_name}), run_time={dur})")
+                    elif a == 'write':
+                        if group == 'parallel':
+                            queue.append(f"Write({var_name}, run_time={dur})")
+                        else:
+                            parts.append(f"        self.play(Write({var_name}), run_time={dur})")
+                    elif a == 'draw_border_then_fill':
+                        if group == 'parallel':
+                            queue.append(f"DrawBorderThenFill({var_name}, run_time={dur})")
+                        else:
+                            parts.append(f"        self.play(DrawBorderThenFill({var_name}), run_time={dur})")
+                    elif a == 'move':
+                        target_pos = params.get('target_position') or params.get('to')
+                        if target_pos:
+                            if group == 'parallel':
+                                queue.append(f"{var_name}.animate.move_to({target_pos}).set_run_time({dur})")
+                            else:
+                                parts.append(f"        self.play({var_name}.animate.move_to({target_pos}), run_time={dur})")
+                    elif a == 'scale':
+                        scale_factor = params.get('scale_factor', 1.5)
+                        if group == 'parallel':
+                            queue.append(f"{var_name}.animate.scale({scale_factor}).set_run_time({dur})")
+                        else:
+                            parts.append(f"        self.play({var_name}.animate.scale({scale_factor}), run_time={dur})")
+                    elif a == 'rotate':
+                        angle = params.get('angle', 1.57)  # 90 degrees in radians
+                        if group == 'parallel':
+                            queue.append(f"{var_name}.animate.rotate({angle}).set_run_time({dur})")
+                        else:
+                            parts.append(f"        self.play({var_name}.animate.rotate({angle}), run_time={dur})")
+                    elif a == 'transform':
+                        target_id = params.get('target_id')
+                        if target_id:
+                            if group == 'parallel':
+                                queue.append(f"Transform({var_name}, {target_id}, run_time={dur})")
+                            else:
+                                parts.append(f"        self.play(Transform({var_name}, {target_id}), run_time={dur})")
+                    elif a == 'replacement_transform':
+                        target_id = params.get('target_id')
+                        if target_id:
+                            if group == 'parallel':
+                                queue.append(f"ReplacementTransform({var_name}, {target_id}, run_time={dur})")
+                            else:
+                                parts.append(f"        self.play(ReplacementTransform({var_name}, {target_id}), run_time={dur})")
+                    elif a == 'move_along_path':
+                        pts = params.get('path_points', [])
+                        if pts:
+                            parts.append("        path = VMobject()")
+                            parts.append(f"        path.set_points_as_corners([np.array([p[0], p[1], (p[2] if len(p)>2 else 0.0)]) for p in {pts}])")
+                            if group == 'parallel':
+                                queue.append(f"MoveAlongPath({var_name}, path, run_time={dur})")
+                            else:
+                                parts.append(f"        self.play(MoveAlongPath({var_name}, path), run_time={dur})")
+                    elif a == 'grow_from_center':
+                        if group == 'parallel':
+                            queue.append(f"GrowFromCenter({var_name}, run_time={dur})")
+                        else:
+                            parts.append(f"        self.play(GrowFromCenter({var_name}), run_time={dur})")
+                    elif a == 'grow_from_edge':
+                        if group == 'parallel':
+                            queue.append(f"GrowFromEdge({var_name}, run_time={dur})")
+                        else:
+                            parts.append(f"        self.play(GrowFromEdge({var_name}), run_time={dur})")
+                    elif a == 'show_creation':
+                        if group == 'parallel':
+                            queue.append(f"ShowCreation({var_name}, run_time={dur})")
+                        else:
+                            parts.append(f"        self.play(ShowCreation({var_name}), run_time={dur})")
+                    else:
+                        # Universal animation handling - try to create any Manim animation
+                        anim_name = a.replace('_', '').title()  # Convert snake_case to CamelCase
+
+                        # Try to create the animation dynamically
+                        parts.append(f"        try:")
+                        parts.append(f"            # Try to create {anim_name} animation")
+
+                        # Handle special animation cases
+                        if 'move' in a.lower() and 'path' in a.lower():
+                            # MoveAlongPath animation
+                            pts = params.get('path_points', [])
+                            if pts:
+                                parts.append(f"            path = VMobject()")
+                                parts.append(f"            path.set_points_as_corners([np.array([p[0], p[1], (p[2] if len(p) > 2 else 0.0)]) for p in {pts}])")
+                                if group == 'parallel':
+                                    queue.append(f"MoveAlongPath({var_name}, path, run_time={dur})")
+                                else:
+                                    parts.append(f"            self.play(MoveAlongPath({var_name}, path), run_time={dur})")
+                            else:
+                                parts.append(f"            # MoveAlongPath requires path_points")
+                                parts.append(f"            self.play(FadeIn({var_name}), run_time={dur})")
+                        elif 'transform' in a.lower():
+                            # Transform animation
+                            target_id = params.get('target_id')
+                            if target_id:
+                                if group == 'parallel':
+                                    queue.append(f"Transform({var_name}, {target_id}, run_time={dur})")
+                                else:
+                                    parts.append(f"            self.play(Transform({var_name}, {target_id}), run_time={dur})")
+                            else:
+                                parts.append(f"            # Transform requires target_id")
+                                parts.append(f"            self.play(FadeIn({var_name}), run_time={dur})")
+                        else:
+                            # Try to create animation with the given name
+                            anim_params = []
+                            if params:
+                                for key, value in params.items():
+                                    if isinstance(value, str):
+                                        anim_params.append(f"{key}='{value}'")
+                                    elif isinstance(value, list):
+                                        anim_params.append(f"{key}={value}")
+                                    else:
+                                        anim_params.append(f"{key}={value}")
+
+                            param_str = ", ".join(anim_params) if anim_params else ""
+
+                            if group == 'parallel':
+                                queue.append(f"{anim_name}({var_name}, run_time={dur}{', ' + param_str if param_str else ''})")
+                            else:
+                                parts.append(f"            self.play({anim_name}({var_name}, run_time={dur}{', ' + param_str if param_str else ''}))")
+
+                        parts.append(f"        except Exception as anim_e:")
+                        parts.append(f"            # Fallback to FadeIn if {anim_name} fails")
+                        parts.append(f"            logger.warning(f'Failed to create {anim_name} animation: {{anim_e}}, using fallback')")
+                        if group == 'parallel':
+                            queue.append(f"FadeIn({var_name}, run_time={dur})")
+                        else:
+                            parts.append(f"            self.add({var_name})")
+                            parts.append(f"            self.play(FadeIn({var_name}), run_time={dur})")
+
+                if queue:
+                    parts.append(f"        self.add({var_name})")
+                    parts.append(f"        self.play(AnimationGroup({', '.join(queue)}, lag_ratio=0))")
+
+            for obj in objects_list:
+                otype = str(obj.get('type', 'unknown')).lower()
+                oid = obj.get('id', 'obj')
+                props = obj.get('properties', {})
+                parts.append(f"        # Object: {otype} ({oid})")
+
+                if otype == 'circle':
+                    pos = props.get('position', [0,0,0])
+                    r = float(props.get('size', 1.0))
+                    color = props.get('color', 'RED')
+                    parts.append(f"        circle = Circle(radius={r}, color={color})")
+                    parts.append(f"        circle.move_to({pos})")
+                    emit_anims('circle', obj.get('animations', []))
+
+                elif otype == 'square':
+                    pos = props.get('position', [0,0,0])
+                    s = float(props.get('size', 2.0))
+                    color = props.get('color', 'BLUE')
+                    parts.append(f"        square = Square(side_length={s}, color={color})")
+                    parts.append(f"        square.move_to({pos})")
+                    emit_anims('square', obj.get('animations', []))
+
+                elif otype == 'dot':
+                    pos = props.get('position', [0,0,0])
+                    rad = float(props.get('size', 0.08))
+                    color = props.get('color', 'WHITE')
+                    parts.append(f"        dot = Dot(point={pos}, radius={rad}, color={color})")
+                    emit_anims('dot', obj.get('animations', []))
+
+                elif otype == 'text':
+                    txt = str(props.get('text', 'Text'))
+                    pos = props.get('position', [0,0,0])
+                    fs = int(props.get('font_size', 36))
+                    parts.append(f"        text = Text(text='{txt}', font_size={fs})")
+                    parts.append(f"        text.move_to({pos})")
+                    emit_anims('text', obj.get('animations', []))
+
+                elif otype == 'axes':
+                    pos = props.get('position', [0,0,0])
+                    parts.append("        axes = Axes()")
+                    parts.append(f"        axes.move_to({pos})")
+                    emit_anims('axes', obj.get('animations', []))
+
+                elif otype == 'polygon':
+                    pts = props.get('points', [[-1,0,0],[1,0,0],[0,1,0]])
+                    pos = props.get('position', [0,0,0])
+                    parts.append(f"        poly = Polygon(*[tuple(p) for p in {pts}], color=BLUE)")
+                    parts.append(f"        poly.move_to({pos})")
+                    emit_anims('poly', obj.get('animations', []))
+
+                elif otype in {'surface','parametric_surface','surface3d'}:
+                    u = props.get('u_range', [-2,2])
+                    v = props.get('v_range', [-2,2])
+                    pos = props.get('position', [0,0,0])
+                    parts.append("        surf = ParametricSurface(lambda u,v: np.array([u, v, 0.5*np.sin(u)*np.cos(v)]), "
+                                 f"u_range={u}, v_range={v}, checkerboard_colors=[BLUE_D, BLUE_E])")
+                    parts.append(f"        surf.move_to({pos})")
+                    emit_anims('surf', obj.get('animations', []))
+
+                elif otype == 'parametric_function':
+                    # Handle parametric functions with enhanced support
+                    pos = props.get('position', [0,0,0])
+                    t_range = props.get('t_range', [0, 2*np.pi])
+                    color = props.get('color', 'BLUE')
+
+                    # Default parametric function (circle) with customizable parameters
+                    parts.append(f"        func = ParametricFunction(lambda t: np.array([np.cos(t), np.sin(t), 0]), t_range={t_range}, color={color})")
+                    parts.append(f"        func.move_to({pos})")
+                    emit_anims('func', obj.get('animations', []))
+
+                elif otype == 'matrix':
+                    data = props.get('data', [[1,0],[0,1]])
+                    pos = props.get('position', [0,0,0])
+                    parts.append(f"        m = Matrix({data})")
+                    parts.append(f"        m.move_to({pos})")
+                    emit_anims('m', obj.get('animations', []))
+
+                elif otype == 'table':
+                    data = props.get('data', [["A","B"],["C","D"]])
+                    pos = props.get('position', [0,0,0])
+                    parts.append(f"        t = Table({data})")
+                    parts.append(f"        t.move_to({pos})")
+                    emit_anims('t', obj.get('animations', []))
+
+                elif otype in {'valuetracker','value_tracker'}:
+                    initial = float(props.get('initial', 0.0))
+                    parts.append(f"        vt_{oid} = ValueTracker({initial})")
+                else:
+                    # Universal object creation - handle any Manim object type
+                    position = props.get('position', [0, 0, 0])
+                    color = props.get('color', 'WHITE')
+                    size = props.get('size', 1.0)
+
+                    # Attempt to create any Manim object dynamically
+                    parts.append(f"        # Universal object creation: {otype}")
+                    parts.append(f"        try:")
+                    parts.append(f"            # Try to create {otype} with intelligent parameter mapping")
+                    parts.append(f"            obj_params = {{}}")
+
+                    # Map common properties to constructor parameters based on object type
+                    if 'circle' in otype.lower() or 'sphere' in otype.lower():
+                        parts.append(f"            obj_params['radius'] = {size}")
+                    elif 'square' in otype.lower() or 'rectangle' in otype.lower():
+                        parts.append(f"            obj_params['side_length'] = {size}")
+                    elif 'dot' in otype.lower():
+                        parts.append(f"            obj_params['radius'] = {size}")
+                    elif 'text' in otype.lower():
+                        text_content = props.get('text', f'{otype} object')
+                        parts.append(f"            obj_params['text'] = '{text_content}'")
+                        font_size = props.get('font_size', 36)
+                        parts.append(f"            obj_params['font_size'] = {font_size}")
+
+                    # Add color if applicable
+                    if 'color' in props and otype.lower() not in ['text', 'tex', 'mathtex']:
+                        parts.append(f"            obj_params['color'] = '{color}'")
+
+                    # Add any custom properties that aren't position/size/color/animations
+                    for key, value in props.items():
+                        if key not in ['position', 'size', 'color', 'animations', 'text', 'font_size']:
+                            if isinstance(value, str):
+                                parts.append(f"            obj_params['{key}'] = '{value}'")
+                            elif isinstance(value, list):
+                                parts.append(f"            obj_params['{key}'] = {value}")
+                            else:
+                                parts.append(f"            obj_params['{key}'] = {value}")
+
+                    # Create the object dynamically
+                    parts.append(f"            {oid} = {otype}(**obj_params)")
+                    parts.append(f"            {oid}.move_to({position})")
+                    parts.append(f"            {oid}._animathic_id = '{oid}'")
+                    parts.append(f"        except Exception as e:")
+                    parts.append(f"            # Fallback to circle if {otype} creation fails")
+                    parts.append(f"            logger.warning(f'Failed to create {otype}: {{e}}, using fallback')")
+                    parts.append(f"            {oid} = Circle(radius={size}, color='{color}')")
+                    parts.append(f"            {oid}.move_to({position})")
+                    parts.append(f"            {oid}._animathic_id = '{oid}'")
+
+                    emit_anims(oid, obj.get('animations', []))
+
+            parts.append("        self.wait(2.0)")
+            return "\n".join(parts)
         except Exception as e:
-            logger.error(f"Error generating Manim code: {{e}}")
+            logger.error(f"Error generating Manim code: {e}")
             raise
-    
-    def _apply_smart_camera_management(self, objects_created):
-        """Apply smart camera management based on object types and positioning"""
-        try:
-            if not objects_created:
-                return
-            
-            # Analyze objects for camera optimization
-            math_objects = [obj for obj in objects_created if hasattr(obj, 'type') and obj.type in ['plot', 'function', 'graph', 'axes']]
-            text_objects = [obj for obj in objects_created if hasattr(obj, 'type') and obj.type == 'text']
-            geometric_objects = [obj for obj in objects_created if hasattr(obj, 'type') and obj.type in ['circle', 'square', 'triangle', 'diamond']]
-            
-            # Apply mathematical content optimization if needed
-            if math_objects:
-                print(f"Optimizing camera for {len(math_objects)} mathematical objects")
-                self._optimize_camera_for_math()
-            
-            # Apply text readability optimization if needed
-            if text_objects:
-                print(f"Optimizing camera for {len(text_objects)} text objects")
-                self._optimize_camera_for_text()
-            
-            # Apply geometric shape framing if needed
-            if geometric_objects:
-                print(f"Optimizing camera for {len(geometric_objects)} geometric shapes")
-                self._optimize_camera_for_shapes(len(geometric_objects))
-            
-            # Final camera adjustment based on overall object distribution
-            self._adjust_camera_for_object_distribution(objects_created)
-            
-        except Exception as e:
-            print(f"Error in smart camera management: {{e}}")
-    
-    def _optimize_camera_for_math(self):
-        """Optimize camera for mathematical content"""
-        try:
-            # Tight margins for mathematical precision
-            current_width = float(self.camera.frame.get_width())
-            optimal_width = current_width * 0.84  # 8% margin on each side
-            
-            self.camera.frame.set_width(optimal_width)
-            self.camera.frame.move_to([0, 0, 0])
-            
-            # Ensure coordinate system integrity
-            self.camera.frame.set(x_range=[-7, 7], y_range=[-5, 5])
-            
-            print("Camera optimized for mathematical content")
-            
-        except Exception as e:
-            print(f"Math camera optimization failed: {{e}}")
-    
-    def _optimize_camera_for_text(self):
-        """Optimize camera for text readability"""
-        try:
-            # Increase width for better text visibility
-            current_width = float(self.camera.frame.get_width())
-            optimal_width = current_width * 1.2  # 20% increase
-            
-            self.camera.frame.set_width(optimal_width)
-            self.camera.frame.move_to([0, 0, 0])
-            
-            print("Camera optimized for text readability")
-            
-        except Exception as e:
-            print(f"Text camera optimization failed: {{e}}")
-    
-    def _optimize_camera_for_shapes(self, shape_count):
-        """Optimize camera for geometric shapes"""
-        try:
-            # Adjust margin based on shape count
-            base_margin = 0.25
-            if shape_count > 3:
-                base_margin += 0.1
-            
-            current_width = float(self.camera.frame.get_width())
-            optimal_width = current_width * (1 + base_margin)
-            
-            self.camera.frame.set_width(optimal_width)
-            self.camera.frame.move_to([0, 0, 0])
-            
-            print(f"Camera optimized for {shape_count} geometric shapes")
-                    
-        except Exception as e:
-            print(f"Shape camera optimization failed: {{e}}")
-    
-    def _adjust_camera_for_object_distribution(self, objects_created):
-        """Adjust camera based on overall object distribution"""
-        try:
-            if len(objects_created) <= 1:
-                return
-            
-            # Calculate bounding box of all objects
-            positions = []
-            for obj in objects_created:
-                try:
-                    center = obj.get_center()
-                    positions.append(center)
-                except:
-                    continue
-            
-            if len(positions) < 2:
-                return
-            
-            # Find min/max positions
-            x_coords = [pos[0] for pos in positions]
-            y_coords = [pos[1] for pos in positions]
-            
-            min_x, max_x = min(x_coords), max(x_coords)
-            min_y, max_y = min(y_coords), max(y_coords)
-            
-            # Calculate required frame size
-            width_needed = max_x - min_x
-            height_needed = max_y - min_y
-            
-            # Ensure minimum frame size
-            min_frame_width = 8.0
-            optimal_width = max(width_needed * 1.4, min_frame_width)  # 40% margin
-            
-            # Apply camera adjustment if needed
-            current_width = float(self.camera.frame.get_width())
-            if abs(current_width - optimal_width) > 1.0:
-                self.camera.frame.set_width(optimal_width)
-                
-                # Center camera on objects
-                center_x = (min_x + max_x) / 2
-                center_y = (min_y + max_y) / 2
-                self.camera.frame.move_to([center_x, center_y, 0])
-                
-                print(f"Camera adjusted for object distribution: width={optimal_width:.2f}, center=({center_x:.2f}, {center_y:.2f})")
-            
-        except Exception as e:
-            print(f"Object distribution camera adjustment failed: {{e}}")

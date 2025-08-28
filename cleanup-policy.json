@@ -1,0 +1,7 @@
+[
+  {
+    "id": "keep-recent-5",
+    "description": "Keep the 5 most recent versions",
+    "keep": { "mostRecentVersions": { "count": 5 } }
+  }
+]

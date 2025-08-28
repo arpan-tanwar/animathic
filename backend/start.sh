@@ -38,10 +38,10 @@ print('✓ Supabase client import successful')
 
 print('5. Testing services...')
 try:
-    from services.ai_service_new import AIService
-    print('✓ AI Service import successful')
+    from services.simple_ai_service import SimpleAIService
+    print('✓ Simple AI Service import successful')
 except Exception as e:
-    print(f'✗ AI Service import failed: {e}')
+    print(f'✗ Simple AI Service import failed: {e}')
 
 print('6. Testing production config...')
 try:

@@ -36,11 +36,25 @@ class ManimObject(BaseModel):
         "ellipse",
         "triangle",
         "text",
+        "tex",
+        "mathtex",
         "line",
         "dot",
         "axes",
         "number_line",
+        "number_plane",
         "graph",
+        "polygon",
+        "arc",
+        "svg",
+        "image",
+        "brace",
+        "surrounding_rectangle",
+        "vgroup",
+        "parametric_function",
+        "table",
+        "matrix",
+        "code",
     ]
     # Generic properties; compiler will interpret according to type
     props: Dict[str, object] = Field(default_factory=dict)
@@ -50,9 +64,14 @@ class ManimScene(BaseModel):
     scene_name: str = Field(..., description="Python class name for the scene")
     background_color: str = Field("#000000")
     resolution: Tuple[int, int] = Field((1280, 720))
+    pixel_width: Optional[int] = None
+    pixel_height: Optional[int] = None
+    default_run_time: float = Field(1.0, ge=0.0)
+    default_rate_func: Optional[str] = Field(None, description="Name of Manim rate function, e.g., 'smooth'")
     imports: List[str] = Field(default_factory=lambda: ["from manim import *"])
     objects: List[ManimObject] = Field(default_factory=list)
     animations: List[AnimationStep] = Field(default_factory=list)
+    constraints: Dict[str, object] = Field(default_factory=dict, description="Scene-level constraints like layout, no_overlap, keep_on_screen")
 
     @validator("scene_name")
     def validate_scene_name(cls, value: str) -> str:

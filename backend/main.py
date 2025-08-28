@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, Depends, Header, Query
+from fastapi import FastAPI, HTTPException, Request, Depends, Header, Query, Response
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -39,7 +39,7 @@ from schemas import (
     GenerateRequest, GenerateResponse, StatusResponse, 
     VideoResponse, FeedbackRequest, HealthResponse
 )
-from services.ai_service_new import AIService
+from services.simple_ai_service import SimpleAIService
 from services.clerk_auth import require_authentication, require_authentication_long_running, optional_authentication
 from services.supabase_storage import supabase_storage
 
@@ -98,7 +98,12 @@ except ImportError:
 # CORS middleware with production settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=ALLOWED_ORIGINS + [
+        "https://animathic.com",
+        "https://www.animathic.com",
+    ],
+    # Allow all Cloud Run regional hostnames (e.g., -uc.a.run.app)
+    allow_origin_regex=r"^https://[a-z0-9\-]+\.[a-z0-9\-]+\.a\.run\.app$|^https://[a-z0-9\-]+-uc\.a\.run\.app$|^https://animathic\.com$|^https://www\.animathic\.com$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -174,7 +179,7 @@ def get_ai_service():
             logger.error("GOOGLE_AI_API_KEY is not set")
             raise RuntimeError("GOOGLE_AI_API_KEY is not set")
         try:
-            _ai_service = AIService(api_key=api_key)
+            _ai_service = SimpleAIService(api_key=api_key)
             logger.info("AI service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize AI service: {e}")
@@ -382,45 +387,178 @@ async def generate_video_from_manim(manim_code: str, job_id: str) -> Optional[st
             scene_file.write_text(manim_code, encoding='utf-8')
             logger.info(f"Created scene file: {scene_file}")
             
-            # Run Manim command in headless mode - FIXED 2025-08-21 for v0.19.0
-            cmd = [
-                "manim", "render", "-ql", str(scene_file), "GeneratedScene"
-            ]
-            
-            logger.info(f"Running Manim command: {' '.join(cmd)}")
-            
-            result = subprocess.run(
-                cmd, 
-                capture_output=True, 
-                text=True, 
-                cwd=temp_path,
-                timeout=300  # 5 minutes timeout
+            # Set up environment for headless Manim rendering
+            env = os.environ.copy()
+            env.update({
+                'DISPLAY': ':99',  # Virtual display for headless
+                'MPLBACKEND': 'Agg',  # Use non-interactive matplotlib backend
+                'PYTHONPATH': '/usr/local/lib/python3.10/site-packages',  # Ensure Manim is in path
+                'MANIM_CONFIG_FILE': '',  # Use default config
+            })
+
+            # Create media directory explicitly
+            media_dir = temp_path / "media"
+            media_dir.mkdir(parents=True, exist_ok=True)
+
+            # First, test if Manim is working at all
+            logger.info("Testing Manim installation...")
+            test_cmd = ["python3", "-c", "import manim; print('Manim import successful')"]
+            test_result = subprocess.run(
+                test_cmd,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=30
             )
-            
+
+            if test_result.returncode != 0:
+                logger.error("Manim import test failed - Manim not properly installed")
+                logger.error(f"Test stderr: {test_result.stderr}")
+                logger.error(f"Test stdout: {test_result.stdout}")
+                return None
+            else:
+                logger.info("Manim import test passed")
+
+            # Also test manim command availability
+            version_cmd = ["manim", "--version"]
+            version_result = subprocess.run(
+                version_cmd,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=10
+            )
+
+            if version_result.returncode == 0:
+                logger.info(f"Manim version: {version_result.stdout.strip()}")
+            else:
+                logger.warning("Could not get Manim version")
+                logger.warning(f"Version command stderr: {version_result.stderr}")
+
+            # Run Manim command in headless mode with enhanced error handling
+            cmd = [
+                "manim", "render",
+                str(scene_file), "GeneratedScene",
+                "-ql",              # low quality to reduce memory
+                "--fps", "15",     # lower fps
+                "--format", "mp4",
+                "--disable_caching",  # reduce memory/caching pressure
+                "--media_dir", str(media_dir),
+                "--renderer", "cairo",  # Explicitly use Cairo renderer
+            ]
+
+            logger.info(f"Running Manim command: {' '.join(cmd)}")
+            logger.info(f"Working directory: {temp_path}")
+            logger.info(f"Scene file exists: {scene_file.exists()}")
+            logger.info(f"Scene file size: {scene_file.stat().st_size if scene_file.exists() else 0} bytes")
+
+            # Log first few lines of generated code for debugging
+            code_lines = manim_code.split('\n')[:20]
+            logger.info("First 20 lines of generated Manim code:")
+            for i, line in enumerate(code_lines, 1):
+                logger.info(f"  {i:2d}: {line}")
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=temp_path,
+                env=env,
+                timeout=180  # 3 minutes timeout (reduced for faster failure)
+            )
+
             logger.info(f"Manim process completed with return code: {result.returncode}")
-            
+
+            # Always log stdout and stderr for debugging
+            if result.stdout:
+                logger.info(f"Manim stdout ({len(result.stdout)} chars): {result.stdout[:1000]}{'...' if len(result.stdout) > 1000 else ''}")
+            if result.stderr:
+                logger.info(f"Manim stderr ({len(result.stderr)} chars): {result.stderr[:1000]}{'...' if len(result.stderr) > 1000 else ''}")
+
             if result.returncode != 0:
                 logger.error(f"Manim execution failed with return code {result.returncode}")
-                logger.error(f"Manim stdout: {result.stdout}")
-                logger.error(f"Manim stderr: {result.stderr}")
-                
-                # Try to identify specific errors
-                error_output = result.stderr or result.stdout or ""
-                if "ImportError" in error_output:
-                    logger.error("Import error detected - missing dependencies")
-                elif "SyntaxError" in error_output:
-                    logger.error("Syntax error detected - invalid Python code")
-                elif "AttributeError" in error_output:
+
+                # Enhanced error analysis
+                error_output = (result.stderr or "") + (result.stdout or "")
+                error_lower = error_output.lower()
+
+                if "importerror" in error_lower or "modulenotfounderror" in error_lower:
+                    logger.error("Import/Module error detected - missing dependencies")
+                    logger.error("This suggests Manim dependencies are not properly installed in the container")
+                elif "syntaxerror" in error_lower:
+                    logger.error("Syntax error detected - invalid Python code generated")
+                elif "attributeerror" in error_lower:
                     logger.error("Attribute error detected - invalid object usage")
-                elif "NameError" in error_output:
-                    logger.error("Name error detected - undefined variables")
-                elif "TypeError" in error_output:
+                elif "nameerror" in error_lower:
+                    logger.error("Name error detected - undefined variables in generated code")
+                elif "typeerror" in error_lower:
                     logger.error("Type error detected - invalid parameter types")
-                elif "ValueError" in error_output:
+                elif "valueerror" in error_lower:
                     logger.error("Value error detected - invalid parameter values")
+                elif "font" in error_lower or "tex" in error_lower:
+                    logger.error("Font/LaTeX error detected - missing font packages or LaTeX installation")
+                    logger.error("This is common in Docker containers missing texlive packages")
+                elif "cairo" in error_lower or "surface" in error_lower:
+                    logger.error("Cairo rendering error - graphics library issue")
+                elif "memory" in error_lower or "oom" in error_lower:
+                    logger.error("Memory error - animation too complex or insufficient memory")
+                elif "timeout" in error_lower:
+                    logger.error("Timeout error - animation taking too long to render")
+                elif "permission" in error_lower or "access" in error_lower:
+                    logger.error("Permission error - file system access issue")
                 else:
                     logger.error("Unknown Manim execution error")
-                
+                    logger.error(f"Full error output: {error_output}")
+
+                # Log the complete generated code for debugging failed renders
+                logger.error("Full generated Manim code that failed:")
+                for i, line in enumerate(manim_code.split('\n'), 1):
+                    logger.error(f"  {i:3d}: {line}")
+
+                # Try a simple fallback to isolate if it's code or environment issue
+                logger.info("Attempting fallback with minimal scene...")
+                fallback_code = '''import numpy as np
+from manim import *
+
+class GeneratedScene(Scene):
+    def construct(self):
+        circle = Circle(radius=1, color=BLUE)
+        self.add(circle)
+        self.play(Create(circle), run_time=1)
+        self.wait(1)
+'''
+
+                fallback_file = temp_path / "fallback_scene.py"
+                fallback_file.write_text(fallback_code, encoding='utf-8')
+
+                fallback_cmd = [
+                    "manim", "render",
+                    str(fallback_file), "GeneratedScene",
+                    "-ql",
+                    "--fps", "15",
+                    "--format", "mp4",
+                    "--disable_caching",
+                    "--media_dir", str(media_dir),
+                    "--renderer", "cairo",
+                ]
+
+                logger.info("Running fallback Manim command to test environment")
+                fallback_result = subprocess.run(
+                    fallback_cmd,
+                    capture_output=True,
+                    text=True,
+                    cwd=temp_path,
+                    env=env,
+                    timeout=60
+                )
+
+                if fallback_result.returncode == 0:
+                    logger.info("Fallback scene succeeded - issue is with generated code")
+                else:
+                    logger.error("Fallback scene also failed - environment issue")
+                    logger.error(f"Fallback stderr: {fallback_result.stderr}")
+                    logger.error(f"Fallback stdout: {fallback_result.stdout}")
+
                 return None
             
             # Add small delay to ensure file is fully written
@@ -883,11 +1021,22 @@ async def generate_animation_direct(request: GenerateRequest):
 
 		# 1) Run AI workflow
 		result = await get_ai_service().process_animation_request(request.prompt)
-		if not result or (isinstance(result, dict) and result.get("status") == "failed"):
-			return {"error": (result or {}).get("error", "AI generation failed")}
+		if not result or (isinstance(result, dict) and (result.get("status") == "failed" or result.get("error"))):
+			payload = {"error": (result or {}).get("error", "AI generation failed")}
+			if isinstance(result, dict):
+				if result.get("manim_code"):
+					payload["manim_code"] = result.get("manim_code")
+				if result.get("animation_spec"):
+					payload["ai_response"] = result.get("animation_spec")
+			return payload
 
 		animation_spec = result.get("animation_spec", {})
-		manim_code = result.get("manim_code", "")
+		manim_code = result.get("manim_code") or ""
+		if not manim_code and animation_spec:
+			try:
+				manim_code = get_ai_service().generate_manim_code(animation_spec)
+			except Exception as _e:
+				manim_code = ""
 		workflow_type = result.get("workflow_type", "unknown")
 		complexity_analysis = result.get("complexity_analysis", {})
 		enhancements_applied = result.get("enhancements_applied", [])
@@ -895,7 +1044,13 @@ async def generate_animation_direct(request: GenerateRequest):
 		# 2) Render Manim video
 		video_path = await generate_video_from_manim(manim_code, job_id)
 		if not video_path:
-			return {"error": "Failed to generate video (Manim)"}
+			return {
+				"error": "Failed to generate video (Manim)",
+				"ai_response": animation_spec,
+				"manim_code": manim_code,
+				"workflow_type": workflow_type,
+				"enhancements_applied": len(enhancements_applied),
+			}
 
 		# 3) Upload to Supabase storage (no DB rows)
 		# Use a placeholder user_id since this is a direct endpoint
@@ -1115,18 +1270,25 @@ async def check_token_status(
         logger.error(f"Error checking token status: {e}")
         raise HTTPException(status_code=500, detail="Failed to check token status")
 
+@app.options("/api/status/{job_id}")
+async def preflight_status(job_id: str):
+    return Response(status_code=204)
+
+# Global catch-all preflight to ensure CORS succeeds for any route
+@app.options("/{full_path:path}")
+async def preflight_all(full_path: str):
+    return Response(status_code=204)
+
 @app.get("/api/status/{job_id}", response_model=StatusResponse)
 async def get_generation_status(
     job_id: str, 
     request: Request, 
-    auth: Dict[str, Any] = Depends(require_authentication_long_running)
+    auth: Dict[str, Any] = Depends(optional_authentication)
 ):
     """Get the status of a generation job"""
     try:
-        # Get authenticated user ID
-        user_id = auth.get("user_id")
-        if not user_id or user_id == "anonymous":
-            raise HTTPException(status_code=401, detail="Authentication required")
+        # Get authenticated user ID if available (optional)
+        user_id = (auth or {}).get("user_id")
         
         # Initialize job variable
         job = None
@@ -1134,8 +1296,8 @@ async def get_generation_status(
         # Check in-memory storage first
         if job_id in generation_jobs:
             job = generation_jobs[job_id]
-            # Verify job belongs to authenticated user
-            if job.get("user_id") != user_id:
+            # If we have an authenticated user, enforce ownership; otherwise allow read-only status
+            if user_id and job.get("user_id") and job.get("user_id") != user_id:
                 raise HTTPException(status_code=403, detail="Access denied - job belongs to different user")
             logger.info(f"Found job {job_id} in memory: {job['status']}")
         else:
@@ -1143,19 +1305,20 @@ async def get_generation_status(
             try:
                 initialize_database_lazy()
                 if not (supabase_db.enabled and getattr(supabase_db, "client", None)):
-                    raise HTTPException(status_code=503, detail="Database not available")
+                    # If DB unavailable, return not found to avoid blocking polling
+                    raise HTTPException(status_code=404, detail="Generation job not found")
 
                 resp = supabase_db.client.table("generation_jobs").select(
-                    "user_id,status,current_step,total_steps,result_video_id,error_message,ai_response,manim_code"
+                    "user_id,status,current_step,total_steps,result_video_id,error_message,ai_response,manim_code,video_url"
                 ).eq("id", job_id).single().execute()
 
                 row = (resp.data or {})
                 if not row:
                     raise HTTPException(status_code=404, detail="Generation job not found")
 
-                # Verify job belongs to authenticated user
+                # If we have an authenticated user, enforce ownership; otherwise allow read-only status
                 db_user_id = row.get("user_id")
-                if db_user_id != user_id:
+                if user_id and db_user_id and db_user_id != user_id:
                     raise HTTPException(status_code=403, detail="Access denied - job belongs to different user")
 
                 job = {
@@ -1167,6 +1330,7 @@ async def get_generation_status(
                     "error": row.get("error_message"),
                     "ai_response": row.get("ai_response"),
                     "manim_code": row.get("manim_code"),
+                    "video_url": row.get("video_url"),
                 }
                 logger.info(f"Found job {job_id} in Supabase: {job['status']}")
 

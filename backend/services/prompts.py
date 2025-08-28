@@ -3,20 +3,36 @@ Prompt Templates and Schema Definitions for Animathic
 Contains all AI prompts and JSON schemas
 """
 
-# Animation generation prompt template
+# Simple, Reliable Animation Generation Prompt Template
 ANIMATION_PROMPT_TEMPLATE = """
-You are an expert animation creator using Manim (Mathematical Animation Engine).
-Given the user's prompt below, produce a STRICT JSON object that follows this schema exactly.
+You are a simple, reliable animation assistant that creates clean, working Manim animations.
+Focus on creating simple, predictable animations that work consistently.
 
-CRITICAL RULES (must follow exactly):
-- Output ONLY a JSON object. No prose, no code fences, no comments.
-- Use double quotes for all keys and string values.
-- No trailing commas. No NaN/Infinity. Use numbers for durations/zoom and arrays for positions.
-- Create objects and animations EXACTLY as described in the user's prompt.
-- If the user mentions "fade in", "fade out", "appears", "disappears" - include those animations.
-- If the user mentions colors like "red", "blue", "green" - use those exact colors.
-- Keep the animation EXACTLY as described in the user's prompt - no more, no less.
-- The JSON should be a direct translation of the user's request, not an interpretation with added features.
+SUPPORTED OBJECTS (keep it simple):
+- circle: A circular shape
+- square: A square or rectangle shape
+- triangle: A triangular shape
+- text: Text labels and messages
+- axes: Coordinate system axes
+- plot: Simple mathematical function plots (sine, cosine, linear)
+
+SUPPORTED ANIMATIONS (keep it simple):
+- fade_in: Object appears with smooth fade
+- fade_out: Object disappears with smooth fade
+- move: Object moves to a new position
+- rotate: Object rotates around its center
+- scale: Object changes size
+
+SIMPLE RULES:
+1. Keep animations simple and predictable
+2. Use reasonable colors (BLUE, GREEN, RED, YELLOW, WHITE)
+3. Position objects where they won't overlap
+4. Use smooth, standard timing (0.5-1.0 seconds)
+5. Focus on creating working animations, not complex effects
+
+Given the user's prompt below, create a simple animation that matches their request using the supported objects and animations above.
+
+Output only the animation description, not JSON or complex structures.
 
 COORDINATE POSITIONING RULES (CRITICAL):
 - ALWAYS use EXACT coordinates as specified in the user prompt
@@ -45,50 +61,84 @@ TEXT LABEL RULES (IMPORTANT):
 - Position text labels near but not overlapping with the objects they describe.
 - Use simple, short text labels - avoid long descriptive text.
 
+TYPOGRAPHY AND LOGO RULES (CRITICAL - ALWAYS FOLLOW):
+- For ANY word/logo animation, you MUST create EACH LETTER as a SEPARATE text object
+- WRONG: {"id": "text_1", "type": "text", "properties": {"text": "HELLO"}}
+- CORRECT: Create letter_H, letter_E, letter_L, letter_L, letter_O as separate objects
+- Use descriptive IDs: "letter_H", "letter_E", "google_G", "google_o1", "google_o2"
+- Position letters horizontally: [-3.0, 0, 0], [-1.8, 0, 0], [-0.6, 0, 0], [0.6, 0, 0], [1.8, 0, 0]
+- For logo transformations: use move animations to rearrange letters into final positions
+- Apply color changes during transformations (e.g., from WHITE to brand colors)
+- Use fade_in/create animations for initial appearance, then move animations for transformations
+- Maintain smooth sequential timing for complex typography animations
+- NEVER put entire word in single text object - this breaks the animation!
+
 Schema:
 {
-  "animation_type": string,                // e.g. "geometric", "mathematical", "text"
+  "animation_type": string,                // e.g. "geometric", "mathematical", "text", "typography", "3d", "interactive"
   "scene_description": string,             // brief summary matching the user's request
   "objects": [
     {
       "id": string,                        // unique id for timeline reference
-      "type": string,                      // one of: "circle" | "square" | "text" | "line" | "dot" | "axes" | "plot" | "diamond" | "star" | "hexagon" | "triangle" | "rectangle" | "ellipse"
+      "type": string,                      // ANY Manim object type: "circle", "square", "rectangle", "polygon", "text", "tex", "mathtex", "dot", "line", "arrow", "axes", "plot", "parametric_function", "parametric_surface", "surface", "graph", "vector_field", "matrix", "table", "brace", "angle", "arc", "ellipse", "regular_polygon", "triangle", "diamond", "star", "hexagon", "sector", "annulus", "cube", "sphere", "cylinder", "cone", "torus", "custom_object", or ANY other Manim object
       "properties": {
         // common
         "position": [number, number, number],
-        "color": string,                   // Use bright colors: WHITE, YELLOW, CYAN, GREEN, RED, BLUE, MAGENTA
+        "color": string,                   // Use bright colors: WHITE, YELLOW, CYAN, GREEN, RED, BLUE, MAGENTA, ORANGE, PURPLE, PINK
         "size": number,
 
         // text-specific (ONLY if user requests text)
         "text": string,                    // ONLY include if text is explicitly requested
+        "font_size": number,               // Font size for text objects
 
-        // line-specific (ONLY if user requests lines)
+        // line/arrow-specific
         "start": [number, number, number],
         "end": [number, number, number],
 
         // axes-specific (ONLY if user requests axes)
         "x_range": [number, number, number],  // [min, max, step]
         "y_range": [number, number, number],
+        "z_range": [number, number, number],  // For 3D axes
         "show_labels": boolean,
 
-        // plot-specific (ONLY if user requests plots)
-        "function": string,                   // e.g. "sine", "cosine", "tangent", "exponential", "polynomial"
+        // plot/parametric-specific
+        "function": string,                   // e.g. "sine", "cosine", "tangent", "exponential", "polynomial", "parabola"
         "expression": string,                 // e.g. "sin(x)" or "x**2 - 1" (optional, function takes priority)
         "x_range_plot": [number, number],     // [min, max]
+        "t_range": [number, number],          // For parametric functions [t_min, t_max]
+        "u_range": [number, number],          // For surfaces
+        "v_range": [number, number],          // For surfaces
+
+        // polygon-specific
+        "points": [[number, number, number]], // Array of points for polygon
+
+        // matrix/table-specific
+        "data": [[any]],                     // 2D array of data
+
+        // 3D-specific
+        "depth": number,                     // For 3D objects
+        "rotation": [number, number, number], // [x, y, z] rotation angles
       },
       "animations": [
         {
-          "type": string,                  // "fade_in", "fade_out", "move", "scale", "rotate", "wait"
-          "duration": number,              // seconds
-          "parameters": object             // e.g. {"target_position": [x,y,z]} or {"scale_factor": 1.2}
+          "type": string,                  // ANY Manim animation: "fade_in", "fade_out", "create", "write", "draw_border_then_fill", "show_creation", "grow_from_center", "grow_from_edge", "grow_arrow", "move", "scale", "rotate", "transform", "replacement_transform", "move_along_path", "move_to_target", "apply_method", "flash_around", "flash_on_circle", "show_partial", "unwrite", "indicate", "wiggle", "bounce", "pulse", "shake", "custom_animation", or ANY other Manim animation
+          "duration": number,              // seconds (default: 1.0)
+          "parameters": object,             // e.g. {"target_position": [x,y,z]}, {"scale_factor": 1.2}, {"angle": 1.57}, {"path_points": [[x,y,z]]}
+          "start_time": string             // "immediate", "after_previous", "with_previous"
         }
       ]
     }
   ],
-  "camera_settings": {"position": [number,number,number], "zoom": number},
+  "camera_settings": {
+    "position": [number,number,number],
+    "zoom": number,
+    "rotation": [number,number,number],    // For 3D camera rotation
+    "focus_point": [number,number,number]  // For 3D camera focus
+  },
   "duration": number,
   "background_color": string,              // Default to #000000 (black)
-  "style": string
+  "style": string,                         // "modern", "classic", "minimal", "educational"
+  "scene_type": string                     // "Scene", "MovingCameraScene", "ThreeDScene", "GraphScene"
 }
 
 FUNCTION PLOT RULES (CRITICAL):

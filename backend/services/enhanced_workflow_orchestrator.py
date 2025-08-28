@@ -39,11 +39,11 @@ class EnhancedWorkflowOrchestrator:
             'enable_sequence_optimization': True,
             'validation_level': 'comprehensive',  # 'minimal', 'standard', 'comprehensive'
             'performance_mode': 'balanced',  # 'fast', 'balanced', 'quality'
-            'enable_smart_fade_out': True,  # NEW: Smart fade-out system
+            'enable_smart_fade_out': False,  # NEW: Smart fade-out system (disabled by default)
             'enable_fade_out_validation': True,  # NEW: Fade-out validation
             'max_fade_out_retries': 3,  # NEW: Maximum retry attempts
             'fade_out_timeout': 5.0,  # NEW: Timeout for fade-out operations
-            'enable_real_time_overlap_monitoring': True,  # NEW: Real-time overlap monitoring
+            'enable_real_time_overlap_monitoring': False,  # DISABLED: Real-time overlap monitoring (causes performance issues)
             'real_time_monitoring_config': {
                 'check_interval': 0.1,
                 'overlap_threshold': 0.1,
@@ -133,7 +133,9 @@ class EnhancedWorkflowOrchestrator:
     def _on_overlap_detected(self, overlap_event) -> None:
         """Callback for detected overlaps"""
         try:
-            logger.warning(f"Real-time overlap detected: {overlap_event.object1_id} ({overlap_event.object1_type}) and {overlap_event.object2_id} ({overlap_event.object2_type}) - Severity: {overlap_event.severity.value}")
+            # Only log critical overlaps to reduce log spam
+            if overlap_event.severity.value == 'critical':
+                logger.warning(f"Critical overlap detected: {overlap_event.object1_id} ({overlap_event.object1_type}) and {overlap_event.object2_id} ({overlap_event.object2_type})")
             
             # Store overlap event for workflow analysis
             if not hasattr(self, '_real_time_overlaps'):

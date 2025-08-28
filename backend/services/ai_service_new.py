@@ -6,7 +6,7 @@ Main service class that orchestrates all modular components
 import os
 import json
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import numpy as np
 import google.generativeai as genai
 try:
@@ -89,6 +89,8 @@ class AIService:
             # Enhance the prompt with context-aware improvements
             enhanced_prompt = self.prompt_enhancer.enhance_ai_prompt_with_context(prompt)
             logger.info(f"Prompt enhanced from {len(prompt)} to {len(enhanced_prompt)} characters")
+            logger.info(f"Original prompt: {prompt}")
+            logger.info(f"Enhanced prompt: {enhanced_prompt}")
             
             # Format the enhanced prompt
             formatted_prompt = ANIMATION_PROMPT_TEMPLATE.replace("{prompt}", enhanced_prompt)
@@ -165,6 +167,9 @@ class AIService:
             except Exception:
                 normalized["objects"] = []
         
+        # Check if this is a typography/logo animation and apply special handling
+        is_typography_animation = self._is_typography_animation(prompt, normalized["objects"])
+
         # Only validate critical properties, don't add anything
         if normalized["objects"]:
             validated_objects = []
@@ -175,16 +180,396 @@ class AIService:
                         obj["properties"] = {}
                     if "animations" not in obj:
                         obj["animations"] = []
-                    
+
                     # Only set position if it's completely missing (critical for rendering)
                     if "position" not in obj["properties"]:
                         obj["properties"]["position"] = [0, 0, 0]
-                    
+
+                    # Coerce bracketed matrix-like text into matrix object if applicable
+                    obj = self._maybe_coerce_matrix_text(obj)
+
                     validated_objects.append(obj)
-            
+
             normalized["objects"] = validated_objects
+
+            # Merge numeric text grids (2x2) into a single matrix object
+            normalized["objects"] = self._merge_numeric_text_grid_to_matrix(normalized["objects"])
+
+            # Apply typography positioning for typography animations
+            if is_typography_animation:
+                normalized["objects"] = self._apply_typography_positioning_to_all(normalized["objects"])
         
         return normalized
+
+    def _maybe_coerce_matrix_text(self, obj: Dict[str, Any]) -> Dict[str, Any]:
+        """If an object is a text/tex with bracketed matrix-like content, coerce to matrix type.
+
+        Example: text="[[1, 2],[3, 4]]" -> {'type':'matrix','properties':{'data':[['1','2'],['3','4']]}}
+        Preserves 'position','color','size' and 'animations' if present.
+        """
+        try:
+            obj_type = str(obj.get('type', '')).lower()
+            props = obj.get('properties', {}) or {}
+            text_value = props.get('text')
+            if obj_type in ('text', 'tex', 'mathtex') and isinstance(text_value, str):
+                import re
+                content = text_value.strip()
+                # Compact whitespace/newlines so variants like "[ [1,2],\n [3,4] ]" are accepted
+                compact = re.sub(r"\s+", "", content)
+                # Must look like a 2D list e.g. [[...],[...]] regardless of internal whitespace
+                if compact.startswith('[[') and compact.endswith(']]') and '],[' in compact:
+                    inner = compact[1:-1]  # strip outer []
+                    # Split rows by '],'
+                    rows_compact = inner.split('],')
+                    data = []
+                    for row in rows_compact:
+                        row = row.strip()
+                        if not row.endswith(']'):
+                            row = row + ']'
+                        if row.startswith('[') and row.endswith(']'):
+                            row = row[1:-1]
+                        items = [itm for itm in row.split(',') if itm != '']
+                        data.append(items)
+                    coerced = {
+                        'type': 'matrix',
+                        'id': obj.get('id'),
+                        'properties': {
+                            'data': data,
+                        }
+                    }
+                    for key in ('position', 'color', 'size'):
+                        if key in props:
+                            coerced['properties'][key] = props[key]
+                    if 'animations' in obj:
+                        coerced['animations'] = obj['animations']
+                    return coerced
+        except Exception:
+            # Keep original if parsing fails
+            return obj
+        return obj
+
+    def _is_typography_animation(self, prompt: str, objects: List[Dict]) -> bool:
+        """Detect if this is a typography/logo animation that needs special handling"""
+        prompt_lower = prompt.lower()
+
+        # Check for typography keywords
+        typography_keywords = [
+            'typography', 'logo', 'text morph', 'letter', 'word', 'font', 'typeface',
+            'google', 'logo', 'brand', 'morph', 'transform', 'rearrange', 'evolve'
+        ]
+
+        has_typography_keywords = any(keyword in prompt_lower for keyword in typography_keywords)
+
+        # Check if we have multiple text objects that could be letters
+        text_objects = [obj for obj in objects if str(obj.get('type', '')).lower() in ['text', 'letter']]
+        has_multiple_text_objects = len(text_objects) >= 3
+
+        # Check for objects with IDs that look like individual letters
+        letter_like_ids = [obj for obj in objects if obj.get('id', '').startswith(('letter_', 'char_', 'google_', 'text_'))]
+        has_letter_like_objects = len(letter_like_ids) >= 3
+
+        result = has_typography_keywords or has_multiple_text_objects or has_letter_like_objects
+
+        return result
+
+    def _is_typography_context(self, obj: Dict[str, Any], existing_objects: List[Dict]) -> bool:
+        """Check if the current object is part of a typography animation context"""
+        # Count text objects with single characters (likely letters)
+        single_char_texts = 0
+        total_text_objects = 0
+
+        for existing_obj in existing_objects:
+            if str(existing_obj.get('type', '')).lower() in ['text', 'letter']:
+                total_text_objects += 1
+                text_content = str(existing_obj.get('properties', {}).get('text', ''))
+                if len(text_content) <= 2:  # Single characters or short text
+                    single_char_texts += 1
+
+        # Check current object too
+        current_text = str(obj.get('properties', {}).get('text', ''))
+        if str(obj.get('type', '')).lower() in ['text', 'letter']:
+            total_text_objects += 1
+            if len(current_text) <= 2:
+                single_char_texts += 1
+
+        # Consider it typography if we have 3+ single character text objects
+        return single_char_texts >= 3
+
+    def _apply_typography_positioning(self, obj: Dict[str, Any], existing_objects: List[Dict]) -> Dict[str, Any]:
+        """Apply special positioning for typography animations to prevent overlap"""
+        if str(obj.get('type', '')).lower() not in ['text', 'letter']:
+            return obj
+
+        obj_id = obj.get('id', '')
+        props = obj.get('properties', {})
+
+        # Check if this is a typography animation by looking at existing objects
+        # If we have multiple text objects with single characters, apply typography positioning
+        is_typography_context = self._is_typography_context(obj, existing_objects)
+
+        # If this looks like a letter in a word (e.g., google_G, google_o, text_G, letter_H, pagerank_text)
+        if is_typography_context and ('google_' in obj_id or obj_id.startswith(('letter_', 'char_', 'text_')) or
+                                      'pagerank' in obj_id.lower() or len(str(props.get('text', ''))) <= 2):
+            # Extract letter index from ID to space them properly
+            letter_index = 0
+            if 'google_' in obj_id:
+                letter_part = obj_id.split('google_')[-1]
+                if letter_part.isdigit():
+                    letter_index = int(letter_part)
+                elif len(letter_part) == 1:
+                    # Map letters to indices: G=0, o=1, o=2, g=3, l=4, e=5
+                    letter_map = {'g': 0, 'o': 1, 'o2': 2, 'g2': 3, 'l': 4, 'e': 5}
+                    letter_index = letter_map.get(letter_part, 0)
+                else:
+                    # Handle cases like "o1", "o2"
+                    if letter_part.startswith('o') and letter_part[1:].isdigit():
+                        letter_index = int(letter_part[1:])
+
+            elif obj_id.startswith('letter_'):
+                try:
+                    letter_index = int(obj_id.split('_')[-1])
+                except ValueError:
+                    letter_index = len(existing_objects)
+
+            elif obj_id.startswith('text_'):
+                # Handle text_ prefixed IDs like text_G, text_o1, text_o2
+                text_part = obj_id.split('text_')[-1]
+                if text_part.isdigit():
+                    letter_index = int(text_part)
+                elif len(text_part) == 1:
+                    # Single letter - use existing objects count as fallback
+                    letter_index = len(existing_objects)
+                else:
+                    # Handle cases like "o1", "o2", "L1", "L2"
+                    if text_part[0].isalpha() and text_part[1:].isdigit():
+                        letter_index = int(text_part[1:])
+                    else:
+                        letter_index = len(existing_objects)
+
+            elif 'pagerank' in obj_id.lower():
+                # Handle pagerank_text - position it first (index 0)
+                letter_index = 0
+
+            elif len(str(props.get('text', ''))) <= 2:
+                # For any short text (single characters), use existing objects count
+                letter_index = len(existing_objects)
+
+            else:
+                # Fallback - use existing objects count
+                letter_index = len(existing_objects)
+
+            # Space letters horizontally with proper spacing
+            base_x = -3.0  # Start position for Google logo
+            letter_spacing = 1.2  # Space between letters
+            x_position = base_x + (letter_index * letter_spacing)
+            y_position = 0  # Center vertically
+
+            # Force override the position regardless of what's already there
+            props['position'] = [x_position, y_position, 0]
+            obj['properties'] = props
+
+            logger.info(f"Applied typography positioning for {obj_id}: position [{x_position}, {y_position}, 0] (letter_index: {letter_index})")
+
+        return obj
+
+    def _apply_typography_positioning_to_all(self, objects: List[Dict]) -> List[Dict]:
+        """Apply typography positioning to all objects in a typography animation"""
+        # Filter text objects that need typography positioning
+        typography_objects = []
+        for obj in objects:
+            if str(obj.get('type', '')).lower() in ['text', 'letter']:
+                obj_id = obj.get('id', '')
+                # Check if this looks like a letter in typography
+                if ('google_' in obj_id or obj_id.startswith(('letter_', 'char_', 'text_')) or
+                    'pagerank' in obj_id.lower() or len(str(obj.get('properties', {}).get('text', ''))) <= 2):
+                    typography_objects.append(obj)
+
+        if len(typography_objects) < 3:
+            return objects  # Not enough typography objects to position
+
+        # Apply positioning to typography objects
+        for i, obj in enumerate(typography_objects):
+            obj_id = obj.get('id', '')
+
+            # Extract letter index from ID
+            letter_index = self._get_letter_index_from_id(obj_id, i)
+
+            # Space letters horizontally with proper spacing
+            base_x = -3.0  # Start position for Google logo
+            letter_spacing = 1.2  # Space between letters
+            x_position = base_x + (letter_index * letter_spacing)
+            y_position = 0  # Center vertically
+
+            # Apply the position
+            if 'properties' not in obj:
+                obj['properties'] = {}
+            obj['properties']['position'] = [x_position, y_position, 0]
+
+            logger.info(f"Applied typography positioning for {obj_id}: position [{x_position}, {y_position}, 0] (letter_index: {letter_index})")
+
+        return objects
+
+    def _get_letter_index_from_id(self, obj_id: str, fallback_index: int) -> int:
+        """Extract letter index from object ID for typography positioning"""
+        if 'google_' in obj_id:
+            letter_part = obj_id.split('google_')[-1]
+            if letter_part.isdigit():
+                return int(letter_part)
+            elif len(letter_part) == 1:
+                # Map letters to indices: G=0, o=1, o=2, g=3, l=4, e=5
+                letter_map = {'g': 0, 'o': 1, 'o2': 2, 'g2': 3, 'l': 4, 'e': 5}
+                return letter_map.get(letter_part, fallback_index)
+
+        elif obj_id.startswith('letter_'):
+            try:
+                return int(obj_id.split('_')[-1])
+            except ValueError:
+                return fallback_index
+
+        elif obj_id.startswith('text_'):
+            # Handle text_ prefixed IDs like text_G, text_o1, text_o2
+            text_part = obj_id.split('text_')[-1]
+            if text_part.isdigit():
+                return int(text_part)
+            elif len(text_part) == 1:
+                # Single letter - use existing objects count as fallback
+                return fallback_index
+            else:
+                # Handle cases like "o1", "o2", "L1", "L2"
+                if text_part[0].isalpha() and text_part[1:].isdigit():
+                    return int(text_part[1:])
+                else:
+                    return fallback_index
+
+        elif 'pagerank' in obj_id.lower():
+            # Handle pagerank_text - position it first (index 0)
+            return 0
+
+        elif len(obj_id) <= 2:
+            # For any short IDs (single characters), use fallback
+            return fallback_index
+
+        else:
+            # Fallback
+            return fallback_index
+
+    def _merge_numeric_text_grid_to_matrix(self, objects: list) -> list:
+        """Detect a 2x2 grid of single-number Text objects and merge into a Matrix object.
+
+        Heuristic:
+        - Find groups of 4 Text objects whose text is numeric (int/float)
+        - Their positions form two distinct Xs and two distinct Ys within small tolerances
+        - Build data=[[a,b],[c,d]] in row-major (top-to-bottom, left-to-right)
+        - Position the Matrix at the centroid of the four numbers; preserve color/size from first item if present
+        """
+        try:
+            from math import isclose
+            import re
+            num_re = re.compile(r"^[-+]?\d+(?:\.\d+)?$")
+
+            # Collect candidate numeric texts
+            candidates = []
+            for idx, obj in enumerate(objects):
+                if not isinstance(obj, dict):
+                    continue
+                if str(obj.get('type','')).lower() != 'text':
+                    continue
+                props = obj.get('properties', {}) or {}
+                text_val = props.get('text')
+                pos = props.get('position') or obj.get('position')
+                if not isinstance(text_val, str) or not isinstance(pos, (list, tuple)) or len(pos) < 2:
+                    continue
+                if not num_re.match(text_val.strip()):
+                    continue
+                candidates.append({'index': idx, 'obj': obj, 'x': float(pos[0]), 'y': float(pos[1]), 'text': text_val.strip()})
+
+            if len(candidates) < 4:
+                return objects
+
+            # Simple approach: try to find best 2x2 by bucketing x and y values with tolerances
+            xs = sorted({round(c['x'], 1) for c in candidates})
+            ys = sorted({round(c['y'], 1) for c in candidates}, reverse=True)  # top row first (higher y)
+            # Use tolerance to merge nearby values
+            def cluster(values, tol=0.25):
+                clusters = []
+                for v in values:
+                    placed = False
+                    for cl in clusters:
+                        if isclose(v, cl['rep'], abs_tol=tol):
+                            cl['values'].append(v)
+                            cl['rep'] = sum(cl['values']) / len(cl['values'])
+                            placed = True
+                            break
+                    if not placed:
+                        clusters.append({'rep': v, 'values': [v]})
+                return [cl['rep'] for cl in clusters]
+
+            x_bins = cluster(xs)
+            y_bins = cluster(ys)
+            if len(x_bins) != 2 or len(y_bins) != 2:
+                return objects
+
+            x_bins = sorted(x_bins)  # left to right
+            y_bins = sorted(y_bins, reverse=True)  # top to bottom
+
+            # Assign candidates to nearest bin
+            def nearest_bin(val, bins):
+                return min(bins, key=lambda b: abs(val - b))
+
+            grid = {(0,0): None, (0,1): None, (1,0): None, (1,1): None}
+            assigned = []
+            for c in candidates:
+                xb = nearest_bin(c['x'], x_bins)
+                yb = nearest_bin(c['y'], y_bins)
+                xi = 0 if isclose(xb, x_bins[0], abs_tol=0.3) else 1
+                yi = 0 if isclose(yb, y_bins[0], abs_tol=0.3) else 1
+                key = (yi, xi)  # (row, col)
+                if grid[key] is None:
+                    grid[key] = c
+                    assigned.append(c)
+
+            # Ensure full 2x2 grid assigned
+            if any(grid[k] is None for k in grid):
+                return objects
+
+            # Build matrix data rows: row 0 is top (higher y), row 1 is bottom
+            data = [
+                [grid[(0,0)]['text'], grid[(0,1)]['text']],
+                [grid[(1,0)]['text'], grid[(1,1)]['text']],
+            ]
+
+            # Compute centroid position
+            cx = sum(cell['x'] for cell in grid.values()) / 4.0
+            cy = sum(cell['y'] for cell in grid.values()) / 4.0
+            cz = 0.0
+
+            # Use first assigned object's style if available
+            first_props = assigned[0]['obj'].get('properties', {}) or {}
+            color = first_props.get('color')
+            size = first_props.get('size')
+
+            matrix_obj = {
+                'id': 'matrix_auto_1',
+                'type': 'matrix',
+                'properties': {
+                    'data': data,
+                    'position': [cx, cy, cz],
+                },
+                'animations': [{'type': 'fade_in', 'duration': 1.0, 'parameters': {}}]
+            }
+            if color:
+                matrix_obj['properties']['color'] = color
+            if size:
+                matrix_obj['properties']['size'] = size
+
+            # Remove the four numeric text elements and insert matrix instead (at end)
+            remove_indices = {c['index'] for c in assigned}
+            new_objects = [o for i, o in enumerate(objects) if i not in remove_indices]
+            new_objects.append(matrix_obj)
+            return new_objects
+        except Exception:
+            # On any error, return original objects unchanged
+            return objects
     
     def generate_manim_code(self, animation_spec: Dict[str, Any]) -> str:
         """Convert animation specification to Manim Python code using modular generator"""
@@ -292,8 +677,18 @@ class AIService:
             # Phase 5: Validate generated code
             logger.info("Phase 5: Validating generated code")
             if not self._validate_manim_code(manim_code):
-                logger.error("Generated Manim code validation failed")
-                return {'error': 'Generated Manim code is invalid'}
+                logger.error("Generated Manim code validation failed; dumping code snippet and spec for diagnosis")
+                try:
+                    snippet = (manim_code or "").splitlines()
+                    snippet = "\n".join(snippet[:100])  # limit log size
+                    logger.error("Invalid Manim code (first 100 lines):\n" + snippet)
+                except Exception:
+                    pass
+                return {
+                    'error': 'Generated Manim code is invalid',
+                    'manim_code': manim_code,
+                    'animation_spec': final_spec,
+                }
             
             logger.info("All phases completed successfully")
             
@@ -315,66 +710,132 @@ class AIService:
         """Analyze prompt complexity to determine workflow selection - IMPROVED VERSION"""
         prompt_lower = prompt.lower()
         
-        # Simplified, more reliable complexity indicators
+        # Comprehensive complexity indicators with weighted scoring
         complexity_indicators = {
-            'mathematical_content': any(keyword in prompt_lower for keyword in 
-                ['function', 'plot', 'graph', 'equation', 'formula', 'sine', 'cosine', 'polynomial', 'math', 'calculate']),
-            'multiple_objects': any(keyword in prompt_lower for keyword in 
-                ['multiple', 'several', 'many', 'various', 'both', 'and', 'with', 'together', 'group']),
-            'sequence_requirements': any(keyword in prompt_lower for keyword in 
-                ['sequence', 'step', 'progression', 'evolution', 'then', 'next', 'after', 'first', 'second', 'third']),
-            'interaction_requirements': any(keyword in prompt_lower for keyword in 
-                ['interact', 'connect', 'relate', 'combine', 'between', 'among', 'link', 'join']),
-            'temporal_aspects': any(keyword in prompt_lower for keyword in 
-                ['time', 'duration', 'speed', 'timing', 'slow', 'fast', 'seconds', 'minutes']),
-            'spatial_relationships': any(keyword in prompt_lower for keyword in 
-                ['above', 'below', 'left', 'right', 'near', 'far', 'position', 'location', 'place']),
-            # Animation effects - only for complex animations
-            'animation_effects': any(keyword in prompt_lower for keyword in 
-                ['fade', 'appear', 'disappear', 'animate', 'transition', 'effect', 'morph', 'transform']),
-            # Color specifications - only for multiple colors or complex color schemes
-            'color_specifications': any(keyword in prompt_lower for keyword in 
-                ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'color', 'colored', 'rainbow', 'gradient'])
+            # Mathematical content (high weight)
+            'mathematical_functions': any(keyword in prompt_lower for keyword in
+                ['sine', 'cosine', 'tangent', 'exponential', 'logarithmic', 'polynomial', 'parabola', 'hyperbola', 'function', 'plot', 'graph', 'equation', 'formula', 'calculus', 'derivative', 'integral']),
+            'parametric_equations': any(keyword in prompt_lower for keyword in
+                ['parametric', 'surface', '3d', 'three dimensional', 'rotation', 'spinning']),
+            'matrices_vectors': any(keyword in prompt_lower for keyword in
+                ['matrix', 'vector', 'linear algebra', 'transformation', 'eigenvalue']),
+
+            # Animation complexity
+            'multiple_objects': any(keyword in prompt_lower for keyword in
+                ['multiple', 'several', 'many', 'various', 'both', 'and', 'with', 'together', 'group', 'collection', 'set of']),
+            'complex_sequences': any(keyword in prompt_lower for keyword in
+                ['sequence', 'step by step', 'progression', 'evolution', 'transition', 'morphing', 'transforming', 'then', 'next', 'after', 'before', 'first', 'second', 'third', 'finally']),
+            'interaction_effects': any(keyword in prompt_lower for keyword in
+                ['interact', 'connect', 'relate', 'combine', 'collide', 'bounce', 'between', 'among', 'link', 'join', 'merge', 'split']),
+
+            # Visual complexity
+            'color_schemes': any(keyword in prompt_lower for keyword in
+                ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pink', 'cyan', 'magenta', 'rainbow', 'gradient', 'colorful', 'multicolor']),
+            'text_typography': any(keyword in prompt_lower for keyword in
+                ['text', 'letter', 'word', 'typography', 'font', 'write', 'type', 'label', 'annotation', 'caption']),
+            'spatial_relationships': any(keyword in prompt_lower for keyword in
+                ['above', 'below', 'left', 'right', 'near', 'far', 'inside', 'outside', 'around', 'through', 'along', 'position', 'location', 'place']),
+
+            # Temporal aspects
+            'timing_requirements': any(keyword in prompt_lower for keyword in
+                ['slow', 'fast', 'quick', 'gradual', 'sudden', 'smooth', 'jerky', 'duration', 'seconds', 'minutes', 'timing', 'pace', 'rhythm']),
+            'path_based_motion': any(keyword in prompt_lower for keyword in
+                ['path', 'trajectory', 'orbit', 'circle around', 'follow', 'trace', 'curve', 'wave', 'oscillate']),
+
+            # Advanced features
+            'three_dimensional': any(keyword in prompt_lower for keyword in
+                ['3d', 'three dimensional', 'depth', 'perspective', 'rotate', 'spin', 'cube', 'sphere', 'surface']),
+            'particle_systems': any(keyword in prompt_lower for keyword in
+                ['particle', 'particles', 'system', 'many objects', 'swarm', 'cloud', 'field']),
+            'advanced_animations': any(keyword in prompt_lower for keyword in
+                ['fade', 'appear', 'disappear', 'animate', 'transition', 'effect', 'morph', 'transform', 'grow', 'shrink', 'bounce', 'elastic', 'spring'])
         }
         
-        # Calculate complexity score with weighted indicators
-        base_score = sum(complexity_indicators.values())
-        
-        # Weight certain indicators more heavily
-        weighted_score = base_score
-        if complexity_indicators['mathematical_content']:
-            weighted_score += 2  # Math is complex
-        if complexity_indicators['multiple_objects'] and complexity_indicators['interaction_requirements']:
-            weighted_score += 1  # Multiple interacting objects are complex
-        if complexity_indicators['sequence_requirements'] and complexity_indicators['temporal_aspects']:
-            weighted_score += 1  # Complex timing sequences are complex
-        
-        # Determine complexity level with better thresholds
-        if weighted_score <= 2:
+        # Calculate weighted complexity score
+        weights = {
+            'mathematical_functions': 3,
+            'parametric_equations': 4,
+            'matrices_vectors': 3,
+            'multiple_objects': 2,
+            'complex_sequences': 2,
+            'interaction_effects': 3,
+            'color_schemes': 1,
+            'text_typography': 2,
+            'spatial_relationships': 1,
+            'timing_requirements': 1,
+            'path_based_motion': 2,
+            'three_dimensional': 4,
+            'particle_systems': 3,
+            'advanced_animations': 2
+        }
+
+        weighted_score = sum(weights[indicator] for indicator, present in complexity_indicators.items() if present)
+
+        # Determine complexity level with refined thresholds
+        if weighted_score <= 5:
             complexity_level = 'simple'
-        elif weighted_score <= 4:
+        elif weighted_score <= 12:
             complexity_level = 'moderate'
-        else:
+        elif weighted_score <= 20:
             complexity_level = 'complex'
-        
-        # More conservative enhancement triggering
-        # Only enhance if truly complex or has specific advanced features
+        else:
+            complexity_level = 'very_complex'
+
+        # Enhanced workflow recommendation logic
         requires_enhancement = (
-            weighted_score >= 7 or  # Increased threshold from 5 to 7
-            (complexity_indicators['mathematical_content'] and complexity_indicators['multiple_objects'] and weighted_score >= 4) or  # Math + multiple objects + high score
-            (complexity_indicators['sequence_requirements'] and complexity_indicators['interaction_requirements'] and weighted_score >= 5) or  # Complex sequences + high score
-            (complexity_indicators['animation_effects'] and weighted_score >= 5)  # Animation effects + high score
+            weighted_score >= 10 or  # High complexity threshold
+            complexity_indicators['parametric_equations'] or  # Always enhance 3D/parametric
+            complexity_indicators['three_dimensional'] or  # Always enhance 3D content
+            (complexity_indicators['mathematical_functions'] and complexity_indicators['multiple_objects']) or  # Math + multiple objects
+            (complexity_indicators['complex_sequences'] and complexity_indicators['interaction_effects']) or  # Complex interactions
+            complexity_indicators['particle_systems']  # Particle systems always need enhancement
         )
-        
-        logger.info(f"Prompt complexity analysis: score={weighted_score}, level={complexity_level}, enhance={requires_enhancement}")
-        
+
+        # Determine scene type recommendation
+        scene_type = 'Scene'  # default
+        if complexity_indicators['three_dimensional']:
+            scene_type = 'ThreeDScene'
+        elif complexity_indicators['mathematical_functions'] and not complexity_indicators['parametric_equations']:
+            scene_type = 'GraphScene'
+
+        logger.info(f"Comprehensive complexity analysis: score={weighted_score}, level={complexity_level}, enhance={requires_enhancement}, scene_type={scene_type}")
+
         return {
             'level': complexity_level,
             'score': weighted_score,
             'indicators': complexity_indicators,
             'requires_enhancement': requires_enhancement,
-            'workflow_recommendation': 'enhanced' if requires_enhancement else 'restrictive'
+            'workflow_recommendation': 'enhanced' if requires_enhancement else 'restrictive',
+            'scene_type_recommendation': scene_type,
+            'estimated_duration': self._estimate_animation_duration(weighted_score, complexity_indicators),
+            'recommended_quality': 'high' if weighted_score > 15 else 'medium' if weighted_score > 8 else 'low'
         }
+
+    def _estimate_animation_duration(self, score: int, indicators: Dict[str, bool]) -> float:
+        """Estimate optimal animation duration based on complexity"""
+        base_duration = 5.0
+
+        # Add time for complex features
+        if indicators['mathematical_functions']:
+            base_duration += 3.0
+        if indicators['parametric_equations']:
+            base_duration += 4.0
+        if indicators['complex_sequences']:
+            base_duration += 2.0
+        if indicators['three_dimensional']:
+            base_duration += 3.0
+        if indicators['particle_systems']:
+            base_duration += 2.0
+
+        # Adjust based on overall complexity
+        if score > 20:
+            base_duration *= 1.5
+        elif score > 15:
+            base_duration *= 1.3
+        elif score < 5:
+            base_duration *= 0.8
+
+        return max(3.0, min(base_duration, 15.0))  # Clamp between 3-15 seconds
     
     def _apply_basic_workflow(self, animation_spec: Dict[str, Any], prompt: str = "") -> Dict[str, Any]:
         """Apply basic restrictive workflow (minimal intervention) - IMPROVED VERSION"""
@@ -748,9 +1209,8 @@ class AIService:
     def _generate_manim_code(self, animation_spec: Dict[str, Any]) -> Optional[str]:
         """Generate Manim code from animation specification"""
         try:
-            # Use the existing code generator
-            code_generator = ManimCodeGenerator()
-            return code_generator.generate_manim_code(animation_spec)
+            # Use the enhanced code generator (supports move and move_along_path)
+            return self.code_generator.generate_manim_code(animation_spec)
         except Exception as e:
             logger.error(f"Error generating Manim code: {e}")
             return None
@@ -804,9 +1264,7 @@ class AIService:
             required_components = [
                 'from manim import',
                 'class GeneratedScene',
-                'def construct(self)',
-                'self.add(',
-                'self.play('
+                'def construct(self)'
             ]
             
             for component in required_components:

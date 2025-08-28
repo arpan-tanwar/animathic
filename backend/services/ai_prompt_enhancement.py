@@ -22,6 +22,7 @@ class PromptEnhancementContext:
     has_text_annotations: bool = False
     has_geometric_shapes: bool = False
     has_function_plots: bool = False
+    has_typography_content: bool = False
     overlap_risk_level: str = 'low'
     performance_considerations: str = 'standard'
 
@@ -42,6 +43,32 @@ class AIPromptEnhancementSystem:
         
         # Enhancement templates for different content types
         self.enhancement_templates = {
+            'typography_content': {
+                'letter_positioning': """
+CRITICAL FOR TYPOGRAPHY: When user asks for word/logo animations, ALWAYS create EACH LETTER as separate text object:
+1. Create individual text objects: {"id": "letter_H", "type": "text", "properties": {"text": "H", "position": [-3.0, 0, 0]}}
+2. Use consistent spacing: positions like [-3.0, 0, 0], [-1.8, 0, 0], [-0.6, 0, 0], [0.6, 0, 0], [1.8, 0, 0]
+3. Each letter gets its own animation sequence
+4. NO single text object containing entire word - this is WRONG!
+5. Example for "HELLO": create letter_H, letter_E, letter_L, letter_L, letter_O as separate objects
+""",
+                'logo_transformation': """
+FOR LOGO ANIMATIONS: Google, Facebook, etc.
+1. Start with individual letters positioned horizontally
+2. Use move animations to transform letters into final logo positions
+3. Apply color changes during transformation (e.g., from white to brand colors)
+4. Maintain smooth transitions between states
+5. Use sequential timing for complex transformations
+""",
+                'typography_sequence': """
+Typography animation sequence - ALWAYS FOLLOW THIS:
+1. Individual letters appear first (fade_in or write animations)
+2. Wait for all letters to appear before transformation begins
+3. Apply transformation animations (move, color change) in logical sequence
+4. End with final logo state clearly visible
+5. NEVER put entire word in single text object!
+""",
+            },
             'mathematical_content': {
                 'overlap_prevention': """
 IMPORTANT: When creating multiple graphs or plots:
@@ -177,7 +204,8 @@ PERFORMANCE GUIDANCE (Complex Scene):
             
             logger.info(f"Enhancing prompt with context: {animation_context}")
             
-            # Apply context-specific enhancements
+            # Apply context-specific enhancements (typography first for priority)
+            enhanced_prompt = self._apply_typography_enhancements(enhanced_prompt, animation_context)
             enhanced_prompt = self._apply_mathematical_enhancements(enhanced_prompt, animation_context)
             enhanced_prompt = self._apply_geometric_enhancements(enhanced_prompt, animation_context)
             enhanced_prompt = self._apply_text_enhancements(enhanced_prompt, animation_context)
@@ -202,9 +230,19 @@ PERFORMANCE GUIDANCE (Complex Scene):
         
         context = PromptEnhancementContext()
         
-        # Analyze mathematical content
+        # Analyze mathematical content (exclude typography keywords)
         math_keywords = ['function', 'plot', 'graph', 'equation', 'formula', 'sine', 'cosine', 'tangent', 'exponential', 'polynomial', 'math', 'calculate']
-        context.has_mathematical_content = any(keyword in prompt_lower for keyword in math_keywords)
+        typography_keywords_check = ['typography', 'logo', 'brand', 'letter', 'word', 'font', 'typeface', 'google', 'character', 'glyph', 'symbol', 'emblem', 'monogram', 'insignia']
+
+        # Only mark as mathematical if math keywords are present AND typography keywords are NOT dominant
+        has_math_keywords = any(keyword in prompt_lower for keyword in math_keywords)
+        has_typography_keywords = any(keyword in prompt_lower for keyword in typography_keywords_check)
+
+        # Prioritize typography over mathematical when both are detected
+        if has_typography_keywords and has_math_keywords:
+            context.has_mathematical_content = False  # Typography takes priority
+        else:
+            context.has_mathematical_content = has_math_keywords
         
         # Analyze geometric shapes
         shape_keywords = ['circle', 'square', 'triangle', 'diamond', 'star', 'hexagon', 'rectangle', 'ellipse', 'shape', 'geometric']
@@ -213,6 +251,26 @@ PERFORMANCE GUIDANCE (Complex Scene):
         # Analyze text annotations
         text_keywords = ['text', 'label', 'annotation', 'name', 'title', 'caption', 'description']
         context.has_text_annotations = any(keyword in prompt_lower for keyword in text_keywords)
+
+        # Analyze typography content (logos, letters, branding) - MORE AGGRESSIVE DETECTION
+        typography_keywords = [
+            'typography', 'logo', 'brand', 'letter', 'word', 'font', 'typeface',
+            'google', 'logo', 'brand', 'morph', 'transform', 'rearrange', 'evolve',
+            'character', 'glyph', 'symbol', 'emblem', 'monogram', 'insignia',
+            'each letter', 'individual letter', 'separate letter', 'letter by letter',
+            'spelling', 'spell out', 'text animation', 'letter animation'
+        ]
+        context.has_typography_content = any(keyword in prompt_lower for keyword in typography_keywords)
+
+        # Additional check for explicit typography patterns
+        if not context.has_typography_content:
+            # Check for patterns like "word X where each letter..."
+            if 'word' in prompt_lower and ('letter' in prompt_lower or 'each' in prompt_lower):
+                context.has_typography_content = True
+            # Check for brand/logo names that are likely typography
+            brand_names = ['google', 'facebook', 'apple', 'microsoft', 'amazon', 'netflix', 'youtube']
+            if any(brand in prompt_lower for brand in brand_names):
+                context.has_typography_content = True
         
         # Analyze animation effects
         animation_keywords = ['fade', 'appear', 'disappear', 'animate', 'transition', 'effect', 'morph', 'transform', 'sequence']
@@ -261,21 +319,42 @@ PERFORMANCE GUIDANCE (Complex Scene):
         
         return context
     
+    def _apply_typography_enhancements(self, prompt: str, context: PromptEnhancementContext) -> str:
+        """Apply typography content enhancements"""
+        if not context.has_typography_content:
+            return prompt
+
+        enhanced_prompt = prompt
+
+        # Add typography letter positioning guidance
+        enhanced_prompt += self.enhancement_templates['typography_content']['letter_positioning']
+
+        # Add logo transformation guidance for complex typography
+        if 'logo' in prompt.lower() or 'transform' in prompt.lower():
+            enhanced_prompt += self.enhancement_templates['typography_content']['logo_transformation']
+
+        # Add typography sequence guidance
+        if context.has_sequence_requirements or context.has_animation_effects:
+            enhanced_prompt += self.enhancement_templates['typography_content']['typography_sequence']
+
+        logger.info("Applied typography content enhancements")
+        return enhanced_prompt
+
     def _apply_mathematical_enhancements(self, prompt: str, context: PromptEnhancementContext) -> str:
         """Apply mathematical content enhancements"""
         if not context.has_mathematical_content:
             return prompt
-        
+
         enhanced_prompt = prompt
-        
+
         # Add mathematical overlap prevention
         if context.overlap_risk_level in ['medium', 'high']:
             enhanced_prompt += self.enhancement_templates['mathematical_content']['overlap_prevention']
-        
+
         # Add mathematical sequence guidance
         if context.has_sequence_requirements:
             enhanced_prompt += self.enhancement_templates['mathematical_content']['sequence_guidance']
-        
+
         logger.info("Applied mathematical content enhancements")
         return enhanced_prompt
     

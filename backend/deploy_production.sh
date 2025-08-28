@@ -71,15 +71,22 @@ except Exception as e:
 # Test basic functionality
 echo "🧪 Testing basic functionality..."
 python -c "
-from services.ai_service_new import AIService
+from services.manim_api_docs import ManimAPIDocumentationSystem
+from services.enhanced_manim_generator import EnhancedManimCodeGenerator
 from services.clerk_auth import ClerkAuthService
 from services.supabase_storage import SupabaseStorageService
 
 try:
-    ai_service = AIService()
+    # Test enhanced workflow components
+    manim_docs = ManimAPIDocumentationSystem()
+    code_generator = EnhancedManimCodeGenerator(manim_docs)
+    
+    # Test old services for compatibility
     clerk_service = ClerkAuthService()
     storage_service = SupabaseStorageService()
+    
     print('✅ All services initialized successfully')
+    print(f'✅ Enhanced workflow: {len(manim_docs.symbol_registry)} Manim symbols available')
 except Exception as e:
     print(f'❌ Service initialization failed: {e}')
     exit(1)

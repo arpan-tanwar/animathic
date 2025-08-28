@@ -55,7 +55,7 @@ class MonitoringConfig:
     correction_strategies: List[str] = field(default_factory=lambda: [
         'reposition', 'fade_out', 'scale_adjust', 'timing_adjust'
     ])
-    max_concurrent_corrections: int = 3
+    max_concurrent_corrections: int = 10  # Increased for typography animations
     correction_timeout: float = 5.0  # Timeout for correction operations
 
 
@@ -156,28 +156,41 @@ class RealTimeOverlapMonitor:
             logger.error(f"Failed to remove object {obj_id}: {e}")
     
     def _monitoring_loop(self) -> None:
-        """Main monitoring loop"""
+        """Main monitoring loop with optimized performance"""
         try:
+            consecutive_empty_checks = 0
+            max_consecutive_empty = 10  # Stop monitoring after 10 empty checks
+
             while self.monitoring_active:
                 start_time = time.time()
-                
+
                 # Check for overlaps
                 overlaps = self._check_current_overlaps()
-                
+
                 # Process detected overlaps
-                for overlap in overlaps:
-                    self._process_overlap(overlap)
-                
+                if overlaps:
+                    consecutive_empty_checks = 0
+                    for overlap in overlaps:
+                        self._process_overlap(overlap)
+                else:
+                    consecutive_empty_checks += 1
+
                 # Update monitoring stats
                 self.monitoring_stats['total_checks'] += 1
                 self.monitoring_stats['last_check_time'] = start_time
-                
+
+                # Auto-stop monitoring if no overlaps detected for extended period
+                if consecutive_empty_checks >= max_consecutive_empty:
+                    logger.info("No overlaps detected for extended period, stopping monitoring")
+                    self.monitoring_active = False
+                    break
+
                 # Wait for next check interval
                 elapsed = time.time() - start_time
                 sleep_time = max(0, self.config.check_interval - elapsed)
                 if sleep_time > 0:
                     time.sleep(sleep_time)
-                    
+
         except Exception as e:
             logger.error(f"Error in monitoring loop: {e}")
             self.monitoring_active = False
@@ -215,7 +228,9 @@ class RealTimeOverlapMonitor:
                         
                         if overlap_area > self.config.overlap_threshold:
                             # Determine severity
-                            severity = self._determine_overlap_severity(overlap_area, distance, combined_size)
+                            severity = self._determine_overlap_severity(overlap_area, distance, combined_size, type1, type2)
+
+
                             
                             # Create overlap event
                             overlap_event = OverlapEvent(
@@ -275,11 +290,24 @@ class RealTimeOverlapMonitor:
             logger.error(f"Error calculating overlap area: {e}")
             return 0.0
     
-    def _determine_overlap_severity(self, overlap_area: float, distance: float, combined_size: float) -> OverlapSeverity:
+    def _determine_overlap_severity(self, overlap_area: float, distance: float, combined_size: float, obj1_type: str = "", obj2_type: str = "") -> OverlapSeverity:
         """Determine the severity of an overlap"""
         try:
             overlap_ratio = overlap_area / (combined_size ** 2 * math.pi)
-            
+
+            # Special handling for typography animations (text objects close together)
+            if obj1_type.lower() in ['text', 'letter'] and obj2_type.lower() in ['text', 'letter']:
+                # Letters in typography animations can be much closer without being critical
+                if overlap_ratio > 0.95:
+                    return OverlapSeverity.CRITICAL
+                elif overlap_ratio > 0.8:
+                    return OverlapSeverity.HIGH
+                elif overlap_ratio > 0.6:
+                    return OverlapSeverity.MEDIUM
+                else:
+                    return OverlapSeverity.LOW
+
+            # Standard thresholds for other object types
             if overlap_ratio > 0.8:
                 return OverlapSeverity.CRITICAL
             elif overlap_ratio > 0.5:
@@ -288,7 +316,7 @@ class RealTimeOverlapMonitor:
                 return OverlapSeverity.MEDIUM
             else:
                 return OverlapSeverity.LOW
-                
+
         except Exception as e:
             logger.error(f"Error determining overlap severity: {e}")
             return OverlapSeverity.MEDIUM
@@ -322,7 +350,9 @@ class RealTimeOverlapMonitor:
         try:
             # Log overlap event
             if self.config.logging:
-                logger.warning(f"Overlap detected: {overlap.object1_id} ({overlap.object1_type}) and {overlap.object2_id} ({overlap.object2_type}) - Severity: {overlap.severity.value}")
+                # Only log critical overlaps or every 10th overlap to reduce log spam
+                if overlap.severity.value == 'critical' or self.monitoring_stats['overlaps_detected'] % 10 == 0:
+                    logger.warning(f"Overlap detected: {overlap.object1_id} ({overlap.object1_type}) and {overlap.object2_id} ({overlap.object2_type}) - Severity: {overlap.severity.value}")
             
             # Add to overlap history
             self.overlap_history.append(overlap)
@@ -340,9 +370,7 @@ class RealTimeOverlapMonitor:
             if self.config.auto_correct and overlap.severity == OverlapSeverity.CRITICAL:
                 # Only for truly critical overlaps
                 self._schedule_correction(overlap)
-            elif self.config.auto_correct and overlap.severity == OverlapSeverity.HIGH and overlap.object1_type in ['text', 'label'] or overlap.object2_type in ['text', 'label']:
-                # Only auto-correct high severity text overlaps
-                self._schedule_correction(overlap)
+
             
         except Exception as e:
             logger.error(f"Error processing overlap: {e}")
